@@ -8189,9 +8189,9 @@ function normalizeArabic(s) {
 let currentUser = null;
 const ROLE_LABELS = { admin: 'مدير النظام', accountant: 'محاسب', sales: 'موظف مبيعات' };
 const PERMISSIONS = {
-  admin: ['dashboard','customers','issuances','invoices','payments','transfers','suppliers','inventory','expenses','reports','users','audit','settings'],
-  accountant: ['dashboard','customers','issuances','invoices','payments','transfers','suppliers','expenses','reports'],
-  sales: ['dashboard','customers','issuances','invoices','payments','inventory']
+  admin: ['dashboard','customers','issuances','invoices','payments','transfers','suppliers','inventory','expenses','reports','aiassistant','users','audit','settings'],
+  accountant: ['dashboard','customers','issuances','invoices','payments','transfers','suppliers','expenses','reports','aiassistant'],
+  sales: ['dashboard','customers','issuances','invoices','payments','inventory','aiassistant']
 };
 function can(page) { return currentUser && PERMISSIONS[currentUser.role].includes(page); }
 
