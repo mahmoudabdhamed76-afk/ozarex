@@ -46,7 +46,7 @@
    عشان البرنامج يفتح على رابط Railway مباشرة:
        https://your-app.up.railway.app/
    مش على:
-       https://your-app.up.railway.app/EmdadX-ERP/
+       https://your-app.up.railway.app/Ozarex/
 
 (5) في تاب "Volumes":
     أضف Volume جديد:
@@ -66,17 +66,17 @@
    الـ Deployment على Synology (Container Manager)
 ==============================================================
 
-(1) ارفع الملفات لـ /docker/emdadx-erp على Synology
+(1) ارفع الملفات لـ /docker/ozarex-erp على Synology
 
 (2) افتح Container Manager → Project → Create
-    - Project name: emdadx-erp
-    - Path: /docker/emdadx-erp
+    - Project name: ozarex-erp
+    - Path: /docker/ozarex-erp
     - Source: Use existing docker-compose.yml
 
 (3) اضغط Next → Done
 
 (4) لما يخلص، افتح:
-       http://[IP-السينولوجي]:8787/EmdadX-ERP
+       http://[IP-السينولوجي]:8787/Ozarex
 
 ==============================================================
    التشغيل اللوكال على الكمبيوتر
@@ -89,13 +89,13 @@
        node backend/server.js
 
 (3) افتح:
-       http://localhost:8787/EmdadX-ERP
+       http://localhost:8787/Ozarex
 
 ==============================================================
    هيكل المشروع
 ==============================================================
 
-emdadx-final/
+ozarex-erp/
 ├── backend/
 │   ├── server.js         السيرفر الرئيسي
 │   ├── db/
@@ -107,7 +107,7 @@ emdadx-final/
 │   └── public/
 │       └── index.html        الواجهة الكاملة
 ├── data/                     قاعدة البيانات (بتتعمل تلقائياً)
-│   └── emdadx.db
+│   └── ozarex.db
 ├── Dockerfile
 ├── docker-compose.yml
 ├── railway.json              إعداد Railway
@@ -121,7 +121,7 @@ emdadx-final/
 |-----------|-------------|----------------|-------------|
 | PORT      | auto        | 8787           | 8787        |
 | HOST      | 0.0.0.0     | 0.0.0.0        | 0.0.0.0     |
-| APP_PATH  | '' (فاضي)   | /EmdadX-ERP    | /EmdadX-ERP |
+| APP_PATH  | '' (فاضي)   | /Ozarex    | /Ozarex |
 | DATA_DIR  | /app/data   | /app/data      | (تلقائي)    |
 
 ==============================================================

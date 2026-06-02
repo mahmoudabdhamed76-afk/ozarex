@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>نظام إدارة أوزاريكس للحلول الطبية - ERP</title>
+<title>نظام إدارة أوزاريكس - ERP</title>
 
 <!-- PWA: install to home screen with company logo -->
 <link rel="manifest" href="manifest.json">
@@ -4536,6 +4536,24 @@ table.data-table tbody tr:last-child td { border-bottom: none; }
   box-shadow: 0 2px 5px rgba(234,88,12,.40);
   letter-spacing: -0.2px;
 }
+/* Notes count badge on the new topbar notes icon (next to notifications) */
+#notes-icon-btn .qa-notes-count {
+  position: absolute;
+  top: -3px;
+  inset-inline-end: -3px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  background: linear-gradient(135deg, #ea580c, #c2410c);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(234,88,12,.45);
+}
 .topbar-qa-btn.topbar-qa-notes {
   background: linear-gradient(135deg, rgba(245,158,11,.10), rgba(234,88,12,.06));
   border-color: rgba(245,158,11,.30);
@@ -7636,51 +7654,8 @@ body.mobile-drawer-open { overflow: hidden; }
   .dash-row > *, .dash-row-3 > * { min-width: 0 !important; }
 }
 
-/* 🎯 Quick actions → floating button. Applies up to 1024px so tablets
-   don't show the buttons crammed into the topbar. Notes only; currency desktop-only. */
-@media (max-width: 1024px) {
-  .topbar-quick-actions {
-    position: fixed !important;
-    bottom: 18px !important;
-    inset-inline-start: 16px !important;
-    inset-inline-end: auto !important;
-    top: auto !important;
-    z-index: 900 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 10px !important;
-    background: transparent !important;
-    width: auto !important;
-  }
-  .topbar-qa-currency { display: none !important; }
-  .topbar-qa-btn {
-    width: 52px !important;
-    height: 52px !important;
-    border-radius: 50% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: 0 4px 16px rgba(0,0,0,.3) !important;
-    background: var(--primary, #10b981) !important;
-    color: #fff !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    position: relative !important;
-  }
-  .topbar-qa-btn span:not(.qa-notes-count) { display: none !important; }
-  .topbar-qa-btn svg { width: 22px !important; height: 22px !important; color: #fff !important; }
-  .topbar-qa-btn .qa-notes-count {
-    position: absolute !important;
-    top: -4px !important; inset-inline-end: -4px !important;
-    background: var(--danger, #ef4444) !important;
-    color: #fff !important;
-    min-width: 20px !important; height: 20px !important;
-    border-radius: 999px !important;
-    font-size: 11px !important; font-weight: 800 !important;
-    display: flex !important; align-items: center !important; justify-content: center !important;
-    padding: 0 5px !important;
-  }
-}
+/* Notes icon button sits next to notifications in the topbar (all screen sizes) */
+#notes-icon-btn { display: inline-flex !important; }
 
 </style>
 </head>
@@ -7698,7 +7673,7 @@ body.mobile-drawer-open { overflow: hidden; }
     <div class="login-logo login-logo-svg">
       <img src="icons/logo-square.png" alt="Ozarex" style="width:100%;height:100%;object-fit:cover;border-radius:14px">
     </div>
-    <h1>أوزاريكس للحلول الطبية</h1>
+    <h1>أوزاريكس</h1>
     <p class="sub">نظام إدارة التوريدات والمحاسبة المتكامل</p>
     <form id="login-form">
       <div class="form-group">
@@ -7723,7 +7698,7 @@ body.mobile-drawer-open { overflow: hidden; }
     <div class="sidebar-brand">
       <div>
         <div class="brand-name">أوزاريكس</div>
-        <div class="brand-sub">للحلول الطبية</div>
+        <div class="brand-sub">نظام الإدارة</div>
       </div>
       <div class="brand-logo brand-logo-svg" aria-label="Ozarex">
         <img src="icons/logo-square.png" alt="Ozarex" style="width:100%;height:100%;object-fit:cover;border-radius:12px">
@@ -7741,7 +7716,7 @@ body.mobile-drawer-open { overflow: hidden; }
     <div class="company-banner">
       <div class="banner-inner">
         <img class="banner-icon" src="icons/logo-square.png" alt="Ozarex" style="width:26px;height:26px;border-radius:6px;object-fit:cover">
-        <span class="banner-name">أوزاريكس للحلول الطبية</span>
+        <span class="banner-name">أوزاريكس</span>
         <span class="banner-tag">OZAREX • For Medical Solution</span>
       </div>
     </div>
@@ -7750,21 +7725,6 @@ body.mobile-drawer-open { overflow: hidden; }
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <div class="topbar-title" id="topbar-title">لوحة التحكم</div>
-
-      <!-- Quick Actions: between title and home -->
-      <div class="topbar-quick-actions">
-        <button class="topbar-qa-btn topbar-qa-notes" onclick="openNotesPanel()" title="الملاحظات السريعة">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="9" y1="13" x2="15" y2="13"/>
-            <line x1="9" y1="17" x2="15" y2="17"/>
-            <line x1="9" y1="9" x2="11" y2="9"/>
-          </svg>
-          <span>ملاحظاتي</span>
-          <span class="qa-notes-count" id="qa-notes-count" style="display:none">0</span>
-        </button>
-      </div>
 
       <div class="topbar-spacer"></div>
       <button class="icon-btn topbar-home-btn" id="topbar-home-btn" onclick="navigate('dashboard')" title="العودة للصفحة الرئيسية" style="display:none">
@@ -7791,6 +7751,16 @@ body.mobile-drawer-open { overflow: hidden; }
         <span class="pulse-dot"></span>
         <span id="reciter-label-inline">▶ سورة يوسف</span>
       </div>
+      <button class="icon-btn" id="notes-icon-btn" onclick="openNotesPanel()" title="الملاحظات السريعة" style="position:relative">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="9" y1="13" x2="15" y2="13"/>
+          <line x1="9" y1="17" x2="15" y2="17"/>
+          <line x1="9" y1="9" x2="11" y2="9"/>
+        </svg>
+        <span class="qa-notes-count" id="qa-notes-count" style="display:none">0</span>
+      </button>
       <button class="icon-btn" id="notif-btn" onclick="openNotifications()" title="الإشعارات">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="notif-dot" id="notif-dot" style="display:none"></span>
@@ -7800,7 +7770,7 @@ body.mobile-drawer-open { overflow: hidden; }
     <div class="page-content" id="page-content"></div>
 
     <footer class="app-footer">
-      <div>جميع الحقوق محفوظة © 2026 أوزاريكس للحلول الطبية</div>
+      <div>جميع الحقوق محفوظة © 2026 أوزاريكس</div>
       <div class="version">الإصدار 2.1.0</div>
     </footer>
   </div>
@@ -7873,9 +7843,9 @@ body.mobile-drawer-open { overflow: hidden; }
 /* =========================================================
    DATA LAYER (LocalStorage) - Robust with auto-backup rotation
 ========================================================= */
-const STORAGE_KEY = 'emdadx_erp_v1';
-const SESSION_KEY = 'emdadx_session';
-const BACKUP_KEY_PREFIX = 'emdadx_erp_backup_';
+const STORAGE_KEY = 'ozarex_erp_v1';
+const SESSION_KEY = 'ozarex_session';
+const BACKUP_KEY_PREFIX = 'ozarex_erp_backup_';
 const MAX_BACKUPS = 5;
 
 /* =========================================================
@@ -7887,7 +7857,7 @@ const MAX_BACKUPS = 5;
 function detectApiBase() {
   const origin = window.location.origin; // e.g. https://erp.example.com
   const p = window.location.pathname || '/';
-  const m = p.match(/^(\/EmdadX-ERP)(\/|$)/);
+  const m = p.match(/^(\/Ozarex)(\/|$)/);
   const prefix = m ? m[1] : '';
   return origin + prefix;
 }
@@ -8013,7 +7983,7 @@ function seedData() {
     employees: [],
     salaryRuns: [],
     settings: {
-      companyName: 'أوزاريكس للحلول الطبية',
+      companyName: 'أوزاريكس',
       companyAddress: '',
       companyPhone: '',
       taxNumber: '',
@@ -8389,7 +8359,7 @@ function renderSidebar() {
     }
     if (it.key === 'audit' && currentUser.role === 'admin') {
       // Count audit entries NOT yet seen by the admin
-      const lastSeen = parseInt(localStorage.getItem('emdadx_audit_seen_ts') || '0');
+      const lastSeen = parseInt(localStorage.getItem('ozarex_audit_seen_ts') || '0');
       const unread = (DB.data.auditLog || []).filter(e => e.timestamp > lastSeen).length;
       if (unread > 0) badge = `<span class="badge badge-audit">${unread > 99 ? '99+' : unread}</span>`;
     }
@@ -8723,7 +8693,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   if (!DB.load()) seedData();
   // Ensure latest schema bits exist
-  if (!DB.data.settings) DB.data.settings = { companyName:'أوزاريكس للحلول الطبية', taxRate:0, currency:'جنيه', soundEnabled: true };
+  if (!DB.data.settings) DB.data.settings = { companyName:'أوزاريكس', taxRate:0, currency:'جنيه', soundEnabled: true };
   if (DB.data.settings.soundEnabled === undefined) DB.data.settings.soundEnabled = true;
   if (!DB.data.counters) DB.data.counters = { invoice: 1000, issuance: 1000, purchase: 1000 };
   if (!DB.data.counters.issuance) DB.data.counters.issuance = 1000;
@@ -13259,7 +13229,7 @@ let _ratesCache = null;
 async function getCurrencyRates() {
   // Try cached rates first
   try {
-    const raw = localStorage.getItem('emdadx_currency_rates');
+    const raw = localStorage.getItem('ozarex_currency_rates');
     if (raw) {
       const cached = JSON.parse(raw);
       const age = Date.now() - cached.fetchedAt;
@@ -13292,7 +13262,7 @@ async function getCurrencyRates() {
     rates.GBP_to_EGP = (data.rates.EGP || 0) / (data.rates.GBP || 1);
     rates.SAR_to_EGP = (data.rates.EGP || 0) / (data.rates.SAR || 1);
     rates.AED_to_EGP = (data.rates.EGP || 0) / (data.rates.AED || 1);
-    try { localStorage.setItem('emdadx_currency_rates', JSON.stringify(rates)); } catch (e) {}
+    try { localStorage.setItem('ozarex_currency_rates', JSON.stringify(rates)); } catch (e) {}
     _ratesCache = rates;
     return rates;
   } catch (err) {
@@ -16841,7 +16811,7 @@ async function getClientIP() {
   if (_clientIPCache) return _clientIPCache;
   // Try cached from previous session
   try {
-    const cached = localStorage.getItem('emdadx_client_ip');
+    const cached = localStorage.getItem('ozarex_client_ip');
     if (cached) {
       const obj = JSON.parse(cached);
       if (Date.now() - obj.ts < 6 * 60 * 60 * 1000) { // 6h cache
@@ -16858,7 +16828,7 @@ async function getClientIP() {
     if (resp.ok) {
       const data = await resp.json();
       _clientIPCache = data.ip || 'محلي';
-      try { localStorage.setItem('emdadx_client_ip', JSON.stringify({ ip: _clientIPCache, ts: Date.now() })); } catch (e) {}
+      try { localStorage.setItem('ozarex_client_ip', JSON.stringify({ ip: _clientIPCache, ts: Date.now() })); } catch (e) {}
       return _clientIPCache;
     }
   } catch (e) {
@@ -16993,7 +16963,7 @@ function logAudit(opts) {
 /* When admin opens the audit page, mark all current entries as "seen" */
 function markAuditAsSeen() {
   try {
-    localStorage.setItem('emdadx_audit_seen_ts', String(Date.now()));
+    localStorage.setItem('ozarex_audit_seen_ts', String(Date.now()));
   } catch (e) {}
   if (typeof renderSidebar === 'function') renderSidebar();
 }
@@ -18149,11 +18119,11 @@ function buildBackupEnvelope() {
   return payload;
 }
 
-/* Pretty filename: emdadx_backup_2026-05-23_14-32.json */
+/* Pretty filename: ozarex_backup_2026-05-23_14-32.json */
 function backupFilename() {
   const d = new Date();
   const pad = n => String(n).padStart(2, '0');
-  return `emdadx_backup_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}.json`;
+  return `ozarex_backup_${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}.json`;
 }
 
 function exportBackup() {
@@ -18169,7 +18139,7 @@ function exportBackup() {
     URL.revokeObjectURL(url);
     const sizeKB = (data.length / 1024).toFixed(1);
     // Track last backup date
-    try { localStorage.setItem('emdadx_last_backup', new Date().toISOString()); } catch (e) {}
+    try { localStorage.setItem('ozarex_last_backup', new Date().toISOString()); } catch (e) {}
     refreshBackupReminder();
     toast(`تم تصدير النسخة الاحتياطية (${envelope.summary.total_records} سجل، ${sizeKB} KB)`);
   } catch (err) {
@@ -18183,7 +18153,7 @@ function refreshBackupReminder() {
   const banner = document.getElementById('backup-reminder-banner');
   if (!banner) return;
   let last;
-  try { last = localStorage.getItem('emdadx_last_backup'); } catch (e) {}
+  try { last = localStorage.getItem('ozarex_last_backup'); } catch (e) {}
   if (!last) {
     // Never backed up - show banner
     banner.style.display = 'flex';
@@ -18201,14 +18171,14 @@ function refreshBackupReminder() {
 
 function dismissBackupReminder() {
   // Snooze for 24h
-  try { localStorage.setItem('emdadx_backup_snooze', String(Date.now() + 24*60*60*1000)); } catch (e) {}
+  try { localStorage.setItem('ozarex_backup_snooze', String(Date.now() + 24*60*60*1000)); } catch (e) {}
   const banner = document.getElementById('backup-reminder-banner');
   if (banner) banner.style.display = 'none';
 }
 
 function checkBackupSnooze() {
   let snooze;
-  try { snooze = parseInt(localStorage.getItem('emdadx_backup_snooze') || '0'); } catch (e) { snooze = 0; }
+  try { snooze = parseInt(localStorage.getItem('ozarex_backup_snooze') || '0'); } catch (e) { snooze = 0; }
   return snooze > Date.now();
 }
 

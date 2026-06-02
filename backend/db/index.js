@@ -13,7 +13,7 @@ try {
 
 // Allow override via DATA_DIR env var (important for Railway/Docker volume mounts)
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', '..', 'data');
-const DB_FILE  = path.join(DATA_DIR, 'emdadx.db');
+const DB_FILE  = path.join(DATA_DIR, 'ozarex.db');
 const SCHEMA   = path.join(__dirname, 'schema.sql');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });

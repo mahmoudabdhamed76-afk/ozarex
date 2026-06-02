@@ -20,7 +20,7 @@ const { exportBlob, importBlob, defaultBlob } = require('./src/bridge');
 const PORT      = Number(process.env.PORT) || 8787;
 const HOST      = process.env.HOST || '0.0.0.0';
 // APP_PATH can be overridden; on Railway with a custom domain, set APP_PATH=''
-const APP_PATH  = process.env.APP_PATH !== undefined ? process.env.APP_PATH : '/EmdadX-ERP';
+const APP_PATH  = process.env.APP_PATH !== undefined ? process.env.APP_PATH : '/Ozarex';
 const PUBLIC    = process.env.PUBLIC_DIR || path.join(__dirname, '..', 'frontend', 'public');
 const MAX_BACKUPS = 20;
 
@@ -173,7 +173,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log('====================================');
-  console.log('  EmdadX ERP Server');
+  console.log('  Ozarex ERP Server');
   console.log('====================================');
   console.log('  Listening: ' + HOST + ':' + PORT);
   console.log('  Database : ' + DB_FILE);
