@@ -7538,23 +7538,30 @@ body.mobile-drawer-open { overflow: hidden; }
   /* Toasts compact */
   .toast-container {
     position: fixed !important;
-    top: 55px !important;
-    inset-inline-start: 10px !important;
-    inset-inline-end: 10px !important;
-    left: 10px !important;
-    right: 10px !important;
-    width: auto !important;
-    max-width: none !important;
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    inset-inline-start: auto !important;
+    inset-inline-end: auto !important;
+    transform: translate(-50%, -50%) !important;
+    width: 88vw !important;
+    max-width: 360px !important;
     z-index: 2000;
     pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
   .toast {
     width: 100%;
-    margin-bottom: 6px;
-    font-size: 13px;
-    padding: 10px 12px;
-    border-radius: 8px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    padding: 14px 16px;
+    border-radius: 12px;
     pointer-events: auto;
+    box-shadow: 0 8px 28px rgba(0,0,0,.35);
+    text-align: center;
+    justify-content: center;
   }
 
   /* Tabs scroll horizontally */
@@ -12822,12 +12829,28 @@ function buildInvoiceHTML(inv, opts) {
       ${prefix}.totals-box .row{display:flex;justify-content:space-between;padding:10px 16px;font-size:14px}
       ${prefix}.totals-box .paid{color:#15803d;font-weight:700;background:#f0fdf4}
       ${prefix}.totals-box .due{color:#1e293b;font-weight:800;background:#fef9e7}
-      ${prefix}.signs{display:flex;flex-direction:column;gap:34px;margin-top:30px;width:300px}
+      ${prefix}.signs{display:flex;flex-direction:column;gap:30px;margin-top:28px;width:300px}
       ${prefix}.signs .sig{border-top:1.5px solid #1e293b;padding-top:6px;font-weight:800;font-size:14px;color:${NAVY};width:240px}
-      ${prefix}.footer{margin-top:40px;text-align:center;color:#64748b;font-size:12px;padding-top:16px}
+      ${prefix}.footer{margin-top:32px;text-align:center;color:#64748b;font-size:12px;padding-top:16px}
       ${prefix}.footer .thanks{font-size:13px;color:#94a3b8;margin-bottom:6px}
       ${prefix}.footer .fcompany{font-size:15px;color:${NAVY};font-weight:800}
-      @media print{body{padding:0} @page{margin:8mm}}
+      ${prefix}.wrap, ${prefix}.frame, ${prefix}table, ${prefix}.totals, ${prefix}.signs, ${prefix}.info-grid { page-break-inside: avoid; break-inside: avoid; }
+      @media print{
+        html,body{padding:0 !important;margin:0 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        ${prefix}.wrap{max-width:100%;border-width:2px}
+        ${prefix}.frame{margin:4px;padding:18px 22px 22px}
+        ${prefix}.top{padding-bottom:12px;margin-bottom:14px}
+        ${prefix}.top .logo{max-height:80px;margin-bottom:8px}
+        ${prefix}.top h1{font-size:24px}
+        ${prefix}.invoice-title{padding:10px;margin-bottom:16px;font-size:16px}
+        ${prefix}.info-grid{margin-bottom:16px;gap:12px}
+        ${prefix}.info-grid .box{padding:12px 14px}
+        ${prefix}table{margin-bottom:14px}
+        ${prefix}table th,${prefix}table td{padding:9px}
+        ${prefix}.signs{margin-top:20px;gap:24px}
+        ${prefix}.footer{margin-top:22px;padding-top:12px}
+        @page{margin:6mm;size:A4}
+      }
   `;
   const body = `
     <div class="wrap">
