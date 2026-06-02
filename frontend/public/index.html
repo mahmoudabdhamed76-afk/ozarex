@@ -4372,10 +4372,12 @@ table.data-table tbody tr:last-child td { border-bottom: none; }
 
 /* ===== BASE / BODY ===== */
 [data-theme="dark"] body {
-  background: var(--bg);
+  background: #0c0709;
   background-image:
-    radial-gradient(circle at 12% 20%, rgba(20,184,166,.04) 0%, transparent 35%),
-    radial-gradient(circle at 88% 80%, rgba(139,92,246,.04) 0%, transparent 35%);
+    radial-gradient(circle at 15% 12%, rgba(219,32,51,.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 18%, rgba(124,58,237,.05) 0%, transparent 42%),
+    radial-gradient(circle at 50% 95%, rgba(239,68,88,.05) 0%, transparent 45%),
+    linear-gradient(180deg, #0c0709 0%, #14090c 55%, #0c0709 100%);
   background-attachment: fixed;
 }
 
@@ -7760,6 +7762,53 @@ body.mobile-drawer-open { overflow: hidden; }
   .qa-section-head { font-size: 15px; }
 }
 
+/* ===================== AI ASSISTANT ===================== */
+.ai-chat-wrap {
+  display: flex; flex-direction: column;
+  max-width: 880px; margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px; overflow: hidden;
+  box-shadow: var(--shadow); min-height: 60vh;
+}
+.ai-chat-messages {
+  flex: 1; padding: 20px;
+  display: flex; flex-direction: column; gap: 14px;
+  overflow-y: auto; max-height: 56vh;
+}
+.ai-msg { display: flex; gap: 10px; align-items: flex-end; max-width: 85%; }
+.ai-msg-bot { align-self: flex-start; }
+.ai-msg-user { align-self: flex-end; flex-direction: row-reverse; }
+.ai-avatar {
+  width: 38px; height: 38px; flex-shrink: 0; border-radius: 50%;
+  background: linear-gradient(135deg, #ef4458, #db2033);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px; box-shadow: 0 4px 12px rgba(219,32,51,.4);
+}
+.ai-bubble { padding: 13px 16px; border-radius: 16px; font-size: 14.5px; line-height: 1.7; font-weight: 600; }
+.ai-msg-bot .ai-bubble { background: var(--surface-2); color: var(--text); border-bottom-left-radius: 4px; }
+.ai-msg-user .ai-bubble { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; border-bottom-right-radius: 4px; }
+.ai-suggestions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 20px 14px; }
+.ai-chip {
+  padding: 8px 14px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text); font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all .18s ease;
+}
+.ai-chip:hover { background: rgba(239,68,88,.12); border-color: #ef4458; color: #db2033; transform: translateY(-2px); }
+.ai-input-bar { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--border); background: var(--bg-soft); }
+.ai-input-bar .form-control { flex: 1; }
+.ai-typing-dots { display: inline-flex; gap: 4px; align-items: center; }
+.ai-typing-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); animation: aiTyping 1.2s infinite ease-in-out; }
+.ai-typing-dots span:nth-child(2) { animation-delay: .2s; }
+.ai-typing-dots span:nth-child(3) { animation-delay: .4s; }
+@keyframes aiTyping { 0%, 60%, 100% { transform: translateY(0); opacity: .4; } 30% { transform: translateY(-5px); opacity: 1; } }
+@media (max-width: 768px) {
+  .ai-msg { max-width: 92%; }
+  .ai-chat-messages { max-height: 50vh; padding: 14px; }
+  .ai-bubble { font-size: 14px; }
+}
+
 </style>
 </head>
 <body>
@@ -8426,6 +8475,7 @@ const NAV_ITEMS = [
   { key: 'inventory', label: 'المخازن', color: '#84cc16', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>', section: 'ops' },
   { key: 'expenses', label: 'المصروفات', color: '#ef4444', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>', section: 'ops' },
   { key: 'reports', label: 'التقارير', color: '#a855f7', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>', section: 'ops' },
+  { key: 'aiassistant', label: 'المساعد الذكي', color: '#ef4458', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>', section: 'ops' },
   { key: 'users', label: 'المستخدمين', color: '#14b8a6', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', section: 'admin' },
   { key: 'audit', label: 'سجل التعديلات', color: '#dc2626', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>', section: 'admin' },
   { key: 'settings', label: 'الإعدادات', color: '#64748b', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>', section: 'admin' }
@@ -8492,7 +8542,7 @@ function navigate(page) {
   toggleSidebar(false);
   const titles = { dashboard:'لوحة التحكم', customers:'العملاء والمراكز', issuances:'صرف الورق للمراكز', invoices:'الفواتير', payments:'التحصيل والمديونيات', transfers:'التحويلات البنكية', suppliers:'الموردين', inventory:'إدارة المخازن', expenses:'المصروفات', reports:'التقارير', users:'إدارة المستخدمين', audit:'سجل التعديلات الذكي', settings:'الإعدادات' };
   document.getElementById('topbar-title').innerText = titles[page] || '';
-  const renderers = { dashboard: renderDashboard, customers: renderCustomers, issuances: renderIssuances, invoices: renderInvoices, payments: renderPayments, transfers: renderTransfersPage, suppliers: renderSuppliers, inventory: renderInventory, expenses: renderExpenses, reports: renderReports, users: renderUsers, audit: renderAuditLog, settings: renderSettings };
+  const renderers = { dashboard: renderDashboard, customers: renderCustomers, issuances: renderIssuances, invoices: renderInvoices, payments: renderPayments, transfers: renderTransfersPage, suppliers: renderSuppliers, inventory: renderInventory, expenses: renderExpenses, reports: renderReports, aiassistant: renderAIAssistant, users: renderUsers, audit: renderAuditLog, settings: renderSettings };
   (renderers[page] || renderDashboard)();
   window.scrollTo(0,0);
 }
@@ -17871,6 +17921,196 @@ function deleteUser(id) {
     toast('تم الحذف');
     renderUsers();
   });
+}
+
+/* =========================================================
+   🤖 AI ASSISTANT — تحليلات ذكية وإجابات فورية
+========================================================= */
+function renderAIAssistant() {
+  const root = document.getElementById('page-content');
+  root.innerHTML = `
+    <div class="page-header">
+      <div>
+        <div class="page-title">🤖 المساعد الذكي</div>
+        <div class="page-subtitle">تحليلات ذكية وإجابات فورية عن بيانات الشركة</div>
+      </div>
+    </div>
+
+    <div class="ai-chat-wrap">
+      <div class="ai-chat-messages" id="ai-chat-messages">
+        <div class="ai-msg ai-msg-bot">
+          <div class="ai-avatar">🤖</div>
+          <div class="ai-bubble">
+            أهلاً! أنا المساعد الذكي. اسألني عن أي حاجة في بيانات شركتك — المبيعات، الأرباح، الديون، المخزون، أو العملاء. جرّب أحد الأسئلة السريعة تحت 👇
+          </div>
+        </div>
+      </div>
+
+      <div class="ai-suggestions" id="ai-suggestions">
+        ${[
+          'كام مبيعاتي الشهر ده؟',
+          'إيه صافي الربح؟',
+          'مين أكتر عميل عليه فلوس؟',
+          'إيه اللي قرب يخلص في المخزن؟',
+          'كام إجمالي الديون؟',
+          'كام عميل عندي؟',
+          'أكتر منتج مبيعاً',
+          'عليا كام للموردين؟'
+        ].map(q => `<button class="ai-chip" onclick="askAI('${q.replace(/'/g,"\\'")}')">${q}</button>`).join('')}
+      </div>
+
+      <div class="ai-input-bar">
+        <input type="text" id="ai-input" class="form-control" placeholder="اكتب سؤالك هنا..." onkeydown="if(event.key==='Enter')askAI()">
+        <button class="btn btn-primary" onclick="askAI()" style="flex-shrink:0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function askAI(presetQuestion) {
+  const input = document.getElementById('ai-input');
+  const q = (presetQuestion || (input ? input.value : '') || '').trim();
+  if (!q) return;
+  if (input && !presetQuestion) input.value = '';
+  else if (input && presetQuestion) input.value = '';
+
+  const messages = document.getElementById('ai-chat-messages');
+  // user message
+  messages.insertAdjacentHTML('beforeend', `
+    <div class="ai-msg ai-msg-user">
+      <div class="ai-bubble">${escapeHtml(q)}</div>
+    </div>`);
+
+  // compute answer
+  const answer = aiAnswer(q);
+
+  // typing indicator then answer
+  messages.insertAdjacentHTML('beforeend', `
+    <div class="ai-msg ai-msg-bot" id="ai-typing">
+      <div class="ai-avatar">🤖</div>
+      <div class="ai-bubble"><span class="ai-typing-dots"><span></span><span></span><span></span></span></div>
+    </div>`);
+  messages.scrollTop = messages.scrollHeight;
+
+  setTimeout(() => {
+    const typing = document.getElementById('ai-typing');
+    if (typing) typing.remove();
+    messages.insertAdjacentHTML('beforeend', `
+      <div class="ai-msg ai-msg-bot">
+        <div class="ai-avatar">🤖</div>
+        <div class="ai-bubble">${answer}</div>
+      </div>`);
+    messages.scrollTop = messages.scrollHeight;
+  }, 450);
+}
+
+// The "brain": analyzes the real company data and answers in Arabic
+function aiAnswer(qRaw) {
+  const q = qRaw.toLowerCase();
+  const cur = (DB.data.settings.currency || 'جنيه');
+  const curShort = cur === 'جنيه' ? 'ج.م' : cur === 'ريال' ? 'ر.س' : cur === 'درهم' ? 'د.إ' : cur;
+  const fmtm = (n) => `<b>${fmt(Math.round(n))} ${curShort}</b>`;
+
+  const today = todayStr();
+  const monthStart = today.slice(0,7) + '-01';
+  const has = (...words) => words.some(w => q.includes(w));
+
+  // ---- SALES (مبيعات) ----
+  if (has('مبيعات', 'بعت', 'مبيعاتي', 'البيع')) {
+    const monthIss = (DB.data.issuances||[]).filter(i => i.date >= monthStart);
+    const monthIssTotal = monthIss.reduce((s,i)=>s+i.total, 0);
+    const standalone = DB.data.invoices.filter(i => i.date >= monthStart && !i.sourceIssuanceId).reduce((s,i)=>s+i.total, 0);
+    const monthSales = monthIssTotal + standalone;
+    const todaySales = (DB.data.issuances||[]).filter(i=>i.date===today).reduce((s,i)=>s+i.total,0)
+      + DB.data.invoices.filter(i=>i.date===today && !i.sourceIssuanceId).reduce((s,i)=>s+i.total,0);
+    return `📊 <b>المبيعات:</b><br>• هذا الشهر: ${fmtm(monthSales)}<br>• اليوم: ${fmtm(todaySales)}<br>• عدد عمليات الصرف هذا الشهر: <b>${monthIss.length}</b>`;
+  }
+
+  // ---- PROFIT (أرباح) ----
+  if (has('ربح', 'أرباح', 'ارباح', 'مكسب')) {
+    const monthIss = (DB.data.issuances||[]).filter(i => i.date >= monthStart);
+    const revenue = monthIss.reduce((s,i)=>s+i.total, 0)
+      + DB.data.invoices.filter(i => i.date >= monthStart && !i.sourceIssuanceId).reduce((s,i)=>s+i.total, 0);
+    let cogs = 0;
+    monthIss.forEach(iss => { const p = DB.data.products.find(x=>x.id===iss.productId); if (p) cogs += (p.cost||0)*iss.quantity; });
+    const expenses = DB.data.expenses.filter(e => e.kind !== 'purchase' && e.date >= monthStart).reduce((s,e)=>s+e.amount, 0);
+    const profit = revenue - cogs - expenses;
+    const margin = revenue > 0 ? (profit/revenue*100) : 0;
+    return `💰 <b>صافي الربح هذا الشهر:</b> ${fmtm(profit)}<br>• الإيرادات: ${fmtm(revenue)}<br>• تكلفة البضاعة: ${fmtm(cogs)}<br>• المصروفات: ${fmtm(expenses)}<br>• هامش الربح: <b>${margin.toFixed(1)}%</b>`;
+  }
+
+  // ---- DEBTS / who owes most (ديون / عميل عليه) ----
+  if (has('مديون', 'عليه فلوس', 'عليه', 'ديون', 'دين', 'مستحق', 'فلوسي')) {
+    const debtors = DB.data.customers.filter(c => (c.balance||0) > 0).sort((a,b)=>b.balance-a.balance);
+    const totalDebt = debtors.reduce((s,c)=>s+c.balance, 0);
+    if (debtors.length === 0) return '✅ مفيش أي عميل عليه فلوس حالياً. كل الحسابات مسددة!';
+    let top = debtors.slice(0,5).map((c,i)=>`${i+1}. <b>${escapeHtml(c.name)}</b>: ${fmt(Math.round(c.balance))} ${curShort}`).join('<br>');
+    return `💸 <b>إجمالي الديون على العملاء:</b> ${fmtm(totalDebt)}<br>عدد العملاء المدينين: <b>${debtors.length}</b><br><br>🔝 <b>أكتر العملاء مديونية:</b><br>${top}`;
+  }
+
+  // ---- SUPPLIERS we owe (عليا للموردين) ----
+  if (has('مورد', 'موردين', 'عليا')) {
+    let totalOwed = 0, owedList = [];
+    (DB.data.suppliers||[]).forEach(s => {
+      const m = supplierMetrics(s.id);
+      if (m.balance > 0) { totalOwed += m.balance; owedList.push({name:s.name, bal:m.balance}); }
+    });
+    owedList.sort((a,b)=>b.bal-a.bal);
+    if (owedList.length === 0) return '✅ مفيش مستحقات عليك للموردين حالياً.';
+    let top = owedList.slice(0,5).map((s,i)=>`${i+1}. <b>${escapeHtml(s.name)}</b>: ${fmt(Math.round(s.bal))} ${curShort}`).join('<br>');
+    return `🏭 <b>إجمالي اللي عليك للموردين:</b> ${fmtm(totalOwed)}<br>عدد الموردين: <b>${owedList.length}</b><br><br>🔝 <b>الأكبر:</b><br>${top}`;
+  }
+
+  // ---- INVENTORY / low stock (مخزون / قرب يخلص) ----
+  if (has('مخزن', 'مخزون', 'يخلص', 'ينفذ', 'الكمية', 'متبقي', 'ستوك')) {
+    const low = DB.data.products.filter(p => p.quantity <= p.minQuantity);
+    const totalQty = DB.data.products.reduce((s,p)=>s+(p.quantity||0),0);
+    if (DB.data.products.length === 0) return 'مفيش منتجات مسجلة في المخزن لسه.';
+    let lowText = low.length > 0
+      ? '⚠️ <b>قرب يخلص:</b><br>' + low.map(p=>`• ${escapeHtml(p.name)}: <b>${fmt(p.quantity)} ${escapeHtml(p.unit||'')}</b> (الحد: ${fmt(p.minQuantity)})`).join('<br>')
+      : '✅ كل المنتجات فوق الحد الأدنى.';
+    return `📦 <b>المخزن:</b><br>• إجمالي الأصناف: <b>${DB.data.products.length}</b><br>• إجمالي الكميات: <b>${fmt(totalQty)}</b><br><br>${lowText}`;
+  }
+
+  // ---- TOP PRODUCT (أكتر منتج) ----
+  if (has('أكتر منتج', 'اكتر منتج', 'أفضل منتج', 'أكثر مبيع', 'اكثر مبيع', 'منتج مبيع')) {
+    const sales = {};
+    (DB.data.issuances||[]).forEach(i => { sales[i.productName] = (sales[i.productName]||0) + i.total; });
+    const arr = Object.entries(sales).sort((a,b)=>b[1]-a[1]);
+    if (arr.length === 0) return 'مفيش مبيعات مسجلة لسه عشان أحدد أكتر منتج.';
+    let top = arr.slice(0,5).map((e,i)=>`${i+1}. <b>${escapeHtml(e[0])}</b>: ${fmt(Math.round(e[1]))} ${curShort}`).join('<br>');
+    return `🏆 <b>أكتر المنتجات مبيعاً:</b><br>${top}`;
+  }
+
+  // ---- CUSTOMERS count (كام عميل) ----
+  if (has('كام عميل', 'عدد العملاء', 'عملائي', 'كام مركز', 'العملاء')) {
+    const total = DB.data.customers.length;
+    const active = DB.data.customers.filter(c => (DB.data.issuances||[]).some(i=>i.customerId===c.id) || DB.data.invoices.some(inv=>inv.customerId===c.id)).length;
+    const withDebt = DB.data.customers.filter(c=>(c.balance||0)>0).length;
+    return `👥 <b>العملاء:</b><br>• الإجمالي: <b>${total}</b><br>• نشطين (عليهم تعاملات): <b>${active}</b><br>• عليهم مديونية: <b>${withDebt}</b>`;
+  }
+
+  // ---- INVOICES (فواتير) ----
+  if (has('فاتورة', 'فواتير')) {
+    const total = DB.data.invoices.length;
+    const unpaid = DB.data.invoices.filter(i=>i.status==='unpaid'||i.status==='partial').length;
+    const monthInv = DB.data.invoices.filter(i=>i.date>=monthStart).length;
+    return `🧾 <b>الفواتير:</b><br>• الإجمالي: <b>${total}</b><br>• هذا الشهر: <b>${monthInv}</b><br>• غير مدفوعة/جزئية: <b>${unpaid}</b>`;
+  }
+
+  // ---- summary / general (ملخص) ----
+  if (has('ملخص', 'الوضع', 'إزاي', 'ازاي', 'الشركة', 'تقرير')) {
+    const monthIss = (DB.data.issuances||[]).filter(i => i.date >= monthStart);
+    const revenue = monthIss.reduce((s,i)=>s+i.total,0) + DB.data.invoices.filter(i=>i.date>=monthStart && !i.sourceIssuanceId).reduce((s,i)=>s+i.total,0);
+    const totalDebt = DB.data.customers.reduce((s,c)=>s+(c.balance||0),0);
+    const low = DB.data.products.filter(p=>p.quantity<=p.minQuantity).length;
+    return `📋 <b>ملخص سريع للشركة:</b><br>• مبيعات الشهر: ${fmtm(revenue)}<br>• إجمالي الديون: ${fmtm(totalDebt)}<br>• عدد العملاء: <b>${DB.data.customers.length}</b><br>• أصناف قرب تخلص: <b>${low}</b><br>• فواتير غير مدفوعة: <b>${DB.data.invoices.filter(i=>i.status!=='paid').length}</b>`;
+  }
+
+  // ---- fallback ----
+  return `🤔 معرفتش أجاوب على ده بالظبط. جرّب تسألني عن:<br>• المبيعات أو الأرباح<br>• الديون أو المديونيات<br>• المخزون واللي قرب يخلص<br>• العملاء أو الموردين<br>• الفواتير<br>أو اضغط أحد الأزرار السريعة فوق.`;
 }
 
 /* =========================================================
