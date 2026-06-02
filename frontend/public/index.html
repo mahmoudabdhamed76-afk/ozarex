@@ -301,6 +301,13 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   box-shadow: 0 4px 12px rgba(245,158,11,.35);
 }
 .btn-add-another:hover { filter: brightness(1.07); transform: translateY(-1px); }
+.btn-add-item {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff; font-weight: 800;
+  box-shadow: 0 4px 12px rgba(59,130,246,.32);
+  border: 1px dashed rgba(255,255,255,.4);
+}
+.btn-add-item:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .btn-success {
   background: linear-gradient(135deg, #10b981, #059669);
   color: white;
@@ -9531,7 +9538,6 @@ function renderDashboard() {
     <!-- ⚡ QUICK ACTIONS (premium neon) -->
     <div class="qa-section">
       <div class="qa-section-head">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         <span>إجراءات سريعة</span>
       </div>
       <div class="qa-grid">
@@ -19298,6 +19304,7 @@ function startVoiceCustomerSelect() {
 }
 
 function openIssuanceForm(customerId, productId) {
+  _issuanceCart = []; // reset multi-item cart
   if (DB.data.customers.length === 0) {
     toast('يجب إضافة مركز/عميل أولاً من قسم العملاء', 'error');
     return;
@@ -19336,9 +19343,9 @@ function openIssuanceForm(customerId, productId) {
       </div>
 
       <div class="form-group">
-        <label>نوع الورق *</label>
-        <select class="form-control" name="productId" id="iss-form-product" required onchange="onIssuanceProductChange()">
-          <option value="">-- اختر نوع الورق --</option>
+        <label>نوع التوريد *</label>
+        <select class="form-control" name="productId" id="iss-form-product" onchange="onIssuanceProductChange()">
+          <option value="">-- اختر النوع (ورق / بلاستك / غيره) --</option>
           ${DB.data.products.map(p => `<option value="${p.id}" data-price="${p.price}" data-qty="${p.quantity}" data-unit="${escapeHtml(p.unit||'')}" ${productId===p.id?'selected':''}>${escapeHtml(p.name)} (المتاح: ${fmt(p.quantity)} ${escapeHtml(p.unit||'')})</option>`).join('')}
         </select>
         <small id="iss-stock-info" style="color:var(--muted);display:block;margin-top:4px"></small>
@@ -19346,19 +19353,38 @@ function openIssuanceForm(customerId, productId) {
 
       <div class="form-row">
         <div class="form-group">
-          <label>الكمية (عدد الأوراق) *</label>
-          <input class="form-control" type="number" name="quantity" id="iss-qty" value="" step="any" min="0.01" required oninput="calcIssuanceTotal()" placeholder="مثال: 2000">
+          <label>الكمية *</label>
+          <input class="form-control" type="number" name="quantity" id="iss-qty" value="" step="any" min="0.01" oninput="calcIssuanceTotal()" placeholder="مثال: 2000">
         </div>
         <div class="form-group">
           <label>سعر الوحدة *</label>
-          <input class="form-control" type="number" name="unitPrice" id="iss-price" value="" step="0.01" min="0" required oninput="calcIssuanceTotal()" placeholder="سعر الورقة الواحدة">
+          <input class="form-control" type="number" name="unitPrice" id="iss-price" value="" step="0.01" min="0" oninput="calcIssuanceTotal()" placeholder="سعر الوحدة">
         </div>
       </div>
 
-      <div style="padding:14px;background:var(--bg-soft);border-radius:8px;margin-bottom:14px;font-size:15px">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span><b>الإجمالي:</b></span>
-          <b style="font-size:22px;color:var(--success)" id="iss-total-display">${fmtCurrency(0)}</b>
+      <div style="padding:12px 14px;background:var(--bg-soft);border-radius:8px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+        <span><b>إجمالي الصنف:</b></span>
+        <b style="font-size:20px;color:var(--success)" id="iss-total-display">${fmtCurrency(0)}</b>
+      </div>
+
+      <button type="button" class="btn btn-add-item" onclick="addIssuanceItem()" style="width:100%;margin-bottom:14px">
+        ➕ أضف الصنف للفاتورة
+      </button>
+
+      <!-- CART: items added to this invoice -->
+      <div id="iss-cart-wrap" style="display:none;margin-bottom:14px">
+        <div style="font-weight:800;margin-bottom:8px;color:var(--text)">🧾 أصناف الفاتورة</div>
+        <div style="overflow-x:auto">
+          <table class="data-table" id="iss-cart-table" style="width:100%;font-size:13px">
+            <thead><tr>
+              <th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th><th></th>
+            </tr></thead>
+            <tbody id="iss-cart-body"></tbody>
+            <tfoot><tr style="font-weight:900;background:var(--bg-soft)">
+              <td colspan="3" style="text-align:left">الإجمالي الكلي</td>
+              <td colspan="2" id="iss-cart-grand" style="color:var(--success);font-size:15px">${fmtCurrency(0)}</td>
+            </tr></tfoot>
+          </table>
         </div>
       </div>
 
@@ -19440,8 +19466,7 @@ function openIssuanceForm(customerId, productId) {
         <textarea class="form-control" name="notes" rows="2" placeholder="ملاحظات إضافية..."></textarea>
       </div>
     </form>
-  `, `<button class="btn btn-primary" onclick="saveIssuance()">💾 حفظ وصرف الورق</button>
-      <button class="btn btn-add-another" onclick="saveIssuance(true)" title="يحفظ النوع الحالي ويفتح نوع جديد لنفس العميل">➕ حفظ وإضافة نوع آخر</button>
+  `, `<button class="btn btn-primary" onclick="saveIssuance()">💾 حفظ وإصدار الفاتورة</button>
       <button class="btn btn-secondary" onclick="closeModal()">إلغاء</button>`, 'large');
 
   // Trigger product change if pre-selected
@@ -19606,7 +19631,235 @@ function calcIssuanceTotal() {
   marginText.textContent = `هامش الربح: ${margin.toFixed(1)}%`;
 }
 
+// ===== Multi-item issuance cart =====
+let _issuanceCart = [];
+
+function addIssuanceItem() {
+  const prodSel = document.getElementById('iss-form-product');
+  const productId = prodSel.value;
+  const quantity = parseFloat(document.getElementById('iss-qty').value);
+  const unitPrice = parseFloat(document.getElementById('iss-price').value);
+
+  if (!productId) { toast('اختر النوع', 'error'); return; }
+  if (!quantity || quantity <= 0) { toast('أدخل كمية صحيحة', 'error'); return; }
+  if (unitPrice == null || isNaN(unitPrice) || unitPrice < 0) { toast('أدخل سعراً صحيحاً', 'error'); return; }
+
+  const product = DB.data.products.find(p => p.id === productId);
+  if (!product) { toast('خطأ في بيانات الصنف', 'error'); return; }
+
+  // Stock check considering what's already in cart for this product
+  const inCartQty = _issuanceCart.filter(it => it.productId === productId).reduce((s,it)=>s+it.quantity, 0);
+  if (product.quantity < (inCartQty + quantity)) {
+    if (!confirm(`⚠️ الكمية المطلوبة من "${product.name}" (${fmt(inCartQty + quantity)}) أكبر من المتاح بالمخزن (${fmt(product.quantity)}).\nهل تريد المتابعة؟`)) return;
+  }
+
+  _issuanceCart.push({
+    productId,
+    productName: product.name,
+    productUnit: product.unit || '',
+    quantity,
+    unitPrice,
+    cost: (product.cost || 0) * quantity,
+    total: quantity * unitPrice
+  });
+
+  // reset item inputs (keep product dropdown ready for next)
+  document.getElementById('iss-qty').value = '';
+  document.getElementById('iss-price').value = '';
+  prodSel.value = '';
+  const tot = document.getElementById('iss-total-display');
+  if (tot) tot.textContent = fmtCurrency(0);
+  const panel = document.getElementById('iss-profit-panel');
+  if (panel) panel.style.display = 'none';
+  const stockInfo = document.getElementById('iss-stock-info');
+  if (stockInfo) stockInfo.textContent = '';
+  renderIssuanceCart();
+  try { playTone('click'); } catch(_) {}
+  prodSel.focus();
+}
+
+function removeIssuanceItem(idx) {
+  _issuanceCart.splice(idx, 1);
+  renderIssuanceCart();
+}
+
+function renderIssuanceCart() {
+  const wrap = document.getElementById('iss-cart-wrap');
+  const body = document.getElementById('iss-cart-body');
+  if (!wrap || !body) return;
+  if (_issuanceCart.length === 0) {
+    wrap.style.display = 'none';
+    body.innerHTML = '';
+    return;
+  }
+  wrap.style.display = 'block';
+  body.innerHTML = _issuanceCart.map((it, i) => `<tr>
+    <td>${escapeHtml(it.productName)}</td>
+    <td>${fmt(it.quantity)} ${escapeHtml(it.productUnit)}</td>
+    <td>${fmt(it.unitPrice)}</td>
+    <td><b>${fmt(it.total)}</b></td>
+    <td><button type="button" class="btn-icon" onclick="removeIssuanceItem(${i})" title="حذف" style="color:var(--danger)">✕</button></td>
+  </tr>`).join('');
+  const grand = _issuanceCart.reduce((s,it)=>s+it.total, 0);
+  const grandEl = document.getElementById('iss-cart-grand');
+  if (grandEl) grandEl.textContent = fmtCurrency(grand);
+}
+
 function saveIssuance(keepOpen) {
+  const d = Object.fromEntries(new FormData(document.getElementById('iss-form')));
+  d.paid = parseFloat(d.paid) || 0;
+
+  if (!d.customerId) { toast('اختر المركز', 'error'); return; }
+
+  // If the user filled the item fields but didn't click "أضف"، نضيفه تلقائياً
+  const pendingProduct = document.getElementById('iss-form-product').value;
+  const pendingQty = parseFloat(document.getElementById('iss-qty').value);
+  const pendingPrice = parseFloat(document.getElementById('iss-price').value);
+  if (pendingProduct && pendingQty > 0 && !isNaN(pendingPrice)) {
+    addIssuanceItem();
+  }
+
+  if (_issuanceCart.length === 0) { toast('أضف صنف واحد على الأقل للفاتورة', 'error'); return; }
+
+  const customer = DB.data.customers.find(c => c.id === d.customerId);
+  if (!customer) { toast('خطأ في بيانات العميل', 'error'); return; }
+
+  const grandTotal = _issuanceCart.reduce((s,it)=>s+it.total, 0);
+  if (d.paid > grandTotal) { toast('المدفوع أكبر من الإجمالي', 'error'); return; }
+
+  // Validate due date if set
+  const setDueDate = document.getElementById('iss-set-duedate');
+  let dueDate = null;
+  if (setDueDate && setDueDate.checked) {
+    dueDate = d.dueDate;
+    if (!dueDate) { toast('حدد موعد التحصيل', 'error'); return; }
+    if (dueDate < d.date) { toast('موعد التحصيل قبل تاريخ الصرف!', 'error'); return; }
+  }
+
+  const status = d.paid >= grandTotal ? 'paid' : d.paid > 0 ? 'partial' : 'unpaid';
+  const invoiceId = 'inv_' + uid();
+  const invoiceNumber = ++DB.data.counters.invoice;
+  const methodMap = { credit:'آجل', cash:'كاش', transfer:'تحويل', check:'شيك' };
+
+  // ----- Create ONE merged INVOICE with all items -----
+  const invoice = {
+    id: invoiceId,
+    number: invoiceNumber,
+    customerId: d.customerId,
+    date: d.date,
+    items: _issuanceCart.map(it => ({
+      productId: it.productId,
+      productName: it.productName,
+      qty: it.quantity,
+      price: it.unitPrice,
+      total: it.total
+    })),
+    subtotal: grandTotal,
+    tax: 0, taxRate: 0, discount: 0,
+    total: grandTotal,
+    paid: d.paid,
+    paymentMethod: methodMap[d.paymentMethod] || 'آجل',
+    status: status,
+    notes: d.notes || '',
+    createdAt: Date.now()
+  };
+  DB.data.invoices.push(invoice);
+
+  // ----- For each item: create an issuance record + stock move (all linked to same invoice) -----
+  if (!DB.data.issuances) DB.data.issuances = [];
+  if (!DB.data.stockMoves) DB.data.stockMoves = [];
+  const issuanceNumber = ++DB.data.counters.issuance;
+  const createdIssuanceIds = [];
+
+  // Distribute the paid amount proportionally across items (so each issuance has consistent paid/status)
+  _issuanceCart.forEach((it, idx) => {
+    const product = DB.data.products.find(p => p.id === it.productId);
+    const itemPaid = grandTotal > 0 ? (d.paid * (it.total / grandTotal)) : 0;
+    const itemStatus = itemPaid >= it.total ? 'paid' : itemPaid > 0 ? 'partial' : 'unpaid';
+    const issuanceId = 'iss_' + uid();
+    createdIssuanceIds.push(issuanceId);
+
+    DB.data.issuances.push({
+      id: issuanceId,
+      number: issuanceNumber,          // same number for the whole invoice batch
+      invoiceId: invoiceId,            // all linked to the one merged invoice
+      batchIndex: idx,
+      date: d.date,
+      dueDate: dueDate || null,
+      customerId: d.customerId,
+      customerName: customer.name,
+      productId: it.productId,
+      productName: it.productName,
+      productUnit: it.productUnit,
+      quantity: it.quantity,
+      unitPrice: it.unitPrice,
+      total: it.total,
+      paid: itemPaid,
+      paymentMethod: d.paymentMethod,
+      status: itemStatus,
+      notes: d.notes || '',
+      createdAt: Date.now()
+    });
+
+    // Decrement stock for this product
+    if (product) product.quantity -= it.quantity;
+
+    DB.data.stockMoves.push({
+      id: 'sm_' + uid(),
+      productId: it.productId,
+      type: 'out',
+      quantity: it.quantity,
+      date: d.date,
+      reference: `صرف #${issuanceNumber} - ${customer.name} (فاتورة #${invoiceNumber})`,
+      createdAt: Date.now()
+    });
+  });
+
+  // Update customer balance (add unpaid amount of whole invoice)
+  const owed = grandTotal - d.paid;
+  customer.balance = (customer.balance || 0) + owed;
+
+  // If paid > 0, create ONE linked payment record (to invoice)
+  if (d.paid > 0) {
+    if (!DB.data.payments) DB.data.payments = [];
+    DB.data.payments.push({
+      id: 'pay_' + uid(),
+      customerId: customer.id,
+      customerName: customer.name,
+      issuanceId: createdIssuanceIds[0] || null,
+      invoiceId: invoice.id,
+      amount: d.paid,
+      date: d.date,
+      method: d.paymentMethod === 'credit' ? 'cash' : d.paymentMethod,
+      note: 'دفعة مع فاتورة الصرف #' + invoiceNumber,
+      createdAt: Date.now()
+    });
+  }
+
+  DB.save();
+  logAudit({
+    operation: 'add', table: 'invoices',
+    recordId: invoice.id,
+    recordLabel: `فاتورة صرف #${invoiceNumber} - ${customer.name} (${_issuanceCart.length} صنف)`,
+    before: null,
+    after: JSON.parse(JSON.stringify(invoice)),
+    reason: window._pendingAuditReason || ''
+  });
+  delete window._pendingAuditReason;
+
+  const itemCount = _issuanceCart.length;
+  _issuanceCart = []; // clear cart
+
+  playTone('save');
+  renderIssuances();
+  renderSidebar();
+  updateNotifBadge();
+  closeModal();
+  celebrate();
+  toast(`✓ تم إصدار فاتورة #${invoiceNumber} لـ "${customer.name}" تشمل ${itemCount} صنف`, 'success');
+}
+
+function _saveIssuanceOLD(keepOpen) {
   const d = Object.fromEntries(new FormData(document.getElementById('iss-form')));
   d.quantity = parseFloat(d.quantity);
   d.unitPrice = parseFloat(d.unitPrice);
