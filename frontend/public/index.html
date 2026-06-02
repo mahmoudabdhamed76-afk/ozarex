@@ -7250,8 +7250,10 @@ body.mobile-drawer-open { overflow: hidden; }
     flex-shrink: 0;
   }
   .topbar-title, .page-title-text {
-    font-size: 15px !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
     flex: 1;
+    min-width: 60px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -7259,9 +7261,9 @@ body.mobile-drawer-open { overflow: hidden; }
 
   .topbar .btn-icon, .topbar-home-btn, .topbar-wallet-btn,
   .notif-btn, .theme-toggle, .sound-toggle {
-    width: 34px !important; height: 34px !important;
-    min-width: 34px !important;
-    padding: 0 !important; font-size: 14px !important;
+    width: 36px !important; height: 36px !important;
+    min-width: 36px !important;
+    padding: 0 !important; font-size: 15px !important;
     flex-shrink: 0;
   }
 
@@ -7278,16 +7280,16 @@ body.mobile-drawer-open { overflow: hidden; }
     margin-left: 0 !important;
     width: 100% !important;
     max-width: 100vw !important;
-    padding: 8px 10px 80px 10px !important;
+    padding: 10px 12px 80px 12px !important;
     box-sizing: border-box;
   }
 
   /* Headings */
-  .page-title, .section-title { font-size: 1.05rem !important; margin-bottom: 4px !important; }
-  .page-subtitle, .section-subtitle { font-size: 0.78rem !important; margin-bottom: 8px !important; }
-  h1 { font-size: 1.2rem !important; margin: 6px 0 !important; }
-  h2 { font-size: 1.05rem !important; margin: 6px 0 !important; }
-  h3 { font-size: 0.95rem !important; margin: 4px 0 !important; }
+  .page-title, .section-title { font-size: 1.2rem !important; margin-bottom: 4px !important; }
+  .page-subtitle, .section-subtitle { font-size: 0.85rem !important; margin-bottom: 8px !important; }
+  h1 { font-size: 1.35rem !important; margin: 6px 0 !important; }
+  h2 { font-size: 1.18rem !important; margin: 6px 0 !important; }
+  h3 { font-size: 1.05rem !important; margin: 4px 0 !important; }
 
   /* Stat cards: 2-column compact grid */
   .stats-grid, .stat-cards, .summary-cards, .kpi-grid, .cards-grid {
@@ -7671,7 +7673,7 @@ body.mobile-drawer-open { overflow: hidden; }
   </div>
   <div class="login-card">
     <div class="login-logo login-logo-svg">
-      <img src="icons/logo-square.png" alt="Ozarex" style="width:100%;height:100%;object-fit:cover;border-radius:14px">
+      <img src="icons/logo-square.png" onerror="this.onerror=null;this.src='/icons/logo-square.png'" alt="Ozarex" style="width:100%;height:100%;object-fit:cover;border-radius:14px">
     </div>
     <h1>أوزاريكس</h1>
     <p class="sub">نظام إدارة التوريدات والمحاسبة المتكامل</p>
@@ -7701,7 +7703,7 @@ body.mobile-drawer-open { overflow: hidden; }
         <div class="brand-sub">نظام الإدارة</div>
       </div>
       <div class="brand-logo brand-logo-svg" aria-label="Ozarex">
-        <img src="icons/logo-square.png" alt="Ozarex" style="width:100%;height:100%;object-fit:cover;border-radius:12px">
+        <img src="icons/logo-square.png" onerror="this.onerror=null;this.src='/icons/logo-square.png'" alt="Ozarex" style="width:100%;height:100%;object-fit:cover;border-radius:12px">
       </div>
     </div>
     <nav class="sidebar-nav" id="sidebar-nav"></nav>
@@ -7715,7 +7717,7 @@ body.mobile-drawer-open { overflow: hidden; }
   <div class="main-content">
     <div class="company-banner">
       <div class="banner-inner">
-        <img class="banner-icon" src="icons/logo-square.png" alt="Ozarex" style="width:26px;height:26px;border-radius:6px;object-fit:cover">
+        <img class="banner-icon" src="icons/logo-square.png" onerror="this.onerror=null;this.src='/icons/logo-square.png'" alt="Ozarex" style="width:28px;height:28px;border-radius:6px;object-fit:cover;flex-shrink:0">
         <span class="banner-name">أوزاريكس</span>
         <span class="banner-tag">OZAREX • For Medical Solution</span>
       </div>
@@ -12791,74 +12793,78 @@ function buildInvoiceHTML(inv, opts) {
       .inv-export{padding:40px;background:white;color:#0a0a0a;width:794px;direction:rtl}
   `;
   const prefix = opts.standalone ? '' : '.inv-export ';
+  const NAVY = '#1e3a5f', GOLD = '#c8a04a', NAVYD = '#15263f';
   const styles = `
       ${cssScope}
-      ${prefix}.wrap{max-width:760px;margin:0 auto}
-      ${prefix}.top{border-bottom:3px solid #000;padding-bottom:18px;margin-bottom:24px;text-align:center}
-      ${prefix}.top .logo{display:block;margin:0 auto 12px;max-height:90px;max-width:240px;object-fit:contain}
-      ${prefix}.top h1{font-size:32px;font-weight:900;color:#000;letter-spacing:-.5px}
-      ${prefix}.top .sub{font-size:13px;color:#16a34a;margin-top:4px;font-weight:700;letter-spacing:1px}
-      ${prefix}.top .info{font-size:12px;color:#525252;margin-top:8px;line-height:1.6}
-      ${prefix}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;font-size:13px}
-      ${prefix}.info-grid .box{padding:14px 18px;border:2px solid #000;border-radius:8px}
-      ${prefix}.info-grid .box .lbl{font-size:10px;font-weight:700;color:#16a34a;letter-spacing:1px;margin-bottom:6px}
-      ${prefix}.info-grid .box .v{font-size:18px;font-weight:900;color:#000;line-height:1.3}
-      ${prefix}.info-grid .box .v2{font-size:12px;color:#525252;margin-top:3px;line-height:1.5}
-      ${prefix}.invoice-title{background:#000;color:#fff;padding:10px 18px;border-radius:6px;text-align:center;font-size:16px;font-weight:800;margin-bottom:14px}
-      ${prefix}table{width:100%;border-collapse:collapse;margin-bottom:18px;border:2px solid #000}
-      ${prefix}table th{background:#000;color:#fff;padding:11px;text-align:right;font-size:13px;font-weight:700}
+      ${prefix}.wrap{max-width:760px;margin:0 auto;border:3px solid ${NAVY};border-radius:4px;padding:0}
+      ${prefix}.frame{border:1.5px solid ${GOLD};margin:6px;padding:28px 30px 36px}
+      ${prefix}.top{text-align:center;padding-bottom:18px;margin-bottom:22px}
+      ${prefix}.top .logo{display:block;margin:0 auto 14px;max-height:110px;max-width:200px;object-fit:contain}
+      ${prefix}.top h1{font-size:30px;font-weight:900;color:${NAVY};letter-spacing:-.5px;margin-bottom:4px}
+      ${prefix}.top .sub{font-size:14px;color:${GOLD};font-weight:800;letter-spacing:1px}
+      ${prefix}.top .info{font-size:12px;color:#64748b;margin-top:8px;line-height:1.6}
+      ${prefix}.invoice-title{background:${NAVY};color:#fff;padding:13px 18px;text-align:center;font-size:18px;font-weight:800;margin-bottom:22px;letter-spacing:.5px}
+      ${prefix}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;font-size:13px}
+      ${prefix}.info-grid .box{padding:16px 18px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc}
+      ${prefix}.info-grid .box .lbl{font-size:13px;font-weight:800;color:${GOLD};margin-bottom:8px}
+      ${prefix}.info-grid .box .v{font-size:18px;font-weight:900;color:${NAVY};line-height:1.3}
+      ${prefix}.info-grid .box .v2{font-size:12px;color:#475569;margin-top:4px;line-height:1.6}
+      ${prefix}.info-grid .box.inv-meta .v{color:${NAVY}}
+      ${prefix}table{width:100%;border-collapse:collapse;margin-bottom:22px}
+      ${prefix}table th{background:${NAVY};color:#fff;padding:12px;text-align:right;font-size:13px;font-weight:700}
       ${prefix}table th:last-child,${prefix}table th:nth-child(3),${prefix}table th:nth-child(4){text-align:center}
-      ${prefix}table td{padding:10px 11px;border-bottom:1px solid #d4d4d4;font-size:13px}
+      ${prefix}table td{padding:12px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#1e293b}
       ${prefix}table td:nth-child(3),${prefix}table td:nth-child(4),${prefix}table td:last-child{text-align:center}
-      ${prefix}table tr:nth-child(even) td{background:#f5f5f5}
       ${prefix}table tr:last-child td{border-bottom:none}
-      ${prefix}.totals{display:flex;justify-content:flex-start;margin-top:14px}
-      ${prefix}.totals-box{width:340px;border:2px solid #000;border-radius:8px;overflow:hidden}
-      ${prefix}.totals-box .row{display:flex;justify-content:space-between;padding:10px 16px;font-size:13px;border-bottom:1px dashed #d4d4d4}
-      ${prefix}.totals-box .row:last-child{border-bottom:none}
-      ${prefix}.totals-box .grand{background:#16a34a;color:#fff;font-size:18px;font-weight:900;padding:14px 16px}
-      ${prefix}.totals-box .paid{color:#16a34a;font-weight:700}
-      ${prefix}.totals-box .due{color:#0a0a0a;font-weight:900;background:#fef3c7}
-      ${prefix}.footer{margin-top:36px;text-align:center;color:#525252;font-size:12px;border-top:2px solid #000;padding-top:14px}
-      ${prefix}.footer .thanks{font-size:14px;color:#16a34a;font-weight:800;margin-bottom:6px}
-      @media print{body{padding:18px} @page{margin:12mm}}
+      ${prefix}.totals{display:flex;justify-content:flex-start;margin-top:8px}
+      ${prefix}.totals-box{width:360px;border-radius:4px;overflow:hidden}
+      ${prefix}.totals-box .grand{display:flex;justify-content:space-between;background:#15803d;color:#fff;font-size:17px;font-weight:900;padding:13px 16px}
+      ${prefix}.totals-box .row{display:flex;justify-content:space-between;padding:10px 16px;font-size:14px}
+      ${prefix}.totals-box .paid{color:#15803d;font-weight:700;background:#f0fdf4}
+      ${prefix}.totals-box .due{color:#1e293b;font-weight:800;background:#fef9e7}
+      ${prefix}.signs{display:flex;flex-direction:column;gap:34px;margin-top:30px;width:300px}
+      ${prefix}.signs .sig{border-top:1.5px solid #1e293b;padding-top:6px;font-weight:800;font-size:14px;color:${NAVY};width:240px}
+      ${prefix}.footer{margin-top:40px;text-align:center;color:#64748b;font-size:12px;padding-top:16px}
+      ${prefix}.footer .thanks{font-size:13px;color:#94a3b8;margin-bottom:6px}
+      ${prefix}.footer .fcompany{font-size:15px;color:${NAVY};font-weight:800}
+      @media print{body{padding:0} @page{margin:8mm}}
   `;
   const body = `
     <div class="wrap">
+     <div class="frame">
       <div class="top">
-        ${s.companyLogo ? `<img class="logo" src="${s.companyLogo}" alt="شعار">` : ''}
+        ${s.companyLogo ? `<img class="logo" src="${s.companyLogo}" alt="شعار">` : `<img class="logo" src="icons/logo-square.png" onerror="this.style.display='none'" alt="شعار">`}
         <h1>${escapeHtml(s.companyName||'الشركة')}</h1>
-        <div class="sub">OZAREX • For Medical Solution</div>
+        <div class="sub">OZAREX - FOR MEDICAL SOLUTION</div>
         <div class="info">
           ${s.companyAddress ? `${escapeHtml(s.companyAddress)} • ` : ''}${s.companyPhone ? `📞 ${escapeHtml(s.companyPhone)}` : ''}${s.taxNumber ? ` • سجل ضريبي: ${escapeHtml(s.taxNumber)}` : ''}
         </div>
       </div>
       <div class="invoice-title">فاتورة مبيعات</div>
       <div class="info-grid">
-        <div class="box">
-          <div class="lbl">📋 المركز / العميل</div>
-          <div class="v">${escapeHtml(c?c.name:'-')}</div>
-          <div class="v2">
-            ${c && c.company ? `${escapeHtml(c.company)}<br>` : ''}
-            ${c && c.phone ? `📞 ${escapeHtml(c.phone)}<br>` : ''}
-            ${c && c.address ? `📍 ${escapeHtml(c.address)}` : ''}
-          </div>
-        </div>
-        <div class="box">
-          <div class="lbl">🧾 بيانات الفاتورة</div>
-          <div class="v" style="color:#16a34a">#${inv.number}</div>
+        <div class="box inv-meta">
+          <div class="lbl">بيانات الفاتورة</div>
+          <div class="v">#${inv.number}</div>
           <div class="v2">
             <b>التاريخ:</b> ${inv.date}<br>
             <b>طريقة الدفع:</b> ${escapeHtml(inv.paymentMethod)}
           </div>
         </div>
+        <div class="box">
+          <div class="lbl">العميل / المركز</div>
+          <div class="v">${escapeHtml(c?c.name:'-')}</div>
+          <div class="v2">
+            ${c && c.company ? `${escapeHtml(c.company)}<br>` : ''}
+            ${c && c.phone ? `هاتف: ${escapeHtml(c.phone)}` : ''}
+            ${c && c.address ? `<br>📍 ${escapeHtml(c.address)}` : ''}
+          </div>
+        </div>
       </div>
       <table>
-        <thead><tr><th style="width:40px">#</th><th>الصنف / المنتج</th><th style="width:80px">الكمية</th><th style="width:120px">سعر الوحدة</th><th style="width:130px">الإجمالي</th></tr></thead>
+        <thead><tr><th>الصنف / المنتج</th><th style="width:90px">الكمية</th><th style="width:120px">سعر الوحدة</th><th style="width:130px">الإجمالي</th></tr></thead>
         <tbody>
-          ${inv.items.map((i,idx) => `<tr>
-            <td>${idx+1}</td>
-            <td><b>${escapeHtml(i.productName||'')}</b></td>
+          ${inv.items.map((i) => `<tr>
+            <td>${escapeHtml(i.productName||'')}</td>
             <td>${fmt(i.quantity)}</td>
             <td>${fmt(i.price)}</td>
             <td><b>${fmt(i.total)}</b></td>
@@ -12867,18 +12873,20 @@ function buildInvoiceHTML(inv, opts) {
       </table>
       <div class="totals">
         <div class="totals-box">
-          <div class="row"><span>الإجمالي قبل الخصم</span><span>${fmtCurrency(inv.subtotal)}</span></div>
-          ${inv.discount > 0 ? `<div class="row"><span>الخصم</span><span style="color:#dc2626">${fmtCurrency(inv.discount)}</span></div>` : ''}
-          ${(inv.taxRate||0) > 0 ? `<div class="row"><span>الضريبة (${inv.taxRate}%)</span><span>${fmtCurrency(inv.tax)}</span></div>` : ''}
-          <div class="row grand"><span>الإجمالي</span><span>${fmtCurrency(inv.total)}</span></div>
+          <div class="grand"><span>الإجمالي النهائي</span><span>${fmtCurrency(inv.total)}</span></div>
           <div class="row paid"><span>المدفوع</span><span>${fmtCurrency(inv.paid)}</span></div>
           ${(inv.total - inv.paid) > 0 ? `<div class="row due"><span>المتبقي</span><span>${fmtCurrency(inv.total - inv.paid)}</span></div>` : ''}
         </div>
       </div>
-      <div class="footer">
-        <div class="thanks">شكراً لتعاملكم معنا 🙏</div>
-        ${escapeHtml(s.companyName||'')}
+      <div class="signs">
+        <div class="sig">توقيع المسؤول</div>
+        <div class="sig">توقيع المستلم</div>
       </div>
+      <div class="footer">
+        <div class="thanks">شكراً لتعاملكم معنا</div>
+        <div class="fcompany">${escapeHtml(s.companyName||'')}</div>
+      </div>
+     </div>
     </div>
   `;
   return { styles, body };
