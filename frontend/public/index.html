@@ -295,6 +295,12 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   box-shadow: var(--shadow-sm);
 }
 .btn-secondary:hover { background: var(--surface-2); border-color: var(--primary); color: var(--primary); }
+.btn-add-another {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(245,158,11,.35);
+}
+.btn-add-another:hover { filter: brightness(1.07); transform: translateY(-1px); }
 .btn-success {
   background: linear-gradient(135deg, #10b981, #059669);
   color: white;
@@ -7666,6 +7672,87 @@ body.mobile-drawer-open { overflow: hidden; }
 /* Notes icon button sits next to notifications in the topbar (all screen sizes) */
 #notes-icon-btn { display: inline-flex !important; }
 
+/* ===================== QUICK ACTIONS (premium neon) ===================== */
+.qa-section { margin: 4px 0 18px; }
+.qa-section-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 16px; font-weight: 800; color: var(--text);
+  margin-bottom: 12px;
+}
+.qa-section-head svg { width: 20px; height: 20px; color: var(--primary); }
+.qa-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.qa-card {
+  position: relative;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px;
+  padding: 22px 14px;
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(255,255,255,.04), rgba(255,255,255,.01));
+  border: 1px solid rgba(255,255,255,.08);
+  cursor: pointer; overflow: hidden;
+  transition: transform .2s ease, box-shadow .25s ease, border-color .25s ease;
+  -webkit-tap-highlight-color: transparent;
+  min-height: 130px;
+}
+[data-theme="light"] .qa-card { background: linear-gradient(160deg, #ffffff, #f8fafc); border-color: #e2e8f0; }
+.qa-card .qa-glow {
+  position: absolute; inset: 0;
+  opacity: .14; filter: blur(26px);
+  pointer-events: none; transition: opacity .25s ease;
+}
+.qa-card .qa-ico {
+  position: relative; z-index: 1;
+  width: 60px; height: 60px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 16px;
+}
+.qa-card .qa-ico svg { width: 30px; height: 30px; color: #fff; }
+.qa-card .qa-label {
+  position: relative; z-index: 1;
+  font-size: 14.5px; font-weight: 800; color: var(--text);
+  text-align: center; line-height: 1.2;
+}
+.qa-card:hover { transform: translateY(-4px); }
+.qa-card:active { transform: translateY(-1px) scale(.99); }
+
+.qa-invoice { border-color: rgba(139,92,246,.35); }
+.qa-invoice .qa-glow { background: radial-gradient(circle at 50% 40%, #8b5cf6, transparent 70%); }
+.qa-invoice .qa-ico { background: linear-gradient(135deg,#8b5cf6,#6d28d9); box-shadow: 0 6px 22px rgba(139,92,246,.5), inset 0 1px 0 rgba(255,255,255,.25); }
+.qa-invoice:hover { border-color: #8b5cf6; box-shadow: 0 10px 34px rgba(139,92,246,.32); }
+.qa-invoice:hover .qa-glow { opacity: .28; }
+
+.qa-customer { border-color: rgba(16,185,129,.35); }
+.qa-customer .qa-glow { background: radial-gradient(circle at 50% 40%, #10b981, transparent 70%); }
+.qa-customer .qa-ico { background: linear-gradient(135deg,#10b981,#059669); box-shadow: 0 6px 22px rgba(16,185,129,.5), inset 0 1px 0 rgba(255,255,255,.25); }
+.qa-customer:hover { border-color: #10b981; box-shadow: 0 10px 34px rgba(16,185,129,.32); }
+.qa-customer:hover .qa-glow { opacity: .28; }
+
+.qa-issuance { border-color: rgba(234,88,12,.4); }
+.qa-issuance .qa-glow { background: radial-gradient(circle at 50% 40%, #f97316, transparent 70%); }
+.qa-issuance .qa-ico { background: linear-gradient(135deg,#fb923c,#ea580c); box-shadow: 0 6px 22px rgba(234,88,12,.55), inset 0 1px 0 rgba(255,255,255,.25); }
+.qa-issuance:hover { border-color: #f97316; box-shadow: 0 10px 34px rgba(234,88,12,.34); }
+.qa-issuance:hover .qa-glow { opacity: .3; }
+
+.qa-collect { border-color: rgba(239,68,68,.38); }
+.qa-collect .qa-glow { background: radial-gradient(circle at 50% 40%, #f43f5e, transparent 70%); }
+.qa-collect .qa-ico { background: linear-gradient(135deg,#fb7185,#e11d48); box-shadow: 0 6px 22px rgba(225,29,72,.5), inset 0 1px 0 rgba(255,255,255,.25); }
+.qa-collect:hover { border-color: #f43f5e; box-shadow: 0 10px 34px rgba(225,29,72,.32); }
+.qa-collect:hover .qa-glow { opacity: .28; }
+
+@media (max-width: 768px) {
+  .qa-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .qa-card { min-height: 116px; padding: 18px 12px; border-radius: 18px; }
+  .qa-card .qa-ico { width: 54px; height: 54px; }
+  .qa-card .qa-ico svg { width: 27px; height: 27px; }
+  .qa-card .qa-label { font-size: 14px; }
+  .qa-section-head { font-size: 15px; }
+}
+
 </style>
 </head>
 <body>
@@ -9439,6 +9526,47 @@ function renderDashboard() {
       <span class="brb-msg"></span>
       <button class="btn btn-sm btn-primary" onclick="exportBackup()" style="margin-inline-start:auto">📥 خذ نسخة الآن</button>
       <button class="btn-icon brb-close" onclick="dismissBackupReminder()" title="ذكّرني بكره">✕</button>
+    </div>
+
+    <!-- ⚡ QUICK ACTIONS (premium neon) -->
+    <div class="qa-section">
+      <div class="qa-section-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span>إجراءات سريعة</span>
+      </div>
+      <div class="qa-grid">
+        <button class="qa-card qa-invoice" onclick="openNewInvoice()">
+          <span class="qa-glow"></span>
+          <span class="qa-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          </span>
+          <span class="qa-label">فاتورة جديدة</span>
+        </button>
+
+        <button class="qa-card qa-customer" onclick="openCustomerForm()">
+          <span class="qa-glow"></span>
+          <span class="qa-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+          </span>
+          <span class="qa-label">عميل جديد</span>
+        </button>
+
+        <button class="qa-card qa-issuance" onclick="openIssuanceForm()">
+          <span class="qa-glow"></span>
+          <span class="qa-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+          </span>
+          <span class="qa-label">صرف ورق</span>
+        </button>
+
+        <button class="qa-card qa-collect" onclick="openPaymentForm()">
+          <span class="qa-glow"></span>
+          <span class="qa-ico">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M14.5 9.5a2.5 2.5 0 0 0-2.5-1.5c-1.5 0-2.5.8-2.5 2s1 1.7 2.5 2 2.5.8 2.5 2-1 2-2.5 2a2.5 2.5 0 0 1-2.5-1.5"/><line x1="12" y1="6" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="18"/></svg>
+          </span>
+          <span class="qa-label">تحصيل مديونية</span>
+        </button>
+      </div>
     </div>
 
     <!-- Smart Alerts Bar (نابض) -->
@@ -19313,6 +19441,7 @@ function openIssuanceForm(customerId, productId) {
       </div>
     </form>
   `, `<button class="btn btn-primary" onclick="saveIssuance()">💾 حفظ وصرف الورق</button>
+      <button class="btn btn-add-another" onclick="saveIssuance(true)" title="يحفظ النوع الحالي ويفتح نوع جديد لنفس العميل">➕ حفظ وإضافة نوع آخر</button>
       <button class="btn btn-secondary" onclick="closeModal()">إلغاء</button>`, 'large');
 
   // Trigger product change if pre-selected
@@ -19477,7 +19606,7 @@ function calcIssuanceTotal() {
   marginText.textContent = `هامش الربح: ${margin.toFixed(1)}%`;
 }
 
-function saveIssuance() {
+function saveIssuance(keepOpen) {
   const d = Object.fromEntries(new FormData(document.getElementById('iss-form')));
   d.quantity = parseFloat(d.quantity);
   d.unitPrice = parseFloat(d.unitPrice);
@@ -19614,13 +19743,40 @@ function saveIssuance() {
     reason: window._pendingAuditReason || ''
   });
   delete window._pendingAuditReason;
-  closeModal();
   playTone('save');
-  celebrate();
-  toast(`✓ تم صرف ${fmt(d.quantity)} ${product.unit||'ورقة'} لـ "${customer.name}" - فاتورة #${invoice.number}`, 'success');
   renderIssuances();
   renderSidebar();
   updateNotifBadge();
+
+  if (keepOpen) {
+    const savedCustomer = d.customerId;
+    const savedDate = d.date;
+    toast(`✓ تم صرف "${product.name}" (#${invoice.number}) — أضف النوع التالي`, 'success');
+    const prod = document.getElementById('iss-form-product');
+    const qty = document.getElementById('iss-qty');
+    const price = document.getElementById('iss-price');
+    const paid = document.getElementById('iss-paid');
+    if (prod) prod.value = '';
+    if (qty) qty.value = '';
+    if (price) price.value = '';
+    if (paid) paid.value = '0';
+    const tot = document.getElementById('iss-total-display');
+    if (tot) tot.textContent = fmtCurrency(0);
+    const panel = document.getElementById('iss-profit-panel');
+    if (panel) panel.style.display = 'none';
+    const stockInfo = document.getElementById('iss-stock-info');
+    if (stockInfo) stockInfo.textContent = '';
+    const custSel = document.getElementById('iss-form-customer');
+    if (custSel) custSel.value = savedCustomer;
+    const dateInput = document.querySelector('#iss-form [name="date"]');
+    if (dateInput) dateInput.value = savedDate;
+    if (prod) prod.focus();
+    return;
+  }
+
+  closeModal();
+  celebrate();
+  toast(`✓ تم صرف ${fmt(d.quantity)} ${product.unit||'ورقة'} لـ "${customer.name}" - فاتورة #${invoice.number}`, 'success');
 }
 
 function viewIssuance(id) {
