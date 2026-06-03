@@ -784,11 +784,10 @@ table.data-table tbody tr:last-child td { border-bottom: none; }
   backdrop-filter: blur(4px);
   display: none;
   align-items: center; justify-content: center;
-  z-index: 100;
+  z-index: 5000;
   padding: 20px;
-  animation: fadeIn .2s ease;
 }
-.modal-overlay.show { display: flex; }
+.modal-overlay.show { display: flex !important; opacity: 1 !important; visibility: visible !important; }
 .modal {
   background: var(--surface);
   border-radius: var(--radius-xl);
@@ -7743,9 +7742,9 @@ body.mobile-drawer-open { overflow: hidden; }
   100% { opacity: 0; transform: translate(-50%, -20px); }
 }
 @media (max-width: 768px) {
-  .paper-counter { padding: 5px 9px; gap: 4px; }
-  .paper-counter svg { width: 15px; height: 15px; }
-  .paper-counter-num { font-size: 12.5px; }
+  .paper-counter { padding: 6px 10px; gap: 5px; margin: 0 1px; }
+  .paper-counter svg { width: 16px; height: 16px; }
+  .paper-counter-num { font-size: 13px; }
 }
 
 /* ===================== QUICK ACTIONS (premium neon) ===================== */
@@ -7845,10 +7844,40 @@ body.mobile-drawer-open { overflow: hidden; }
   .ai-avatar { width: 46px !important; height: 46px !important; font-size: 23px !important; }
   .ai-bubble { font-size: 16px !important; padding: 16px 20px !important; line-height: 1.8 !important; }
   .ai-msg { max-width: 78% !important; }
-  .ai-chip { font-size: 14.5px !important; padding: 10px 18px !important; }
-  .ai-suggestions { padding: 0 28px 18px !important; gap: 10px !important; }
   .ai-input-bar { padding: 18px 28px !important; }
   .ai-input-bar .form-control { font-size: 15.5px !important; padding: 14px 16px !important; }
+
+  /* Suggestions as a neat grid (not stacked), each chip in its own colored pill */
+  .ai-suggestions {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 12px !important;
+    padding: 4px 28px 22px !important;
+    justify-content: stretch !important;
+  }
+  .ai-chip {
+    font-size: 14.5px !important;
+    padding: 14px 18px !important;
+    text-align: center;
+    justify-content: center;
+    border-radius: 14px !important;
+    background: linear-gradient(135deg, rgba(var(--primary-rgb),.10), rgba(var(--primary-rgb),.03)) !important;
+    border: 1px solid rgba(var(--primary-rgb),.30) !important;
+    color: var(--text) !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 10px rgba(var(--primary-rgb),.06);
+    white-space: normal !important;
+    line-height: 1.4;
+    display: flex; align-items: center;
+    transition: all .2s ease !important;
+  }
+  .ai-chip:hover {
+    background: linear-gradient(135deg, rgba(var(--primary-rgb),.22), rgba(var(--primary-rgb),.08)) !important;
+    border-color: var(--primary) !important;
+    color: var(--primary) !important;
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 22px rgba(var(--primary-rgb),.22) !important;
+  }
 }
 .ai-chat-messages {
   flex: 1; padding: 20px;
@@ -7898,12 +7927,14 @@ body.mobile-drawer-open { overflow: hidden; }
   background: rgba(3, 6, 14, 0);
   backdrop-filter: blur(0px);
   opacity: 0;
+  pointer-events: none;
   transition: background .25s ease, backdrop-filter .25s ease, opacity .25s ease;
 }
 .notify-overlay.show {
   background: rgba(3, 6, 14, .68);
   backdrop-filter: blur(8px);
   opacity: 1;
+  pointer-events: auto;
 }
 .notify-overlay.closing { opacity: 0; background: rgba(3,6,14,0); backdrop-filter: blur(0); }
 
@@ -8076,14 +8107,8 @@ body.mobile-drawer-open { overflow: hidden; }
 }
 
 /* ===================== ✨ SMOOTH UI ANIMATIONS ===================== */
-/* Modal pop-in — only the transform/opacity intro, never leaves it hidden */
-.modal-overlay.show .modal { animation: modalPopIn .26s cubic-bezier(.34,1.4,.64,1) both; }
-@keyframes modalPopIn {
-  from { transform: scale(.94) translateY(10px); opacity: 0; }
-  to   { transform: scale(1) translateY(0); opacity: 1; }
-}
-/* Safety: ensure an open modal is always fully visible even if animation is interrupted */
-.modal-overlay.show .modal { opacity: 1; }
+/* Modal: show instantly and fully visible (no animation that could leave it hidden). */
+.modal-overlay.show .modal { opacity: 1 !important; transform: none !important; }
 
 /* Sidebar nav items — gentle hover/slide */
 .nav-item {
@@ -8751,19 +8776,6 @@ function celebrate() {
 }
 
 function toast(msg, type='success', duration) {
-  // Errors & warnings are important → show them in the premium centered modal.
-  // Success & info stay as lightweight toasts (so they don't interrupt flow).
-  if (type === 'error' || type === 'warning') {
-    notify({
-      type: type,
-      title: type === 'error' ? 'تنبيه' : 'انتبه',
-      message: msg,
-      showMeta: false,
-      autoClose: true,
-      duration: type === 'error' ? 4000 : 4500
-    });
-    return;
-  }
   const box = document.getElementById('toast-container');
   const el = document.createElement('div');
   el.className = 'toast ' + type;
@@ -8867,7 +8879,13 @@ function notify(opts) {
     overlay.classList.remove('show');
     overlay.classList.add('closing');
     if (_notifyTimer) clearTimeout(_notifyTimer);
-    setTimeout(() => overlay.remove(), 250);
+    if (_notifyRAF) cancelAnimationFrame(_notifyRAF);
+    setTimeout(() => { try { overlay.remove(); } catch(_){} }, 250);
+    setTimeout(() => {
+      document.querySelectorAll('.notify-overlay').forEach(o => {
+        if (!o.classList.contains('show')) try { o.remove(); } catch(_){}
+      });
+    }, 300);
   }
   overlay.querySelector('.notify-close').onclick = close;
   overlay.querySelector('.notify-ok-btn').onclick = close;
@@ -8889,6 +8907,7 @@ function notify(opts) {
 
 
 function openModal(title, bodyHTML, footerHTML='', size='') {
+  document.querySelectorAll('.notify-overlay:not(.show)').forEach(o => { try{o.remove();}catch(_){} });
   const m = document.getElementById('modal');
   m.className = 'modal' + (size ? ' '+size : '');
   m.innerHTML = `
@@ -9019,16 +9038,14 @@ function updateBackButton() {
   if (btn) btn.style.display = _navHistory.length > 0 ? 'grid' : 'none';
 }
 
-// Paper counter: total paper quantity in stock, with a green +delta animation on increase
+// Stock counter: total quantity of ALL products combined, with a green +delta on increase
 let _paperCountLast = null;
 function updatePaperCounter() {
   const el = document.getElementById('paper-counter');
   const numEl = document.getElementById('paper-counter-num');
   if (!el || !numEl || !DB.data || !DB.data.products) return;
-  // Sum quantity of paper-like products (unit contains ورق) — fallback to all products
-  const paperProds = DB.data.products.filter(p => (p.unit||'').includes('ورق') || (p.name||'').includes('ورق'));
-  const source = paperProds.length ? paperProds : DB.data.products;
-  const total = source.reduce((s,p)=> s + (Number(p.quantity)||0), 0);
+  // Sum the quantity of EVERY product/type together
+  const total = DB.data.products.reduce((s,p)=> s + (Number(p.quantity)||0), 0);
 
   numEl.textContent = fmt(Math.round(total));
 
@@ -9335,6 +9352,9 @@ function updateWalletBadge() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   loadTheme();
+  document.addEventListener('pointerdown', () => {
+    document.querySelectorAll('.notify-overlay:not(.show)').forEach(o => { try{o.remove();}catch(_){} });
+  }, true);
   try {
     await bootstrapFromServer();
   } catch (e) {
@@ -18595,10 +18615,10 @@ function aiAnswer(qRaw) {
   }
 
   // ---- INVENTORY — list what's in stock by item with quantities (المخزن) ----
-  if (has('مخزن', 'مخزون', 'المخزن', 'ستوك', 'عندي ايه', 'عندي إيه', 'الاصناف', 'الأصناف', 'موجود في', 'الكمي', 'متبقي', 'يخلص', 'ينفذ', 'قرب')) {
+  if (has('مخزن', 'مخزون', 'المخزن', 'ستوك', 'عندي ايه', 'عندي إيه', 'الاصناف', 'الأصناف', 'موجود في', 'الكمي', 'متبقي', 'يخلص', 'ينفذ', 'قرب', 'ورق قد', 'قد ايه', 'قد إيه', 'عندنا كام', 'عندنا ورق', 'كام ورق', 'فيه كام', 'الورق', 'البضاعة', 'بضاعة')) {
     if (products.length === 0) return '📦 مفيش منتجات مسجلة في المخزن لسه.';
-    // Full list of items with quantities
-    const sorted = [...products].sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar'));
+    const totalQty = products.reduce((s,p)=>s+(Number(p.quantity)||0),0);
+    const sorted = [...products].sort((a,b)=>(Number(b.quantity)||0)-(Number(a.quantity)||0));
     const list = sorted.map(p => {
       const low = (p.quantity||0) <= (p.minQuantity||0);
       const warn = low ? ' ⚠️' : '';
@@ -18608,7 +18628,7 @@ function aiAnswer(qRaw) {
     const lowNote = lowItems.length > 0
       ? `<br><br>⚠️ <b>قرب يخلص (${lowItems.length}):</b> ${lowItems.map(p=>escapeHtml(p.name)).join('، ')}`
       : '<br><br>✅ كل الأصناف فوق الحد الأدنى.';
-    return `📦 <b>الموجود في المخزن (${products.length} صنف):</b><br>${list}${lowNote}`;
+    return `📦 <b>المخزن (${products.length} صنف — إجمالي ${fmt(Math.round(totalQty))} وحدة):</b><br>${list}${lowNote}`;
   }
 
   // ---- CUSTOMERS count (كام عميل) ----
