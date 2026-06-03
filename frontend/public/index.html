@@ -798,7 +798,6 @@ table.data-table tbody tr:last-child td { border-bottom: none; }
   overflow: hidden;
   display: flex; flex-direction: column;
   box-shadow: var(--shadow-lg);
-  animation: scaleIn .25s ease;
 }
 .modal.large { max-width: 900px; }
 .modal.xl { max-width: 1100px; }
@@ -7702,6 +7701,53 @@ body.mobile-drawer-open { overflow: hidden; }
 #ai-icon-btn { display: inline-flex !important; }
 #ai-icon-btn svg { color: var(--primary); }
 
+/* Back button in topbar */
+.topbar-back-btn { display: none; }
+.topbar-back-btn svg { color: var(--text); }
+
+/* ===================== 📄 PAPER COUNTER (neon) ===================== */
+.paper-counter {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; margin: 0 2px;
+  border-radius: 11px;
+  background: rgba(56, 189, 248, .08);
+  border: 1px solid rgba(56, 189, 248, .45);
+  box-shadow: 0 0 10px rgba(56,189,248,.25), inset 0 0 8px rgba(56,189,248,.08);
+  color: #38bdf8;
+  cursor: pointer;
+  position: relative;
+  transition: box-shadow .25s ease, transform .15s ease, border-color .25s ease;
+  white-space: nowrap;
+}
+.paper-counter:hover { box-shadow: 0 0 16px rgba(56,189,248,.45), inset 0 0 10px rgba(56,189,248,.12); transform: translateY(-1px); border-color: rgba(56,189,248,.7); }
+.paper-counter svg { width: 16px; height: 16px; flex-shrink: 0; }
+.paper-counter-num {
+  font-size: 13.5px; font-weight: 800; letter-spacing: .3px;
+  font-variant-numeric: tabular-nums;
+  transition: transform .2s ease;
+}
+.paper-counter.bump .paper-counter-num { animation: paperBump .4s cubic-bezier(.34,1.56,.64,1); }
+@keyframes paperBump { 0%{transform:scale(1);} 40%{transform:scale(1.35);} 100%{transform:scale(1);} }
+/* +amount green delta that floats up and fades */
+.paper-counter-delta {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; font-weight: 800; color: #22c55e;
+  opacity: 0; pointer-events: none; white-space: nowrap;
+  text-shadow: 0 0 8px rgba(34,197,94,.6);
+}
+.paper-counter-delta.show { animation: paperDelta 1.4s ease forwards; }
+@keyframes paperDelta {
+  0%   { opacity: 0; transform: translate(-50%, 4px); }
+  20%  { opacity: 1; transform: translate(-50%, -2px); }
+  70%  { opacity: 1; transform: translate(-50%, -10px); }
+  100% { opacity: 0; transform: translate(-50%, -20px); }
+}
+@media (max-width: 768px) {
+  .paper-counter { padding: 5px 9px; gap: 4px; }
+  .paper-counter svg { width: 15px; height: 15px; }
+  .paper-counter-num { font-size: 12.5px; }
+}
+
 /* ===================== QUICK ACTIONS (premium neon) ===================== */
 .qa-section { margin: 4px 0 18px; }
 .qa-section-head {
@@ -7791,6 +7837,18 @@ body.mobile-drawer-open { overflow: hidden; }
   border: 1px solid var(--border);
   border-radius: 18px; overflow: hidden;
   box-shadow: var(--shadow); min-height: 60vh;
+}
+/* Bigger, roomier assistant on desktop only (mobile stays as-is) */
+@media (min-width: 769px) {
+  .ai-chat-wrap { max-width: 1100px; min-height: 74vh; border-radius: 22px; }
+  .ai-chat-messages { max-height: 62vh !important; padding: 28px !important; gap: 18px !important; }
+  .ai-avatar { width: 46px !important; height: 46px !important; font-size: 23px !important; }
+  .ai-bubble { font-size: 16px !important; padding: 16px 20px !important; line-height: 1.8 !important; }
+  .ai-msg { max-width: 78% !important; }
+  .ai-chip { font-size: 14.5px !important; padding: 10px 18px !important; }
+  .ai-suggestions { padding: 0 28px 18px !important; gap: 10px !important; }
+  .ai-input-bar { padding: 18px 28px !important; }
+  .ai-input-bar .form-control { font-size: 15.5px !important; padding: 14px 16px !important; }
 }
 .ai-chat-messages {
   flex: 1; padding: 20px;
@@ -8018,13 +8076,14 @@ body.mobile-drawer-open { overflow: hidden; }
 }
 
 /* ===================== ✨ SMOOTH UI ANIMATIONS ===================== */
-/* Modal open/close fade + scale — uses .show (the class the app actually toggles) */
-.modal { transition: transform .26s cubic-bezier(.34,1.4,.64,1), opacity .22s ease; }
-.modal-overlay.show .modal { animation: modalPopIn .28s cubic-bezier(.34,1.4,.64,1); }
+/* Modal pop-in — only the transform/opacity intro, never leaves it hidden */
+.modal-overlay.show .modal { animation: modalPopIn .26s cubic-bezier(.34,1.4,.64,1) both; }
 @keyframes modalPopIn {
   from { transform: scale(.94) translateY(10px); opacity: 0; }
   to   { transform: scale(1) translateY(0); opacity: 1; }
 }
+/* Safety: ensure an open modal is always fully visible even if animation is interrupted */
+.modal-overlay.show .modal { opacity: 1; }
 
 /* Sidebar nav items — gentle hover/slide */
 .nav-item {
@@ -8134,6 +8193,9 @@ html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
       <button class="icon-btn menu-toggle" onclick="toggleSidebar()" aria-label="قائمة">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
+      <button class="icon-btn topbar-back-btn" id="topbar-back-btn" onclick="goBack()" title="رجوع للصفحة السابقة" style="display:none">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
       <div class="topbar-title" id="topbar-title">لوحة التحكم</div>
 
       <div class="topbar-spacer"></div>
@@ -8176,6 +8238,11 @@ html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
           <rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>
         </svg>
       </button>
+      <div class="paper-counter" id="paper-counter" title="إجمالي الورق في المخزن" onclick="navigate('inventory')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span class="paper-counter-num" id="paper-counter-num">0</span>
+        <span class="paper-counter-delta" id="paper-counter-delta"></span>
+      </div>
       <button class="icon-btn" id="notif-btn" onclick="openNotifications()" title="الإشعارات">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="notif-dot" id="notif-dot" style="display:none"></span>
@@ -8922,16 +8989,59 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-function navigate(page) {
+let _navHistory = [];
+function navigate(page, isBack) {
   if (!can(page)) { toast('ليس لديك صلاحية للوصول لهذه الصفحة', 'error'); return; }
+  // track history for the back button (skip when navigating via back itself)
+  if (!isBack && typeof currentPage !== 'undefined' && currentPage && currentPage !== page) {
+    _navHistory.push(currentPage);
+    if (_navHistory.length > 40) _navHistory.shift();
+  }
   currentPage = page;
   renderSidebar();
   toggleSidebar(false);
-  const titles = { dashboard:'لوحة التحكم', customers:'العملاء والمراكز', issuances:'صرف الورق للمراكز', invoices:'الفواتير', payments:'التحصيل والمديونيات', transfers:'التحويلات البنكية', suppliers:'الموردين', inventory:'إدارة المخازن', expenses:'المصروفات', reports:'التقارير', users:'إدارة المستخدمين', audit:'سجل التعديلات الذكي', settings:'الإعدادات' };
+  const titles = { dashboard:'لوحة التحكم', customers:'العملاء والمراكز', issuances:'صرف الورق للمراكز', invoices:'الفواتير', payments:'التحصيل والمديونيات', transfers:'التحويلات البنكية', suppliers:'الموردين', inventory:'إدارة المخازن', expenses:'المصروفات', reports:'التقارير', aiassistant:'المساعد الذكي', users:'إدارة المستخدمين', audit:'سجل التعديلات الذكي', settings:'الإعدادات' };
   document.getElementById('topbar-title').innerText = titles[page] || '';
   const renderers = { dashboard: renderDashboard, customers: renderCustomers, issuances: renderIssuances, invoices: renderInvoices, payments: renderPayments, transfers: renderTransfersPage, suppliers: renderSuppliers, inventory: renderInventory, expenses: renderExpenses, reports: renderReports, aiassistant: renderAIAssistant, users: renderUsers, audit: renderAuditLog, settings: renderSettings };
   (renderers[page] || renderDashboard)();
+  updateBackButton();
   window.scrollTo(0,0);
+}
+
+function goBack() {
+  if (_navHistory.length === 0) { navigate('dashboard', true); return; }
+  const prev = _navHistory.pop();
+  navigate(prev, true);
+}
+
+function updateBackButton() {
+  const btn = document.getElementById('topbar-back-btn');
+  if (btn) btn.style.display = _navHistory.length > 0 ? 'grid' : 'none';
+}
+
+// Paper counter: total paper quantity in stock, with a green +delta animation on increase
+let _paperCountLast = null;
+function updatePaperCounter() {
+  const el = document.getElementById('paper-counter');
+  const numEl = document.getElementById('paper-counter-num');
+  if (!el || !numEl || !DB.data || !DB.data.products) return;
+  // Sum quantity of paper-like products (unit contains ورق) — fallback to all products
+  const paperProds = DB.data.products.filter(p => (p.unit||'').includes('ورق') || (p.name||'').includes('ورق'));
+  const source = paperProds.length ? paperProds : DB.data.products;
+  const total = source.reduce((s,p)=> s + (Number(p.quantity)||0), 0);
+
+  numEl.textContent = fmt(Math.round(total));
+
+  if (_paperCountLast !== null && total > _paperCountLast) {
+    const delta = total - _paperCountLast;
+    const d = document.getElementById('paper-counter-delta');
+    if (d) {
+      d.textContent = '+' + fmt(Math.round(delta));
+      d.classList.remove('show'); void d.offsetWidth; d.classList.add('show');
+    }
+    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  }
+  _paperCountLast = total;
 }
 
 function toggleSidebar(state) {
@@ -9112,6 +9222,7 @@ function getDueSoonIssuances() {
 }
 
 function updateNotifBadge() {
+  updatePaperCounter();
   const low = DB.data.products.filter(p => p.quantity <= p.minQuantity).length;
   const overdueIss = getOverdueIssuances().length;
   const dueSoon = getDueSoonIssuances().length;
@@ -18344,7 +18455,11 @@ function renderAIAssistant() {
           'كام إجمالي الديون؟',
           'كام عميل عندي؟',
           'أكتر منتج مبيعاً',
-          'عليا كام للموردين؟'
+          'عليا كام للموردين؟',
+          'متوسط قيمة الفاتورة',
+          'مين أكتر عميل بيشتري؟',
+          'إيه نصيحتك النهارده؟',
+          'ملخص الشركة'
         ].map(q => `<button class="ai-chip" onclick="askAI('${q.replace(/'/g,"\\'")}')">${q}</button>`).join('')}
       </div>
 
@@ -18505,11 +18620,47 @@ function aiAnswer(qRaw) {
   }
 
   // ---- INVOICES (فواتير) ----
-  if (has('فاتورة', 'فواتير', 'كام فاتورة')) {
+  if (has('فاتورة', 'فواتير', 'كام فاتورة') && !has('متوسط', 'معدل')) {
     const total = invoices.length;
     const unpaid = invoices.filter(i=>i.status==='unpaid'||i.status==='partial').length;
     const monthInv = invoices.filter(i=>(i.date||'')>=monthStart).length;
     return `🧾 <b>الفواتير:</b><br>• الإجمالي: <b>${total}</b><br>• هذا الشهر: <b>${monthInv}</b><br>• غير مدفوعة/جزئية: <b>${unpaid}</b>`;
+  }
+
+  // ---- AVERAGE INVOICE VALUE (متوسط الفاتورة) ----
+  if (has('متوسط', 'معدل الفاتورة', 'متوسط الفاتورة', 'متوسط فاتورة')) {
+    if (invoices.length === 0) return '📊 لسه مفيش فواتير لحساب المتوسط.';
+    const avg = invoices.reduce((s,i)=>s+(i.total||0),0) / invoices.length;
+    const max = invoices.reduce((m,i)=>Math.max(m,i.total||0),0);
+    return `📊 <b>متوسط قيمة الفاتورة:</b> ${fmtm(avg)}<br>• أكبر فاتورة: ${fmtm(max)}<br>• عدد الفواتير: <b>${invoices.length}</b>`;
+  }
+
+  // ---- TOP BUYING CUSTOMER (أكتر عميل بيشتري) ----
+  if (has('أكتر عميل بيشتري', 'اكتر عميل بيشتري', 'أفضل عميل', 'افضل عميل', 'أكتر عميل شاري', 'اكتر زبون')) {
+    const byCust = {};
+    invoices.forEach(inv => { byCust[inv.customerId] = (byCust[inv.customerId]||0) + (inv.total||0); });
+    const arr = Object.entries(byCust).sort((a,b)=>b[1]-a[1]);
+    if (arr.length === 0) return '🛒 لسه مفيش مشتريات مسجلة.';
+    const top = arr.slice(0,5).map(([cid,amt],i)=>{
+      const c = customers.find(x=>x.id===cid);
+      return `${i+1}. <b>${escapeHtml(c?c.name:'غير معروف')}</b>: ${fmt(Math.round(amt))} ${curShort}`;
+    }).join('<br>');
+    return `🛒 <b>أكتر العملاء شراءً:</b><br>${top}`;
+  }
+
+  // ---- SMART ADVICE (نصيحة) ----
+  if (has('نصيحة', 'نصيحتك', 'اقتراح', 'رأيك', 'تنصحني', 'اعمل ايه', 'أعمل إيه')) {
+    const tips = [];
+    const lowItems = products.filter(p => (p.quantity||0) <= (p.minQuantity||0));
+    if (lowItems.length) tips.push(`📦 عندك <b>${lowItems.length}</b> صنف قرب يخلص (${lowItems.slice(0,3).map(p=>escapeHtml(p.name)).join('، ')})${lowItems.length>3?'...':''} — يفضل تطلبهم.`);
+    const bigDebtors = customers.filter(c=>(c.balance||0)>0).sort((a,b)=>b.balance-a.balance);
+    if (bigDebtors.length) tips.push(`💸 حصّل من <b>${escapeHtml(bigDebtors[0].name)}</b> (عليه ${fmt(Math.round(bigDebtors[0].balance))} ${curShort}) — أكبر مديونية.`);
+    const overdue = (typeof getOverdueIssuances === 'function') ? getOverdueIssuances().length : 0;
+    if (overdue) tips.push(`⏰ عندك <b>${overdue}</b> عملية متأخرة في التحصيل — راجعها.`);
+    const unpaidInv = invoices.filter(i=>i.status!=='paid').length;
+    if (unpaidInv) tips.push(`🧾 فيه <b>${unpaidInv}</b> فاتورة لسه مش مدفوعة بالكامل.`);
+    if (!tips.length) return '✅ كل حاجة تمام! المخزون كويس، مفيش ديون متأخرة، والفواتير مدفوعة. شغل ممتاز! 👏';
+    return `💡 <b>نصايح النهارده:</b><br><br>${tips.join('<br><br>')}`;
   }
 
   // ---- summary / general (ملخص) ----
