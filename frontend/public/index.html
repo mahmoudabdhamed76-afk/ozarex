@@ -8018,15 +8018,13 @@ body.mobile-drawer-open { overflow: hidden; }
 }
 
 /* ===================== ✨ SMOOTH UI ANIMATIONS ===================== */
-/* Modal open/close fade + scale */
-.modal-overlay {
-  transition: opacity .24s ease, visibility .24s ease;
+/* Modal open/close fade + scale — uses .show (the class the app actually toggles) */
+.modal { transition: transform .26s cubic-bezier(.34,1.4,.64,1), opacity .22s ease; }
+.modal-overlay.show .modal { animation: modalPopIn .28s cubic-bezier(.34,1.4,.64,1); }
+@keyframes modalPopIn {
+  from { transform: scale(.94) translateY(10px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
 }
-.modal {
-  transition: transform .26s cubic-bezier(.34,1.4,.64,1), opacity .24s ease;
-}
-.modal-overlay:not(.open) .modal { transform: scale(.94) translateY(8px); opacity: 0; }
-.modal-overlay.open .modal { transform: scale(1) translateY(0); opacity: 1; }
 
 /* Sidebar nav items — gentle hover/slide */
 .nav-item {
