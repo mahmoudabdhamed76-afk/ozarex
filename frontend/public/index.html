@@ -784,11 +784,10 @@ table.data-table tbody tr:last-child td { border-bottom: none; }
   backdrop-filter: blur(4px);
   display: none;
   align-items: center; justify-content: center;
-  z-index: 100;
+  z-index: 5000;
   padding: 20px;
-  animation: fadeIn .2s ease;
 }
-.modal-overlay.show { display: flex; }
+.modal-overlay.show { display: flex !important; opacity: 1 !important; visibility: visible !important; }
 .modal {
   background: var(--surface);
   border-radius: var(--radius-xl);
@@ -7743,9 +7742,9 @@ body.mobile-drawer-open { overflow: hidden; }
   100% { opacity: 0; transform: translate(-50%, -20px); }
 }
 @media (max-width: 768px) {
-  .paper-counter { padding: 5px 9px; gap: 4px; }
-  .paper-counter svg { width: 15px; height: 15px; }
-  .paper-counter-num { font-size: 12.5px; }
+  .paper-counter { padding: 6px 10px; gap: 5px; margin: 0 1px; }
+  .paper-counter svg { width: 16px; height: 16px; }
+  .paper-counter-num { font-size: 13px; }
 }
 
 /* ===================== QUICK ACTIONS (premium neon) ===================== */
@@ -7898,12 +7897,14 @@ body.mobile-drawer-open { overflow: hidden; }
   background: rgba(3, 6, 14, 0);
   backdrop-filter: blur(0px);
   opacity: 0;
+  pointer-events: none;
   transition: background .25s ease, backdrop-filter .25s ease, opacity .25s ease;
 }
 .notify-overlay.show {
   background: rgba(3, 6, 14, .68);
   backdrop-filter: blur(8px);
   opacity: 1;
+  pointer-events: auto;
 }
 .notify-overlay.closing { opacity: 0; background: rgba(3,6,14,0); backdrop-filter: blur(0); }
 
@@ -8076,14 +8077,8 @@ body.mobile-drawer-open { overflow: hidden; }
 }
 
 /* ===================== ✨ SMOOTH UI ANIMATIONS ===================== */
-/* Modal pop-in — only the transform/opacity intro, never leaves it hidden */
-.modal-overlay.show .modal { animation: modalPopIn .26s cubic-bezier(.34,1.4,.64,1) both; }
-@keyframes modalPopIn {
-  from { transform: scale(.94) translateY(10px); opacity: 0; }
-  to   { transform: scale(1) translateY(0); opacity: 1; }
-}
-/* Safety: ensure an open modal is always fully visible even if animation is interrupted */
-.modal-overlay.show .modal { opacity: 1; }
+/* Modal: show instantly and fully visible (no animation that could leave it hidden). */
+.modal-overlay.show .modal { opacity: 1 !important; transform: none !important; }
 
 /* Sidebar nav items — gentle hover/slide */
 .nav-item {
@@ -9019,16 +9014,14 @@ function updateBackButton() {
   if (btn) btn.style.display = _navHistory.length > 0 ? 'grid' : 'none';
 }
 
-// Paper counter: total paper quantity in stock, with a green +delta animation on increase
+// Stock counter: total quantity of ALL products combined, with a green +delta on increase
 let _paperCountLast = null;
 function updatePaperCounter() {
   const el = document.getElementById('paper-counter');
   const numEl = document.getElementById('paper-counter-num');
   if (!el || !numEl || !DB.data || !DB.data.products) return;
-  // Sum quantity of paper-like products (unit contains ورق) — fallback to all products
-  const paperProds = DB.data.products.filter(p => (p.unit||'').includes('ورق') || (p.name||'').includes('ورق'));
-  const source = paperProds.length ? paperProds : DB.data.products;
-  const total = source.reduce((s,p)=> s + (Number(p.quantity)||0), 0);
+  // Sum the quantity of EVERY product/type together
+  const total = DB.data.products.reduce((s,p)=> s + (Number(p.quantity)||0), 0);
 
   numEl.textContent = fmt(Math.round(total));
 
@@ -18595,10 +18588,10 @@ function aiAnswer(qRaw) {
   }
 
   // ---- INVENTORY — list what's in stock by item with quantities (المخزن) ----
-  if (has('مخزن', 'مخزون', 'المخزن', 'ستوك', 'عندي ايه', 'عندي إيه', 'الاصناف', 'الأصناف', 'موجود في', 'الكمي', 'متبقي', 'يخلص', 'ينفذ', 'قرب')) {
+  if (has('مخزن', 'مخزون', 'المخزن', 'ستوك', 'عندي ايه', 'عندي إيه', 'الاصناف', 'الأصناف', 'موجود في', 'الكمي', 'متبقي', 'يخلص', 'ينفذ', 'قرب', 'ورق قد', 'قد ايه', 'قد إيه', 'عندنا كام', 'عندنا ورق', 'كام ورق', 'فيه كام', 'الورق', 'البضاعة', 'بضاعة')) {
     if (products.length === 0) return '📦 مفيش منتجات مسجلة في المخزن لسه.';
-    // Full list of items with quantities
-    const sorted = [...products].sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar'));
+    const totalQty = products.reduce((s,p)=>s+(Number(p.quantity)||0),0);
+    const sorted = [...products].sort((a,b)=>(Number(b.quantity)||0)-(Number(a.quantity)||0));
     const list = sorted.map(p => {
       const low = (p.quantity||0) <= (p.minQuantity||0);
       const warn = low ? ' ⚠️' : '';
@@ -18608,7 +18601,7 @@ function aiAnswer(qRaw) {
     const lowNote = lowItems.length > 0
       ? `<br><br>⚠️ <b>قرب يخلص (${lowItems.length}):</b> ${lowItems.map(p=>escapeHtml(p.name)).join('، ')}`
       : '<br><br>✅ كل الأصناف فوق الحد الأدنى.';
-    return `📦 <b>الموجود في المخزن (${products.length} صنف):</b><br>${list}${lowNote}`;
+    return `📦 <b>المخزن (${products.length} صنف — إجمالي ${fmt(Math.round(totalQty))} وحدة):</b><br>${list}${lowNote}`;
   }
 
   // ---- CUSTOMERS count (كام عميل) ----
