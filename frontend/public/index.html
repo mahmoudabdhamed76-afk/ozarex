@@ -8000,6 +8000,50 @@ body.mobile-drawer-open { overflow: hidden; }
   .notify-icon-ring { width: 74px; height: 74px; }
 }
 
+/* ===================== 📱 BOTTOM NAVIGATION ===================== */
+.bottom-nav { display: none; }
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 950;
+    background: rgba(10, 14, 24, .92);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid rgba(255,255,255,.08);
+    padding: 6px 4px;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 6px);
+    justify-content: space-around;
+    align-items: stretch;
+  }
+  [data-theme="light"] .bottom-nav { background: rgba(255,255,255,.95); border-top-color: #e2e8f0; }
+  .bottom-nav-item {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 4px;
+    padding: 6px 2px 4px;
+    background: none; border: none; cursor: pointer;
+    color: var(--text-soft, #8ea0c0);
+    transition: color .18s ease, transform .12s ease;
+    position: relative;
+  }
+  .bottom-nav-item svg { width: 24px; height: 24px; }
+  .bottom-nav-item span { font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .bottom-nav-item:active { transform: scale(.92); }
+  .bottom-nav-item.active { color: var(--primary); }
+  .bottom-nav-item.active::after {
+    content: '';
+    position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%);
+    width: 22px; height: 3px; border-radius: 999px;
+    background: var(--primary);
+  }
+  .main-content, .content-wrapper, main { padding-bottom: 88px !important; }
+  .page-content { padding-bottom: 88px !important; }
+  .app-footer { display: none !important; }
+  .topbar-quick-actions { bottom: 84px !important; }
+}
+
 </style>
 </head>
 <body>
@@ -8118,6 +8162,30 @@ body.mobile-drawer-open { overflow: hidden; }
     </footer>
   </div>
 </div>
+
+<!-- 📱 BOTTOM NAVIGATION (mobile only) -->
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="bottom-nav-item" data-page="reports" onclick="navigate('reports')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <span>التقارير</span>
+  </button>
+  <button class="bottom-nav-item" data-page="inventory" onclick="navigate('inventory')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+    <span>المخزون</span>
+  </button>
+  <button class="bottom-nav-item" data-page="customers" onclick="navigate('customers')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span>العملاء</span>
+  </button>
+  <button class="bottom-nav-item" data-page="invoices" onclick="navigate('invoices')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    <span>المبيعات</span>
+  </button>
+  <button class="bottom-nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span>الرئيسية</span>
+  </button>
+</nav>
 
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
@@ -8612,6 +8680,19 @@ function celebrate() {
 }
 
 function toast(msg, type='success', duration) {
+  // Errors & warnings are important → show them in the premium centered modal.
+  // Success & info stay as lightweight toasts (so they don't interrupt flow).
+  if (type === 'error' || type === 'warning') {
+    notify({
+      type: type,
+      title: type === 'error' ? 'تنبيه' : 'انتبه',
+      message: msg,
+      showMeta: false,
+      autoClose: true,
+      duration: type === 'error' ? 4000 : 4500
+    });
+    return;
+  }
   const box = document.getElementById('toast-container');
   const el = document.createElement('div');
   el.className = 'toast ' + type;
@@ -8619,9 +8700,8 @@ function toast(msg, type='success', duration) {
   el.innerHTML = `<span class="icon">${ic}</span><span class="msg">${escapeHtml(msg)}</span><span class="close-x" style="margin-right:auto;font-size:18px;font-weight:900;cursor:pointer;color:var(--text-muted);padding:0 6px">×</span>`;
   el.querySelector('.close-x').onclick = () => { el.style.opacity='0'; setTimeout(()=>el.remove(), 300); };
   box.appendChild(el);
-  // Play sound based on type
   playTone(type);
-  const auto = duration || (type === 'warning' || type === 'error' ? 5000 : 3000);
+  const auto = duration || 3000;
   setTimeout(()=> { el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(()=>el.remove(), 300); }, auto);
 }
 
@@ -8847,6 +8927,10 @@ function navigate(page) {
   document.getElementById('topbar-title').innerText = titles[page] || '';
   const renderers = { dashboard: renderDashboard, customers: renderCustomers, issuances: renderIssuances, invoices: renderInvoices, payments: renderPayments, transfers: renderTransfersPage, suppliers: renderSuppliers, inventory: renderInventory, expenses: renderExpenses, reports: renderReports, aiassistant: renderAIAssistant, users: renderUsers, audit: renderAuditLog, settings: renderSettings };
   (renderers[page] || renderDashboard)();
+  // sync bottom-nav active highlight
+  document.querySelectorAll('.bottom-nav-item').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-page') === page);
+  });
   window.scrollTo(0,0);
 }
 
