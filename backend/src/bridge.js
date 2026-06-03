@@ -138,7 +138,12 @@ const NUMERIC_REQUIRED = {
   supplier_payments: { amount: 0 },
   expenses:          { amount: 0 },
   bank_transfers:    { amount: 0 },
-  salary_runs:       { amount: 0 }
+  salary_runs:       { amount: 0 },
+  products:          { quantity: 0, cost: 0, price: 0, min_quantity: 0, minQuantity: 0 },
+  customers:         { balance: 0, credit_limit: 0, creditLimit: 0 },
+  suppliers:         { balance: 0, opening_balance: 0, openingBalance: 0 },
+  invoices:          { subtotal: 0, tax: 0, discount: 0, total: 0, paid: 0 },
+  issuances:         { quantity: 0, unit_price: 0, unitPrice: 0, total: 0, paid: 0 }
 };
 
 function toNumber(v, fallback) {
@@ -196,8 +201,27 @@ function insertGeneric(tableName, item, cfg) {
   const cols = cfg.cols.filter(c => c in row);
   if (cols.length === 0) return;
   const placeholders = cols.map(() => '?').join(', ');
-  const values = cols.map(c => toSqliteValue(row[c]));
-  db.prepare(`INSERT OR REPLACE INTO ${tableName} (${cols.join(', ')}) VALUES (${placeholders})`).run(...values);
+  let values = cols.map(c => toSqliteValue(row[c]));
+  const stmt = db.prepare(`INSERT OR REPLACE INTO ${tableName} (${cols.join(', ')}) VALUES (${placeholders})`);
+  try {
+    stmt.run(...values);
+  } catch (err) {
+    // Fallback: a NOT NULL numeric column got null. Coerce any null/object
+    // binding to a safe primitive (0 for nulls) and retry once so a single bad
+    // field never crashes the whole save ("فشل في السيرفر").
+    values = values.map(v => {
+      if (v === null || v === undefined) return 0;
+      const t = typeof v;
+      if (t === 'number' || t === 'string') return v;
+      return String(v);
+    });
+    try {
+      stmt.run(...values);
+    } catch (err2) {
+      console.error(`[insertGeneric ${tableName}] skipped a bad row:`, err2.message);
+      // Skip this row rather than failing the entire request.
+    }
+  }
 }
 
 function insertInvoice(inv) {
@@ -206,22 +230,32 @@ function insertInvoice(inv) {
   for (const k of Object.keys(inv)) {
     if (!knownHeader.has(k)) headerData[k] = inv[k];
   }
-  db.prepare(`INSERT OR REPLACE INTO invoices (id, number, customer_id, date, subtotal, discount, tax, total, paid, status, notes, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(
-      inv.id, inv.number ?? null,
-      inv.customerId ?? inv.customer_id ?? null,
-      inv.date, inv.subtotal ?? 0, inv.discount ?? 0, inv.tax ?? 0,
-      inv.total ?? 0, inv.paid ?? 0, inv.status ?? 'open', inv.notes ?? null,
-      Object.keys(headerData).length ? JSON.stringify(headerData) : null,
-      inv.createdAt || inv.created_at || new Date().toISOString(),
-      inv.updatedAt || inv.updated_at || new Date().toISOString()
-    );
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const str = (v) => (v === null || v === undefined) ? null : String(v);
+  try {
+    db.prepare(`INSERT OR REPLACE INTO invoices (id, number, customer_id, date, subtotal, discount, tax, total, paid, status, notes, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(
+        str(inv.id), num(inv.number),
+        str(inv.customerId ?? inv.customer_id),
+        str(inv.date) || new Date().toISOString().slice(0,10),
+        num(inv.subtotal), num(inv.discount), num(inv.tax),
+        num(inv.total), num(inv.paid), str(inv.status) || 'open', str(inv.notes),
+        Object.keys(headerData).length ? JSON.stringify(headerData) : null,
+        str(inv.createdAt || inv.created_at) || new Date().toISOString(),
+        str(inv.updatedAt || inv.updated_at) || new Date().toISOString()
+      );
+  } catch (err) {
+    console.error('[insertInvoice] skipped:', err.message);
+    return;
+  }
   const itemStmt = db.prepare(`INSERT INTO invoice_items (invoice_id, product_id, name, qty, price, total, data) VALUES (?, ?, ?, ?, ?, ?, ?)`);
   for (const it of (inv.items || [])) {
     const known = new Set(['productId','product_id','name','qty','price','total']);
     const d = {};
     for (const k of Object.keys(it)) { if (!known.has(k)) d[k] = it[k]; }
-    itemStmt.run(inv.id, it.productId ?? it.product_id ?? null, it.name ?? null, it.qty ?? 0, it.price ?? 0, it.total ?? 0, Object.keys(d).length ? JSON.stringify(d) : null);
+    try {
+      itemStmt.run(str(inv.id), str(it.productId ?? it.product_id), str(it.name ?? it.productName), num(it.qty ?? it.quantity), num(it.price), num(it.total), Object.keys(d).length ? JSON.stringify(d) : null);
+    } catch (err) { console.error('[invoice_item] skipped:', err.message); }
   }
 }
 
@@ -229,17 +263,23 @@ function insertIssuance(iss) {
   const known = new Set(['id','number','customerId','customer_id','date','notes','items','data','createdAt','updatedAt','created_at','updated_at']);
   const headerData = {};
   for (const k of Object.keys(iss)) { if (!known.has(k)) headerData[k] = iss[k]; }
-  db.prepare(`INSERT OR REPLACE INTO issuances (id, number, customer_id, date, notes, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
-    .run(iss.id, iss.number ?? null, iss.customerId ?? iss.customer_id ?? null, iss.date, iss.notes ?? null,
-      Object.keys(headerData).length ? JSON.stringify(headerData) : null,
-      iss.createdAt || iss.created_at || new Date().toISOString(),
-      iss.updatedAt || iss.updated_at || new Date().toISOString());
+  const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const str = (v) => (v === null || v === undefined) ? null : String(v);
+  try {
+    db.prepare(`INSERT OR REPLACE INTO issuances (id, number, customer_id, date, notes, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(str(iss.id), num(iss.number), str(iss.customerId ?? iss.customer_id), str(iss.date) || new Date().toISOString().slice(0,10), str(iss.notes),
+        Object.keys(headerData).length ? JSON.stringify(headerData) : null,
+        str(iss.createdAt || iss.created_at) || new Date().toISOString(),
+        str(iss.updatedAt || iss.updated_at) || new Date().toISOString());
+  } catch (err) { console.error('[insertIssuance] skipped:', err.message); return; }
   const itemStmt = db.prepare(`INSERT INTO issuance_items (issuance_id, product_id, name, qty, data) VALUES (?, ?, ?, ?, ?)`);
   for (const it of (iss.items || [])) {
     const k2 = new Set(['productId','product_id','name','qty']);
     const d = {};
     for (const k of Object.keys(it)) { if (!k2.has(k)) d[k] = it[k]; }
-    itemStmt.run(iss.id, it.productId ?? it.product_id ?? null, it.name ?? null, it.qty ?? 0, Object.keys(d).length ? JSON.stringify(d) : null);
+    try {
+      itemStmt.run(str(iss.id), str(it.productId ?? it.product_id), str(it.name ?? it.productName), num(it.qty ?? it.quantity), Object.keys(d).length ? JSON.stringify(d) : null);
+    } catch (err) { console.error('[issuance_item] skipped:', err.message); }
   }
 }
 

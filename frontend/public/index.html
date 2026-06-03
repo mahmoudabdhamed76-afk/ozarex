@@ -252,24 +252,26 @@ table { border-collapse: collapse; width: 100%; }
 .demo-creds b { color: var(--primary-dark); }
 
 /* ========================= FORMS ========================= */
-.form-group { margin-bottom: 16px; }
-.form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 13px; color: var(--text); }
+.form-group { margin-bottom: 18px; }
+.form-group label { display: block; margin-bottom: 7px; font-weight: 600; font-size: 13px; color: var(--text-muted); letter-spacing: .2px; }
 .form-control {
   width: 100%;
-  padding: 11px 14px;
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   background: var(--surface);
   color: var(--text);
   font-size: 14px;
-  transition: border var(--transition), box-shadow var(--transition);
+  line-height: 1.4;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
 }
-.form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-50); }
+.form-control:hover { border-color: var(--text-soft); }
+.form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-50); }
 .form-control::placeholder { color: var(--text-soft); }
 textarea.form-control { resize: vertical; min-height: 80px; }
-.form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-.form-row-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-@media (max-width: 700px) { .form-row, .form-row-3 { grid-template-columns: 1fr; } }
+.form-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.form-row-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 700px) { .form-row, .form-row-3 { grid-template-columns: 1fr; gap: 0; } }
 
 /* ========================= BUTTONS ========================= */
 .btn {
@@ -731,27 +733,29 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 .table-toolbar { padding: 14px 16px; display: flex; gap: 10px; align-items: center; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .table-toolbar .search-box { width: 280px; max-width: 100%; }
 .table-scroll { overflow-x: auto; }
-table.data-table { width: 100%; }
+table.data-table { width: 100%; border-collapse: collapse; }
 table.data-table th {
   text-align: right;
-  padding: 12px 16px;
+  padding: 13px 16px;
   font-size: 12px;
   font-weight: 700;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: .5px;
+  letter-spacing: .3px;
   background: var(--surface-2);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
+table.data-table th:first-child { border-top-right-radius: 10px; }
+table.data-table th:last-child { border-top-left-radius: 10px; }
 table.data-table td {
-  padding: 14px 16px;
+  padding: 13px 16px;
   border-bottom: 1px solid var(--border);
   font-size: 13.5px;
   vertical-align: middle;
 }
-table.data-table tbody tr { transition: background var(--transition); }
-table.data-table tbody tr:hover { background: var(--surface-2); }
+table.data-table tbody tr { transition: background .15s ease; }
+table.data-table tbody tr:nth-child(even) { background: rgba(127,127,127,.03); }
+table.data-table tbody tr:hover { background: var(--primary-50); }
 table.data-table tbody tr:last-child td { border-bottom: none; }
 .empty-state { padding: 60px 20px; text-align: center; color: var(--text-muted); }
 .empty-state .icon { font-size: 48px; opacity: .35; margin-bottom: 10px; }
@@ -7695,6 +7699,8 @@ body.mobile-drawer-open { overflow: hidden; }
 
 /* Notes icon button sits next to notifications in the topbar (all screen sizes) */
 #notes-icon-btn { display: inline-flex !important; }
+#ai-icon-btn { display: inline-flex !important; }
+#ai-icon-btn svg { color: var(--primary); }
 
 /* ===================== QUICK ACTIONS (premium neon) ===================== */
 .qa-section { margin: 4px 0 18px; }
@@ -8004,74 +8010,10 @@ body.mobile-drawer-open { overflow: hidden; }
   .notify-icon-ring { width: 74px; height: 74px; }
 }
 
-/* ===================== 📱 BOTTOM NAVIGATION ===================== */
-.bottom-nav { display: none; }
+/* Bottom navigation removed — normal mobile spacing */
 @media (max-width: 768px) {
-  /* Dynamic bottom-nav height = bar content + device safe area.
-     Content/cards get padding-bottom of this value so nothing hides behind the nav. */
-  :root { --bottom-nav-h: calc(64px + env(safe-area-inset-bottom, 0px)); }
-  .bottom-nav {
-    display: flex;
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    z-index: 950;
-    background: rgba(8, 11, 20, .96);
-    backdrop-filter: blur(20px) saturate(140%);
-    -webkit-backdrop-filter: blur(20px) saturate(140%);
-    border-top: 1px solid rgba(255,255,255,.07);
-    box-shadow: 0 -8px 30px rgba(0,0,0,.4);
-    padding: 8px 6px;
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
-    justify-content: space-around;
-    align-items: stretch;
-    gap: 2px;
-  }
-  [data-theme="light"] .bottom-nav { background: rgba(255,255,255,.97); border-top-color: #e8edf3; box-shadow: 0 -8px 30px rgba(0,0,0,.08); }
-
-  .bottom-nav-item {
-    flex: 1;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 5px;
-    padding: 8px 2px 6px;
-    background: none; border: none; cursor: pointer;
-    color: var(--text-soft, #7c8aa3);
-    transition: color .22s ease, transform .18s cubic-bezier(.34,1.56,.64,1);
-    position: relative;
-    border-radius: 16px;
-  }
-  .bottom-nav-item .bn-icon {
-    display: flex; align-items: center; justify-content: center;
-    width: 44px; height: 32px; border-radius: 14px;
-    transition: background .22s ease, transform .22s cubic-bezier(.34,1.56,.64,1);
-  }
-  .bottom-nav-item svg { width: 23px; height: 23px; transition: transform .22s ease; }
-  .bottom-nav-item span {
-    font-size: 11px; font-weight: 700; white-space: nowrap;
-    transition: opacity .2s ease;
-  }
-  .bottom-nav-item:active { transform: scale(.9); }
-
-  /* Active state — modern pill indicator */
-  .bottom-nav-item.active { color: var(--primary); }
-  .bottom-nav-item.active .bn-icon {
-    background: rgba(var(--primary-rgb, 16,185,129), .18);
-    transform: translateY(-2px);
-  }
-  .bottom-nav-item.active svg { transform: scale(1.12); }
-  .bottom-nav-item.active span { font-weight: 800; }
-  .bottom-nav-item.active::after {
-    content: '';
-    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: 20px; height: 3px; border-radius: 999px;
-    background: var(--primary);
-    box-shadow: 0 0 8px var(--primary);
-  }
-
-  /* Dynamic clearance so cards/buttons/quick-actions never hide behind the nav */
-  .main-content, .content-wrapper, main { padding-bottom: calc(var(--bottom-nav-h) + 16px) !important; }
-  .page-content { padding-bottom: calc(var(--bottom-nav-h) + 16px) !important; }
-  .app-footer { display: none !important; }
-  .topbar-quick-actions { bottom: calc(var(--bottom-nav-h) + 10px) !important; }
+  .main-content, .content-wrapper, main { padding-bottom: 24px !important; }
+  .page-content { padding-bottom: 24px !important; }
   .topbar-home-btn { display: none !important; }
 }
 
@@ -8231,6 +8173,11 @@ html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
         </svg>
         <span class="qa-notes-count" id="qa-notes-count" style="display:none">0</span>
       </button>
+      <button class="icon-btn" id="ai-icon-btn" onclick="navigate('aiassistant')" title="المساعد الذكي" style="position:relative">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>
+        </svg>
+      </button>
       <button class="icon-btn" id="notif-btn" onclick="openNotifications()" title="الإشعارات">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="notif-dot" id="notif-dot" style="display:none"></span>
@@ -8245,30 +8192,6 @@ html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
     </footer>
   </div>
 </div>
-
-<!-- 📱 BOTTOM NAVIGATION (mobile only) -->
-<nav class="bottom-nav" id="bottom-nav">
-  <button class="bottom-nav-item" data-page="reports" onclick="navigate('reports')">
-    <span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
-    <span>التقارير</span>
-  </button>
-  <button class="bottom-nav-item" data-page="inventory" onclick="navigate('inventory')">
-    <span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
-    <span>المخزون</span>
-  </button>
-  <button class="bottom-nav-item" data-page="customers" onclick="navigate('customers')">
-    <span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-    <span>العملاء</span>
-  </button>
-  <button class="bottom-nav-item" data-page="invoices" onclick="navigate('invoices')">
-    <span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-    <span>المبيعات</span>
-  </button>
-  <button class="bottom-nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
-    <span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
-    <span>الرئيسية</span>
-  </button>
-</nav>
 
 <div class="modal-overlay" id="modal-overlay">
   <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
@@ -9010,10 +8933,6 @@ function navigate(page) {
   document.getElementById('topbar-title').innerText = titles[page] || '';
   const renderers = { dashboard: renderDashboard, customers: renderCustomers, issuances: renderIssuances, invoices: renderInvoices, payments: renderPayments, transfers: renderTransfersPage, suppliers: renderSuppliers, inventory: renderInventory, expenses: renderExpenses, reports: renderReports, aiassistant: renderAIAssistant, users: renderUsers, audit: renderAuditLog, settings: renderSettings };
   (renderers[page] || renderDashboard)();
-  // sync bottom-nav active highlight
-  document.querySelectorAll('.bottom-nav-item').forEach(b => {
-    b.classList.toggle('active', b.getAttribute('data-page') === page);
-  });
   window.scrollTo(0,0);
 }
 
