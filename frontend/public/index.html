@@ -8008,40 +8008,63 @@ body.mobile-drawer-open { overflow: hidden; }
     position: fixed;
     bottom: 0; left: 0; right: 0;
     z-index: 950;
-    background: rgba(10, 14, 24, .92);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border-top: 1px solid rgba(255,255,255,.08);
-    padding: 6px 4px;
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 6px);
+    background: rgba(8, 11, 20, .96);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border-top: 1px solid rgba(255,255,255,.07);
+    box-shadow: 0 -8px 30px rgba(0,0,0,.4);
+    padding: 8px 6px;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
     justify-content: space-around;
     align-items: stretch;
+    gap: 2px;
   }
-  [data-theme="light"] .bottom-nav { background: rgba(255,255,255,.95); border-top-color: #e2e8f0; }
+  [data-theme="light"] .bottom-nav { background: rgba(255,255,255,.97); border-top-color: #e8edf3; box-shadow: 0 -8px 30px rgba(0,0,0,.08); }
+
   .bottom-nav-item {
     flex: 1;
     display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 4px;
-    padding: 6px 2px 4px;
+    align-items: center; justify-content: center; gap: 5px;
+    padding: 8px 2px 6px;
     background: none; border: none; cursor: pointer;
-    color: var(--text-soft, #8ea0c0);
-    transition: color .18s ease, transform .12s ease;
+    color: var(--text-soft, #7c8aa3);
+    transition: color .22s ease, transform .18s cubic-bezier(.34,1.56,.64,1);
     position: relative;
+    border-radius: 16px;
   }
-  .bottom-nav-item svg { width: 24px; height: 24px; }
-  .bottom-nav-item span { font-size: 11px; font-weight: 700; white-space: nowrap; }
-  .bottom-nav-item:active { transform: scale(.92); }
+  .bottom-nav-item .bn-icon {
+    display: flex; align-items: center; justify-content: center;
+    width: 44px; height: 32px; border-radius: 14px;
+    transition: background .22s ease, transform .22s cubic-bezier(.34,1.56,.64,1);
+  }
+  .bottom-nav-item svg { width: 23px; height: 23px; transition: transform .22s ease; }
+  .bottom-nav-item span {
+    font-size: 11px; font-weight: 700; white-space: nowrap;
+    transition: opacity .2s ease;
+  }
+  .bottom-nav-item:active { transform: scale(.9); }
+
+  /* Active state — modern pill indicator */
   .bottom-nav-item.active { color: var(--primary); }
+  .bottom-nav-item.active .bn-icon {
+    background: rgba(var(--primary-rgb, 16,185,129), .18);
+    transform: translateY(-2px);
+  }
+  .bottom-nav-item.active svg { transform: scale(1.12); }
+  .bottom-nav-item.active span { font-weight: 800; }
   .bottom-nav-item.active::after {
     content: '';
-    position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%);
-    width: 22px; height: 3px; border-radius: 999px;
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 20px; height: 3px; border-radius: 999px;
     background: var(--primary);
+    box-shadow: 0 0 8px var(--primary);
   }
-  .main-content, .content-wrapper, main { padding-bottom: 88px !important; }
-  .page-content { padding-bottom: 88px !important; }
+
+  .main-content, .content-wrapper, main { padding-bottom: 92px !important; }
+  .page-content { padding-bottom: 92px !important; }
   .app-footer { display: none !important; }
-  .topbar-quick-actions { bottom: 84px !important; }
+  .topbar-quick-actions { bottom: 88px !important; }
+  .topbar-home-btn { display: none !important; }
 }
 
 </style>
@@ -8166,23 +8189,23 @@ body.mobile-drawer-open { overflow: hidden; }
 <!-- 📱 BOTTOM NAVIGATION (mobile only) -->
 <nav class="bottom-nav" id="bottom-nav">
   <button class="bottom-nav-item" data-page="reports" onclick="navigate('reports')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    <span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
     <span>التقارير</span>
   </button>
   <button class="bottom-nav-item" data-page="inventory" onclick="navigate('inventory')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+    <span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
     <span>المخزون</span>
   </button>
   <button class="bottom-nav-item" data-page="customers" onclick="navigate('customers')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
     <span>العملاء</span>
   </button>
   <button class="bottom-nav-item" data-page="invoices" onclick="navigate('invoices')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    <span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
     <span>المبيعات</span>
   </button>
   <button class="bottom-nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    <span class="bn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
     <span>الرئيسية</span>
   </button>
 </nav>
