@@ -7217,13 +7217,15 @@ body.mobile-drawer-open { overflow: hidden; }
   .sidebar.open { transform: translateX(0) !important; }
 
   .overlay-backdrop {
-    display: none;
     position: fixed; inset: 0;
     background: rgba(0,0,0,.45);
     z-index: 999;
     backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    opacity: 0; visibility: hidden;
+    transition: opacity .26s ease, visibility .26s ease;
   }
-  body.mobile-drawer-open .overlay-backdrop { display: block; }
+  body.mobile-drawer-open .overlay-backdrop { opacity: 1; visibility: visible; }
 
   /* ===== HEADER STACK FIX (banner + topbar + safe area) ===== */
   /* Banner sits at very top. Use safe-area when available (PWA),
@@ -7801,16 +7803,18 @@ body.mobile-drawer-open { overflow: hidden; }
 .ai-bubble { padding: 13px 16px; border-radius: 16px; font-size: 14.5px; line-height: 1.7; font-weight: 600; }
 .ai-msg-bot .ai-bubble { background: var(--surface-2); color: var(--text); border-bottom-left-radius: 4px; }
 .ai-msg-user .ai-bubble { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; border-bottom-right-radius: 4px; }
-.ai-suggestions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 20px 14px; }
+.ai-suggestions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 20px 14px; justify-content: center; box-sizing: border-box; max-width: 100%; }
 .ai-chip {
   padding: 8px 14px; border-radius: 999px;
   background: var(--surface-2); border: 1px solid var(--border);
   color: var(--text); font-size: 13px; font-weight: 700;
   cursor: pointer; transition: all .18s ease;
+  white-space: nowrap; max-width: 100%; box-sizing: border-box;
+  flex: 0 1 auto;
 }
 .ai-chip:hover { background: rgba(239,68,88,.12); border-color: #ef4458; color: #db2033; transform: translateY(-2px); }
-.ai-input-bar { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--border); background: var(--bg-soft); }
-.ai-input-bar .form-control { flex: 1; }
+.ai-input-bar { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--border); background: var(--bg-soft); box-sizing: border-box; max-width: 100%; }
+.ai-input-bar .form-control { flex: 1; min-width: 0; }
 .ai-typing-dots { display: inline-flex; gap: 4px; align-items: center; }
 .ai-typing-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); animation: aiTyping 1.2s infinite ease-in-out; }
 .ai-typing-dots span:nth-child(2) { animation-delay: .2s; }
@@ -8003,6 +8007,9 @@ body.mobile-drawer-open { overflow: hidden; }
 /* ===================== 📱 BOTTOM NAVIGATION ===================== */
 .bottom-nav { display: none; }
 @media (max-width: 768px) {
+  /* Dynamic bottom-nav height = bar content + device safe area.
+     Content/cards get padding-bottom of this value so nothing hides behind the nav. */
+  :root { --bottom-nav-h: calc(64px + env(safe-area-inset-bottom, 0px)); }
   .bottom-nav {
     display: flex;
     position: fixed;
@@ -8060,11 +8067,64 @@ body.mobile-drawer-open { overflow: hidden; }
     box-shadow: 0 0 8px var(--primary);
   }
 
-  .main-content, .content-wrapper, main { padding-bottom: 92px !important; }
-  .page-content { padding-bottom: 92px !important; }
+  /* Dynamic clearance so cards/buttons/quick-actions never hide behind the nav */
+  .main-content, .content-wrapper, main { padding-bottom: calc(var(--bottom-nav-h) + 16px) !important; }
+  .page-content { padding-bottom: calc(var(--bottom-nav-h) + 16px) !important; }
   .app-footer { display: none !important; }
-  .topbar-quick-actions { bottom: 88px !important; }
+  .topbar-quick-actions { bottom: calc(var(--bottom-nav-h) + 10px) !important; }
   .topbar-home-btn { display: none !important; }
+}
+
+/* ===================== ✨ SMOOTH UI ANIMATIONS ===================== */
+/* Modal open/close fade + scale */
+.modal-overlay {
+  transition: opacity .24s ease, visibility .24s ease;
+}
+.modal {
+  transition: transform .26s cubic-bezier(.34,1.4,.64,1), opacity .24s ease;
+}
+.modal-overlay:not(.open) .modal { transform: scale(.94) translateY(8px); opacity: 0; }
+.modal-overlay.open .modal { transform: scale(1) translateY(0); opacity: 1; }
+
+/* Sidebar nav items — gentle hover/slide */
+.nav-item {
+  transition: background .2s ease, color .2s ease, transform .18s ease, padding .2s ease;
+}
+.nav-item:hover { transform: translateX(-3px); }
+html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
+
+/* Dropdowns / menus fade + slide down */
+.dropdown-menu, .menu-pop, .context-menu, .select-menu {
+  transition: opacity .2s ease, transform .2s ease, visibility .2s ease;
+  transform-origin: top center;
+}
+.dropdown-menu:not(.open), .menu-pop:not(.open), .context-menu:not(.open) {
+  opacity: 0; transform: translateY(-8px) scale(.98); visibility: hidden;
+}
+.dropdown-menu.open, .menu-pop.open, .context-menu.open {
+  opacity: 1; transform: translateY(0) scale(1); visibility: visible;
+}
+
+/* Cards subtle entrance + hover lift */
+.stat-card, .dash-card, .qa-card, .smart-alert {
+  transition: transform .2s ease, box-shadow .25s ease, border-color .25s ease;
+}
+
+/* Generic fade-in for page content on navigate */
+@keyframes uiFadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.page-content > * { animation: uiFadeInUp .32s ease both; }
+
+/* Buttons press feedback */
+.btn, .icon-btn { transition: filter .15s ease, transform .12s ease, box-shadow .2s ease; }
+.btn:active, .icon-btn:active { transform: scale(.96); }
+
+/* Respect users who prefer less motion + keep performance */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }
 
 </style>
@@ -18420,105 +18480,128 @@ function askAI(presetQuestion) {
 
 // The "brain": analyzes the real company data and answers in Arabic
 function aiAnswer(qRaw) {
-  const q = qRaw.toLowerCase();
-  const cur = (DB.data.settings.currency || 'جنيه');
+  const q = (qRaw || '').toLowerCase().trim();
+  const cur = (DB.data.settings && DB.data.settings.currency) || 'جنيه';
   const curShort = cur === 'جنيه' ? 'ج.م' : cur === 'ريال' ? 'ر.س' : cur === 'درهم' ? 'د.إ' : cur;
-  const fmtm = (n) => `<b>${fmt(Math.round(n))} ${curShort}</b>`;
+  const fmtm = (n) => `<b>${fmt(Math.round(n||0))} ${curShort}</b>`;
 
   const today = todayStr();
   const monthStart = today.slice(0,7) + '-01';
   const has = (...words) => words.some(w => q.includes(w));
 
-  // ---- SALES (مبيعات) ----
-  if (has('مبيعات', 'بعت', 'مبيعاتي', 'البيع')) {
-    const monthIss = (DB.data.issuances||[]).filter(i => i.date >= monthStart);
-    const monthIssTotal = monthIss.reduce((s,i)=>s+i.total, 0);
-    const standalone = DB.data.invoices.filter(i => i.date >= monthStart && !i.sourceIssuanceId).reduce((s,i)=>s+i.total, 0);
-    const monthSales = monthIssTotal + standalone;
-    const todaySales = (DB.data.issuances||[]).filter(i=>i.date===today).reduce((s,i)=>s+i.total,0)
-      + DB.data.invoices.filter(i=>i.date===today && !i.sourceIssuanceId).reduce((s,i)=>s+i.total,0);
-    return `📊 <b>المبيعات:</b><br>• هذا الشهر: ${fmtm(monthSales)}<br>• اليوم: ${fmtm(todaySales)}<br>• عدد عمليات الصرف هذا الشهر: <b>${monthIss.length}</b>`;
-  }
+  const invoices = DB.data.invoices || [];
+  const products = DB.data.products || [];
+  const customers = DB.data.customers || [];
 
-  // ---- PROFIT (أرباح) ----
-  if (has('ربح', 'أرباح', 'ارباح', 'مكسب')) {
-    const monthIss = (DB.data.issuances||[]).filter(i => i.date >= monthStart);
-    const revenue = monthIss.reduce((s,i)=>s+i.total, 0)
-      + DB.data.invoices.filter(i => i.date >= monthStart && !i.sourceIssuanceId).reduce((s,i)=>s+i.total, 0);
-    let cogs = 0;
-    monthIss.forEach(iss => { const p = DB.data.products.find(x=>x.id===iss.productId); if (p) cogs += (p.cost||0)*iss.quantity; });
-    const expenses = DB.data.expenses.filter(e => e.kind !== 'purchase' && e.date >= monthStart).reduce((s,e)=>s+e.amount, 0);
-    const profit = revenue - cogs - expenses;
-    const margin = revenue > 0 ? (profit/revenue*100) : 0;
-    return `💰 <b>صافي الربح هذا الشهر:</b> ${fmtm(profit)}<br>• الإيرادات: ${fmtm(revenue)}<br>• تكلفة البضاعة: ${fmtm(cogs)}<br>• المصروفات: ${fmtm(expenses)}<br>• هامش الربح: <b>${margin.toFixed(1)}%</b>`;
-  }
+  // Helper: sum cost of goods for an invoice from its items (using product cost)
+  const invoiceCOGS = (inv) => (inv.items||[]).reduce((s,it) => {
+    const p = products.find(x => x.id === it.productId);
+    return s + ((p ? (p.cost||0) : 0) * (it.qty||it.quantity||0));
+  }, 0);
 
-  // ---- DEBTS / who owes most (ديون / عميل عليه) ----
-  if (has('مديون', 'عليه فلوس', 'عليه', 'ديون', 'دين', 'مستحق', 'فلوسي')) {
-    const debtors = DB.data.customers.filter(c => (c.balance||0) > 0).sort((a,b)=>b.balance-a.balance);
-    const totalDebt = debtors.reduce((s,c)=>s+c.balance, 0);
-    if (debtors.length === 0) return '✅ مفيش أي عميل عليه فلوس حالياً. كل الحسابات مسددة!';
-    let top = debtors.slice(0,5).map((c,i)=>`${i+1}. <b>${escapeHtml(c.name)}</b>: ${fmt(Math.round(c.balance))} ${curShort}`).join('<br>');
-    return `💸 <b>إجمالي الديون على العملاء:</b> ${fmtm(totalDebt)}<br>عدد العملاء المدينين: <b>${debtors.length}</b><br><br>🔝 <b>أكتر العملاء مديونية:</b><br>${top}`;
-  }
-
-  // ---- SUPPLIERS we owe (عليا للموردين) ----
-  if (has('مورد', 'موردين', 'عليا')) {
-    let totalOwed = 0, owedList = [];
-    (DB.data.suppliers||[]).forEach(s => {
-      const m = supplierMetrics(s.id);
-      if (m.balance > 0) { totalOwed += m.balance; owedList.push({name:s.name, bal:m.balance}); }
+  // ---- SUPPLIERS we owe (عليا للموردين) — checked BEFORE debts (more specific) ----
+  if (has('مورد', 'موردين', 'للمورد', 'مورّد') || (has('عليا') && has('مورد'))) {
+    const suppliers = DB.data.suppliers || [];
+    if (suppliers.length === 0) return '🏭 مفيش موردين مسجلين لسه.';
+    let totalOwed = 0; const owedList = [];
+    suppliers.forEach(s => {
+      let bal = 0;
+      if (typeof supplierMetrics === 'function') { bal = supplierMetrics(s.id).balance || 0; }
+      else { bal = s.balance || 0; }
+      if (bal > 0) { totalOwed += bal; owedList.push({ name: s.name, bal }); }
     });
     owedList.sort((a,b)=>b.bal-a.bal);
     if (owedList.length === 0) return '✅ مفيش مستحقات عليك للموردين حالياً.';
-    let top = owedList.slice(0,5).map((s,i)=>`${i+1}. <b>${escapeHtml(s.name)}</b>: ${fmt(Math.round(s.bal))} ${curShort}`).join('<br>');
-    return `🏭 <b>إجمالي اللي عليك للموردين:</b> ${fmtm(totalOwed)}<br>عدد الموردين: <b>${owedList.length}</b><br><br>🔝 <b>الأكبر:</b><br>${top}`;
+    const top = owedList.slice(0,5).map((s,i)=>`${i+1}. <b>${escapeHtml(s.name)}</b>: ${fmt(Math.round(s.bal))} ${curShort}`).join('<br>');
+    return `🏭 <b>إجمالي اللي عليك للموردين:</b> ${fmtm(totalOwed)}<br>عدد الموردين المستحقين: <b>${owedList.length}</b><br><br>🔝 <b>الأكبر:</b><br>${top}`;
   }
 
-  // ---- INVENTORY / low stock (مخزون / قرب يخلص) ----
-  if (has('مخزن', 'مخزون', 'يخلص', 'ينفذ', 'الكمية', 'متبقي', 'ستوك')) {
-    const low = DB.data.products.filter(p => p.quantity <= p.minQuantity);
-    const totalQty = DB.data.products.reduce((s,p)=>s+(p.quantity||0),0);
-    if (DB.data.products.length === 0) return 'مفيش منتجات مسجلة في المخزن لسه.';
-    let lowText = low.length > 0
-      ? '⚠️ <b>قرب يخلص:</b><br>' + low.map(p=>`• ${escapeHtml(p.name)}: <b>${fmt(p.quantity)} ${escapeHtml(p.unit||'')}</b> (الحد: ${fmt(p.minQuantity)})`).join('<br>')
-      : '✅ كل المنتجات فوق الحد الأدنى.';
-    return `📦 <b>المخزن:</b><br>• إجمالي الأصناف: <b>${DB.data.products.length}</b><br>• إجمالي الكميات: <b>${fmt(totalQty)}</b><br><br>${lowText}`;
-  }
-
-  // ---- TOP PRODUCT (أكتر منتج) ----
-  if (has('أكتر منتج', 'اكتر منتج', 'أفضل منتج', 'أكثر مبيع', 'اكثر مبيع', 'منتج مبيع')) {
+  // ---- TOP PRODUCT (أكتر منتج) — checked BEFORE sales (so "أكتر منتج مبيعاً" doesn't hit sales) ----
+  if (has('أكتر منتج', 'اكتر منتج', 'أفضل منتج', 'افضل منتج', 'أكثر مبيع', 'اكثر مبيع', 'منتج مبيع', 'أكتر صنف', 'اكتر صنف', 'أكتر حاجة', 'اكتر حاجة')) {
     const sales = {};
-    (DB.data.issuances||[]).forEach(i => { sales[i.productName] = (sales[i.productName]||0) + i.total; });
+    invoices.forEach(inv => (inv.items||[]).forEach(it => {
+      const name = it.productName || (products.find(p=>p.id===it.productId)||{}).name || 'غير معروف';
+      sales[name] = (sales[name]||0) + (it.total||0);
+    }));
     const arr = Object.entries(sales).sort((a,b)=>b[1]-a[1]);
-    if (arr.length === 0) return 'مفيش مبيعات مسجلة لسه عشان أحدد أكتر منتج.';
-    let top = arr.slice(0,5).map((e,i)=>`${i+1}. <b>${escapeHtml(e[0])}</b>: ${fmt(Math.round(e[1]))} ${curShort}`).join('<br>');
+    if (arr.length === 0) return '🏆 مفيش مبيعات مسجلة لسه عشان أحدد أكتر منتج.';
+    const top = arr.slice(0,5).map((e,i)=>`${i+1}. <b>${escapeHtml(e[0])}</b>: ${fmt(Math.round(e[1]))} ${curShort}`).join('<br>');
     return `🏆 <b>أكتر المنتجات مبيعاً:</b><br>${top}`;
   }
 
+  // ---- SALES (مبيعات) — invoices are the single source of truth ----
+  if (has('مبيعات', 'مبيعاتي', 'بعت', 'البيع', 'بيعت', 'مبيعا')) {
+    const monthInvs = invoices.filter(i => (i.date||'') >= monthStart);
+    const monthSales = monthInvs.reduce((s,i)=>s+(i.total||0), 0);
+    const todaySales = invoices.filter(i=>i.date===today).reduce((s,i)=>s+(i.total||0),0);
+    const allSales = invoices.reduce((s,i)=>s+(i.total||0),0);
+    if (invoices.length === 0) return '📊 لسه مفيش أي مبيعات مسجلة. ابدأ بإصدار فاتورة أو صرف ورق.';
+    return `📊 <b>المبيعات:</b><br>• هذا الشهر: ${fmtm(monthSales)}<br>• اليوم: ${fmtm(todaySales)}<br>• إجمالي كل المبيعات: ${fmtm(allSales)}<br>• عدد فواتير الشهر: <b>${monthInvs.length}</b>`;
+  }
+
+  // ---- PROFIT (أرباح) ----
+  if (has('ربح', 'أرباح', 'ارباح', 'مكسب', 'الربح', 'كسبت')) {
+    const monthInvs = invoices.filter(i => (i.date||'') >= monthStart);
+    const revenue = monthInvs.reduce((s,i)=>s+(i.total||0), 0);
+    let cogs = 0;
+    monthInvs.forEach(inv => { cogs += invoiceCOGS(inv); });
+    const expenses = (DB.data.expenses||[]).filter(e => e.kind !== 'purchase' && (e.date||'') >= monthStart).reduce((s,e)=>s+(e.amount||0), 0);
+    const profit = revenue - cogs - expenses;
+    const margin = revenue > 0 ? (profit/revenue*100) : 0;
+    if (invoices.length === 0) return '💰 لسه مفيش مبيعات لحساب الربح منها.';
+    return `💰 <b>صافي الربح هذا الشهر:</b> ${fmtm(profit)}<br><br>• الإيرادات (المبيعات): ${fmtm(revenue)}<br>• تكلفة البضاعة المباعة: ${fmtm(cogs)}<br>• المصروفات: ${fmtm(expenses)}<br>• هامش الربح: <b>${margin.toFixed(1)}%</b>`;
+  }
+
+  // ---- DEBTS / who owes most (ديون / عميل عليه فلوس) ----
+  if (has('مديون', 'عليه فلوس', 'عليه فلو', 'ديون', 'دين', 'مستحق', 'فلوسي', 'مدين', 'عميل عليه', 'عملاء عليهم')) {
+    const debtors = customers.filter(c => (c.balance||0) > 0).sort((a,b)=>(b.balance||0)-(a.balance||0));
+    const totalDebt = debtors.reduce((s,c)=>s+(c.balance||0), 0);
+    if (debtors.length === 0) return '✅ مفيش أي عميل عليه فلوس حالياً. كل الحسابات مسددة! 👏';
+    const top = debtors.slice(0,5).map((c,i)=>`${i+1}. <b>${escapeHtml(c.name)}</b>: ${fmt(Math.round(c.balance))} ${curShort}`).join('<br>');
+    const topOne = debtors[0];
+    return `💸 <b>أكتر عميل عليه فلوس:</b> ${escapeHtml(topOne.name)} بمبلغ ${fmtm(topOne.balance)}<br><br>إجمالي ديون العملاء: ${fmtm(totalDebt)} (${debtors.length} عميل)<br><br>🔝 <b>الترتيب:</b><br>${top}`;
+  }
+
+  // ---- INVENTORY — list what's in stock by item with quantities (المخزن) ----
+  if (has('مخزن', 'مخزون', 'المخزن', 'ستوك', 'عندي ايه', 'عندي إيه', 'الاصناف', 'الأصناف', 'موجود في', 'الكمي', 'متبقي', 'يخلص', 'ينفذ', 'قرب')) {
+    if (products.length === 0) return '📦 مفيش منتجات مسجلة في المخزن لسه.';
+    // Full list of items with quantities
+    const sorted = [...products].sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar'));
+    const list = sorted.map(p => {
+      const low = (p.quantity||0) <= (p.minQuantity||0);
+      const warn = low ? ' ⚠️' : '';
+      return `• <b>${escapeHtml(p.name)}</b>: ${fmt(p.quantity||0)} ${escapeHtml(p.unit||'')}${warn}`;
+    }).join('<br>');
+    const lowItems = products.filter(p => (p.quantity||0) <= (p.minQuantity||0));
+    const lowNote = lowItems.length > 0
+      ? `<br><br>⚠️ <b>قرب يخلص (${lowItems.length}):</b> ${lowItems.map(p=>escapeHtml(p.name)).join('، ')}`
+      : '<br><br>✅ كل الأصناف فوق الحد الأدنى.';
+    return `📦 <b>الموجود في المخزن (${products.length} صنف):</b><br>${list}${lowNote}`;
+  }
+
   // ---- CUSTOMERS count (كام عميل) ----
-  if (has('كام عميل', 'عدد العملاء', 'عملائي', 'كام مركز', 'العملاء')) {
-    const total = DB.data.customers.length;
-    const active = DB.data.customers.filter(c => (DB.data.issuances||[]).some(i=>i.customerId===c.id) || DB.data.invoices.some(inv=>inv.customerId===c.id)).length;
-    const withDebt = DB.data.customers.filter(c=>(c.balance||0)>0).length;
+  if (has('كام عميل', 'عدد العملاء', 'عملائي', 'كام مركز', 'العملاء', 'كام زبون')) {
+    const total = customers.length;
+    const active = customers.filter(c => invoices.some(inv=>inv.customerId===c.id)).length;
+    const withDebt = customers.filter(c=>(c.balance||0)>0).length;
     return `👥 <b>العملاء:</b><br>• الإجمالي: <b>${total}</b><br>• نشطين (عليهم تعاملات): <b>${active}</b><br>• عليهم مديونية: <b>${withDebt}</b>`;
   }
 
   // ---- INVOICES (فواتير) ----
-  if (has('فاتورة', 'فواتير')) {
-    const total = DB.data.invoices.length;
-    const unpaid = DB.data.invoices.filter(i=>i.status==='unpaid'||i.status==='partial').length;
-    const monthInv = DB.data.invoices.filter(i=>i.date>=monthStart).length;
+  if (has('فاتورة', 'فواتير', 'كام فاتورة')) {
+    const total = invoices.length;
+    const unpaid = invoices.filter(i=>i.status==='unpaid'||i.status==='partial').length;
+    const monthInv = invoices.filter(i=>(i.date||'')>=monthStart).length;
     return `🧾 <b>الفواتير:</b><br>• الإجمالي: <b>${total}</b><br>• هذا الشهر: <b>${monthInv}</b><br>• غير مدفوعة/جزئية: <b>${unpaid}</b>`;
   }
 
   // ---- summary / general (ملخص) ----
-  if (has('ملخص', 'الوضع', 'إزاي', 'ازاي', 'الشركة', 'تقرير')) {
-    const monthIss = (DB.data.issuances||[]).filter(i => i.date >= monthStart);
-    const revenue = monthIss.reduce((s,i)=>s+i.total,0) + DB.data.invoices.filter(i=>i.date>=monthStart && !i.sourceIssuanceId).reduce((s,i)=>s+i.total,0);
-    const totalDebt = DB.data.customers.reduce((s,c)=>s+(c.balance||0),0);
-    const low = DB.data.products.filter(p=>p.quantity<=p.minQuantity).length;
-    return `📋 <b>ملخص سريع للشركة:</b><br>• مبيعات الشهر: ${fmtm(revenue)}<br>• إجمالي الديون: ${fmtm(totalDebt)}<br>• عدد العملاء: <b>${DB.data.customers.length}</b><br>• أصناف قرب تخلص: <b>${low}</b><br>• فواتير غير مدفوعة: <b>${DB.data.invoices.filter(i=>i.status!=='paid').length}</b>`;
+  if (has('ملخص', 'الوضع', 'إزاي', 'ازاي', 'الشركة', 'تقرير', 'الموقف')) {
+    const monthInvs = invoices.filter(i => (i.date||'') >= monthStart);
+    const revenue = monthInvs.reduce((s,i)=>s+(i.total||0),0);
+    const totalDebt = customers.reduce((s,c)=>s+(c.balance||0),0);
+    const low = products.filter(p=>(p.quantity||0)<=(p.minQuantity||0)).length;
+    return `📋 <b>ملخص سريع للشركة:</b><br>• مبيعات الشهر: ${fmtm(revenue)}<br>• إجمالي الديون: ${fmtm(totalDebt)}<br>• عدد العملاء: <b>${customers.length}</b><br>• أصناف قرب تخلص: <b>${low}</b><br>• فواتير غير مدفوعة: <b>${invoices.filter(i=>i.status!=='paid').length}</b>`;
   }
 
   // ---- fallback ----
