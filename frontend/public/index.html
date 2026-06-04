@@ -8776,6 +8776,19 @@ function celebrate() {
 }
 
 function toast(msg, type='success', duration) {
+  // Errors & warnings are important → show them in the premium centered modal.
+  // Success & info stay as lightweight toasts (so they don't interrupt flow).
+  if (type === 'error' || type === 'warning') {
+    notify({
+      type: type,
+      title: type === 'error' ? 'تنبيه' : 'انتبه',
+      message: msg,
+      showMeta: false,
+      autoClose: true,
+      duration: type === 'error' ? 4000 : 4500
+    });
+    return;
+  }
   const box = document.getElementById('toast-container');
   const el = document.createElement('div');
   el.className = 'toast ' + type;
@@ -8879,13 +8892,7 @@ function notify(opts) {
     overlay.classList.remove('show');
     overlay.classList.add('closing');
     if (_notifyTimer) clearTimeout(_notifyTimer);
-    if (_notifyRAF) cancelAnimationFrame(_notifyRAF);
-    setTimeout(() => { try { overlay.remove(); } catch(_){} }, 250);
-    setTimeout(() => {
-      document.querySelectorAll('.notify-overlay').forEach(o => {
-        if (!o.classList.contains('show')) try { o.remove(); } catch(_){}
-      });
-    }, 300);
+    setTimeout(() => overlay.remove(), 250);
   }
   overlay.querySelector('.notify-close').onclick = close;
   overlay.querySelector('.notify-ok-btn').onclick = close;
@@ -8907,7 +8914,6 @@ function notify(opts) {
 
 
 function openModal(title, bodyHTML, footerHTML='', size='') {
-  document.querySelectorAll('.notify-overlay:not(.show)').forEach(o => { try{o.remove();}catch(_){} });
   const m = document.getElementById('modal');
   m.className = 'modal' + (size ? ' '+size : '');
   m.innerHTML = `
@@ -9044,8 +9050,17 @@ function updatePaperCounter() {
   const el = document.getElementById('paper-counter');
   const numEl = document.getElementById('paper-counter-num');
   if (!el || !numEl || !DB.data || !DB.data.products) return;
-  // Sum the quantity of EVERY product/type together
-  const total = DB.data.products.reduce((s,p)=> s + (Number(p.quantity)||0), 0);
+  const excludeWords = ['حبر','تنر','تونر','ink','toner','كارتريدج','cartridge','ريبون','ribbon'];
+  const includeWords = ['ورق','بلاستك','بلاستيك','فوتو','photo','paper','a4','a3','a5','فيلم'];
+  const paperProds = DB.data.products.filter(p => {
+    const name = (p.name || '').toLowerCase();
+    const unit = (p.unit || '').toLowerCase();
+    if (excludeWords.some(w => name.includes(w))) return false;
+    if (includeWords.some(w => name.includes(w) || unit.includes(w))) return true;
+    if (['ورقة','لفة','رزمة','رول'].some(w => unit.includes(w))) return true;
+    return false;
+  });
+  const total = paperProds.reduce((s,p)=> s + (Number(p.quantity)||0), 0);
 
   numEl.textContent = fmt(Math.round(total));
 
@@ -9352,9 +9367,6 @@ function updateWalletBadge() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   loadTheme();
-  document.addEventListener('pointerdown', () => {
-    document.querySelectorAll('.notify-overlay:not(.show)').forEach(o => { try{o.remove();}catch(_){} });
-  }, true);
   try {
     await bootstrapFromServer();
   } catch (e) {
