@@ -8151,6 +8151,107 @@ html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
   }
 }
 
+
+/* ===== INVENTORY STOCK SUMMARY CARD ===== */
+.inv-stock-summary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+}
+.inv-stock-header {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 15px; font-weight: 800; color: var(--text);
+  margin-bottom: 16px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.inv-stock-header svg { color: var(--primary); }
+.inv-stock-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+  gap: 12px;
+}
+.inv-stock-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 12px;
+  display: flex; align-items: center; gap: 12px;
+  cursor: pointer;
+  transition: all .18s ease;
+}
+.inv-stock-item:hover {
+  border-color: var(--primary);
+  box-shadow: 0 4px 16px rgba(var(--primary-rgb),.18);
+  transform: translateY(-2px);
+}
+.inv-stock-icon { font-size: 26px; flex-shrink: 0; }
+.inv-stock-name { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+.inv-stock-qty { font-size: 18px; font-weight: 900; color: var(--primary); }
+.inv-stock-qty span { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+.inv-stock-count { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+@media (max-width: 768px) {
+  .inv-stock-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .inv-stock-item { padding: 12px 10px; }
+  .inv-stock-qty { font-size: 16px; }
+}
+
+/* ===== PAPER COUNTER — same neon style on desktop as mobile ===== */
+.paper-counter {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 11px; margin: 0 2px;
+  border-radius: 11px;
+  background: rgba(56, 189, 248, .08);
+  border: 1px solid rgba(56, 189, 248, .45);
+  box-shadow: 0 0 10px rgba(56,189,248,.25), inset 0 0 8px rgba(56,189,248,.08);
+  color: #38bdf8;
+  cursor: pointer; position: relative;
+  transition: box-shadow .25s ease, transform .15s ease, border-color .25s ease;
+  white-space: nowrap;
+}
+.paper-counter:hover {
+  box-shadow: 0 0 16px rgba(56,189,248,.45), inset 0 0 10px rgba(56,189,248,.12);
+  transform: translateY(-1px); border-color: rgba(56,189,248,.7);
+}
+.paper-counter svg { width: 16px; height: 16px; flex-shrink: 0; }
+.paper-counter-num {
+  font-size: 13.5px; font-weight: 800; letter-spacing: .3px;
+  font-variant-numeric: tabular-nums;
+}
+.paper-counter.bump .paper-counter-num { animation: paperBump .4s cubic-bezier(.34,1.56,.64,1); }
+@keyframes paperBump { 0%{transform:scale(1);} 40%{transform:scale(1.35);} 100%{transform:scale(1);} }
+.paper-counter-delta {
+  position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; font-weight: 800; color: #22c55e;
+  opacity: 0; pointer-events: none; white-space: nowrap;
+  text-shadow: 0 0 8px rgba(34,197,94,.6);
+}
+.paper-counter-delta.show { animation: paperDelta 1.4s ease forwards; }
+@keyframes paperDelta {
+  0%   { opacity:0; transform:translate(-50%,4px); }
+  20%  { opacity:1; transform:translate(-50%,-2px); }
+  70%  { opacity:1; transform:translate(-50%,-10px); }
+  100% { opacity:0; transform:translate(-50%,-20px); }
+}
+
+/* ===== NOTIFICATION FIX ON MOBILE ===== */
+@media (max-width: 768px) {
+  .notify-overlay {
+    align-items: flex-start !important;
+    padding: 60px 16px 20px !important;
+    overflow-y: auto;
+  }
+  .notify-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 20px !important;
+    margin: 0 auto;
+    max-height: calc(100dvh - 80px);
+    overflow-y: auto;
+  }
+}
 </style>
 </head>
 <body>
@@ -9050,17 +9151,8 @@ function updatePaperCounter() {
   const el = document.getElementById('paper-counter');
   const numEl = document.getElementById('paper-counter-num');
   if (!el || !numEl || !DB.data || !DB.data.products) return;
-  const excludeWords = ['حبر','تنر','تونر','ink','toner','كارتريدج','cartridge','ريبون','ribbon'];
-  const includeWords = ['ورق','بلاستك','بلاستيك','فوتو','photo','paper','a4','a3','a5','فيلم'];
-  const paperProds = DB.data.products.filter(p => {
-    const name = (p.name || '').toLowerCase();
-    const unit = (p.unit || '').toLowerCase();
-    if (excludeWords.some(w => name.includes(w))) return false;
-    if (includeWords.some(w => name.includes(w) || unit.includes(w))) return true;
-    if (['ورقة','لفة','رزمة','رول'].some(w => unit.includes(w))) return true;
-    return false;
-  });
-  const total = paperProds.reduce((s,p)=> s + (Number(p.quantity)||0), 0);
+  // Sum the quantity of EVERY product/type together
+  const total = DB.data.products.reduce((s,p)=> s + (Number(p.quantity)||0), 0);
 
   numEl.textContent = fmt(Math.round(total));
 
@@ -15195,11 +15287,22 @@ function deletePayment(id) {
 ========================================================= */
 let invTab = 'products';
 let inventorySearch = '';
+let inventoryCatFilter = '';
 function renderInventory() {
   const root = document.getElementById('page-content');
   const totalProducts = DB.data.products.length;
   const lowStock = DB.data.products.filter(p => p.quantity <= p.minQuantity);
   const totalValue = DB.data.products.reduce((s,p)=>s+p.quantity*p.cost, 0);
+
+  // Group by category for the big stock summary card
+  const categories = {};
+  DB.data.products.forEach(p => {
+    const cat = p.type || 'أخرى';
+    if (!categories[cat]) categories[cat] = { qty: 0, count: 0 };
+    categories[cat].qty += (Number(p.quantity)||0);
+    categories[cat].count++;
+  });
+  const catEntries = Object.entries(categories).sort((a,b)=>b[1].qty - a[1].qty);
 
   root.innerHTML = `
     <div class="page-header">
@@ -15222,24 +15325,52 @@ function renderInventory() {
       <div class="stat-card stat-primary"><div class="accent-stripe"></div><div class="icon-wrap">📦</div><div class="label">إجمالي المنتجات</div><div class="value">${totalProducts}</div></div>
       <div class="stat-card stat-success"><div class="accent-stripe"></div><div class="icon-wrap">💎</div><div class="label">قيمة المخزون</div><div class="value">${fmtCurrency(totalValue)}</div></div>
       <div class="stat-card stat-warning"><div class="accent-stripe"></div><div class="icon-wrap">⚠</div><div class="label">منتجات منخفضة</div><div class="value">${lowStock.length}</div><span class="trend down">تحتاج تموين</span></div>
-      <div class="stat-card stat-info"><div class="accent-stripe"></div><div class="icon-wrap">📊</div><div class="label">حركات اليوم</div><div class="value">${DB.data.stockMoves.filter(m=>m.date===todayStr()).length}</div></div>
+    </div>
+
+    <!-- BIG STOCK SUMMARY CARD -->
+    <div class="inv-stock-summary">
+      <div class="inv-stock-header">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        إجمالي المخزون — حسب الفئة
+      </div>
+      <div class="inv-stock-grid">
+        ${catEntries.length === 0
+          ? '<div style="color:var(--text-muted);padding:16px">لا توجد منتجات مسجلة بعد</div>'
+          : catEntries.map(([cat, d]) => `
+          <div class="inv-stock-item" onclick="inventoryCatFilter='${cat}';renderInventory()">
+            <div class="inv-stock-icon">${{ورق:'📄',طابعات:'🖨️','أحبار وتنر':'🖊️','قطع غيار':'🔧',بلاستك:'📦',فوتو:'📷',أخرى:'🗂️'}[cat]||'📦'}</div>
+            <div class="inv-stock-info">
+              <div class="inv-stock-name">${escapeHtml(cat)}</div>
+              <div class="inv-stock-qty">${fmt(Math.round(d.qty))} <span>وحدة</span></div>
+              <div class="inv-stock-count">${d.count} صنف</div>
+            </div>
+          </div>`).join('')}
+      </div>
     </div>
 
     <div class="filter-bar">
-      <input class="form-control" type="text" id="inv-search" placeholder="🔍 بحث في المخزن (منتج أو حركة بأي حرف...)" value="${inventorySearch||''}" style="flex:1;min-width:200px">
-      <button class="btn btn-ghost" onclick="inventorySearch='';renderInventory()">إعادة ضبط</button>
+      <input class="form-control" type="text" id="inv-search" placeholder="🔍 بحث بالاسم..." value="${inventorySearch||''}" style="flex:1;min-width:160px">
+      <select class="form-control" id="inv-cat-filter" style="min-width:140px;max-width:180px" onchange="inventoryCatFilter=this.value;renderInventory()">
+        <option value="">جميع المنتجات</option>
+        ${['ورق','طابعات','أحبار وتنر','قطع غيار','بلاستك','فوتو','أخرى'].map(cat =>
+          `<option value="${cat}" ${(inventoryCatFilter||'')=== cat?'selected':''}>${cat}</option>`).join('')}
+      </select>
+      <button class="btn btn-ghost" onclick="inventorySearch='';inventoryCatFilter='';renderInventory()">إعادة ضبط</button>
     </div>
 
     <div class="tabs">
-      <button class="tab ${invTab==='products'?'active':''}" onclick="invTab='products';renderInventory()">المنتجات</button>
-      <button class="tab ${invTab==='moves'?'active':''}" onclick="invTab='moves';renderInventory()">سجل حركات المخزن</button>
-      <button class="tab ${invTab==='low'?'active':''}" onclick="invTab='low';renderInventory()">منتجات منخفضة (${lowStock.length})</button>
+      <button class="tab ${invTab==='products'?'active':''}" onclick="invTab='products';renderInventory()">📦 جميع المنتجات</button>
+      <button class="tab ${invTab==='paper'?'active':''}" onclick="invTab='paper';inventoryCatFilter='ورق';renderInventory()">📄 ورق</button>
+      <button class="tab ${invTab==='printers'?'active':''}" onclick="invTab='printers';inventoryCatFilter='طابعات';renderInventory()">🖨️ طابعات</button>
+      <button class="tab ${invTab==='ink'?'active':''}" onclick="invTab='ink';inventoryCatFilter='أحبار وتنر';renderInventory()">🖊️ أحبار</button>
+      <button class="tab ${invTab==='spare'?'active':''}" onclick="invTab='spare';inventoryCatFilter='قطع غيار';renderInventory()">🔧 قطع غيار</button>
+      <button class="tab ${invTab==='moves'?'active':''}" onclick="invTab='moves';inventoryCatFilter='';renderInventory()">🔄 حركات المخزن</button>
+      <button class="tab ${invTab==='low'?'active':''}" onclick="invTab='low';inventoryCatFilter='';renderInventory()">⚠️ منخفضة (${lowStock.length})</button>
     </div>
 
-    ${invTab === 'products' ? renderProductsTab() : invTab === 'moves' ? renderMovesTab() : renderLowStockTab()}
+    ${invTab === 'moves' ? renderMovesTab() : invTab === 'low' ? renderLowStockTab() : renderProductsTab()}
   `;
 
-  // wire search
   const searchEl = document.getElementById('inv-search');
   if (searchEl) {
     searchEl.addEventListener('input', e => { inventorySearch = e.target.value; renderInventory(); searchEl.focus(); });
@@ -15248,7 +15379,9 @@ function renderInventory() {
 
 function renderProductsTab() {
   const q = (inventorySearch||'').toLowerCase();
+  const cat = (typeof inventoryCatFilter !== 'undefined' ? inventoryCatFilter : '');
   let products = DB.data.products;
+  if (cat) products = products.filter(p => (p.type||'أخرى') === cat);
   if (q) {
     products = products.filter(p =>
       (p.name||'').toLowerCase().includes(q) ||
@@ -15438,8 +15571,12 @@ function openProductForm(id) {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>نوع المنتج</label>
-          <input class="form-control" name="type" value="${escapeHtml(p.type||'')}" placeholder="ورق طباعة / كرتون / حبر...">
+          <label>فئة المنتج *</label>
+          <select class="form-control" name="type">
+            <option value="">-- اختر الفئة --</option>
+            ${['ورق','طابعات','أحبار وتنر','قطع غيار','بلاستك','فوتو','أخرى'].map(cat =>
+              `<option value="${cat}" ${(p.type||'')=== cat ? 'selected':''}>${cat}</option>`).join('')}
+          </select>
         </div>
         <div class="form-group">
           <label>وحدة القياس *</label>
@@ -18491,7 +18628,8 @@ function renderAIAssistant() {
           'متوسط قيمة الفاتورة',
           'مين أكتر عميل بيشتري؟',
           'إيه نصيحتك النهارده؟',
-          'ملخص الشركة'
+          'ملخص الشركة',
+          'إيه قطع الغيار الموجودة؟'
         ].map(q => `<button class="ai-chip" onclick="askAI('${q.replace(/'/g,"\\'")}')">${q}</button>`).join('')}
       </div>
 
@@ -18562,6 +18700,18 @@ function aiAnswer(qRaw) {
     const p = products.find(x => x.id === it.productId);
     return s + ((p ? (p.cost||0) : 0) * (it.qty||it.quantity||0));
   }, 0);
+
+  // ---- SPARE PARTS (قطع الغيار) ----
+  if (has('قطع غيار', 'قطع الغيار', 'غيار', 'spare')) {
+    const spares = products.filter(p => (p.type||'') === 'قطع غيار');
+    if (spares.length === 0) return '🔧 لسه مفيش قطع غيار مسجلة في المخزن. أضفها من المخازن واختر فئة "قطع غيار".';
+    const list = spares.map(p => {
+      const low = (p.quantity||0) <= (p.minQuantity||0);
+      return `• <b>${escapeHtml(p.name)}</b>: ${fmt(p.quantity||0)} ${escapeHtml(p.unit||'')}${low?' ⚠️':''}`;
+    }).join('<br>');
+    const total = spares.reduce((s,p)=>s+(Number(p.quantity)||0),0);
+    return `🔧 <b>قطع الغيار في المخزن (${spares.length} صنف):</b><br>${list}<br><br>إجمالي: <b>${fmt(Math.round(total))} وحدة</b>`;
+  }
 
   // ---- SUPPLIERS we owe (عليا للموردين) — checked BEFORE debts (more specific) ----
   if (has('مورد', 'موردين', 'للمورد', 'مورّد') || (has('عليا') && has('مورد'))) {
