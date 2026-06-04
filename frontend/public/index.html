@@ -194,29 +194,61 @@ table { border-collapse: collapse; width: 100%; }
 }
 .login-card {
   width: 100%; max-width: 440px;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  border-radius: var(--radius-xl);
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-radius: 28px;
   padding: 36px 32px 30px;
+  position: relative; z-index: 2;
+  /* Animated glowing border */
+  border: 2px solid transparent;
+  background-clip: padding-box;
   box-shadow:
-    0 25px 60px rgba(5, 150, 105, .15),
-    0 8px 20px rgba(15, 23, 42, .08),
-    inset 0 1px 0 rgba(255,255,255,.8);
-  border: 1px solid rgba(16, 185, 129, .25);
-  animation: fadeUp .5s ease both;
-  position: relative;
-  z-index: 2;
+    0 0 0 2px rgba(219,32,51,.6),
+    0 0 32px rgba(219,32,51,.25),
+    0 25px 60px rgba(0,0,0,.18),
+    inset 0 1px 0 rgba(255,255,255,.9);
+  animation: loginCardIn .6s cubic-bezier(.34,1.56,.64,1) both,
+             loginGlow 3s ease-in-out 0.6s infinite;
 }
 [data-theme="dark"] .login-card {
-  background: rgba(13, 19, 31, 0.88);
-  backdrop-filter: blur(22px) saturate(160%);
-  -webkit-backdrop-filter: blur(22px) saturate(160%);
-  border-color: rgba(16,185,129,.20);
+  background: rgba(10,6,8,.92);
   box-shadow:
-    0 25px 60px rgba(0,0,0,.7),
-    0 12px 32px rgba(16,185,129,.10),
-    inset 0 1px 0 rgba(16,185,129,.15);
+    0 0 0 2px rgba(219,32,51,.7),
+    0 0 40px rgba(219,32,51,.35),
+    0 25px 70px rgba(0,0,0,.85),
+    inset 0 1px 0 rgba(219,32,51,.12);
+}
+/* Corner accent dots */
+.login-card::before,
+.login-card::after {
+  content: '';
+  position: absolute;
+  width: 10px; height: 10px;
+  background: #db2033;
+  border-radius: 50%;
+  box-shadow: 0 0 12px 4px rgba(219,32,51,.7);
+  animation: cornerPulse 2s ease-in-out infinite;
+}
+.login-card::before { top: -5px; right: -5px; }
+.login-card::after  { bottom: -5px; left: -5px; animation-delay: 1s; }
+
+@keyframes loginCardIn {
+  0%   { opacity:0; transform: scale(.8) translateY(30px) rotate(-2deg); }
+  60%  { transform: scale(1.03) translateY(-4px) rotate(.5deg); }
+  100% { opacity:1; transform: scale(1) translateY(0) rotate(0); }
+}
+@keyframes loginGlow {
+  0%,100% {
+    box-shadow: 0 0 0 2px rgba(219,32,51,.6), 0 0 28px rgba(219,32,51,.22), 0 25px 60px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.9);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(219,32,51,.9), 0 0 48px rgba(219,32,51,.45), 0 25px 60px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.9);
+  }
+}
+@keyframes cornerPulse {
+  0%,100% { transform: scale(1); opacity:.8; }
+  50%     { transform: scale(1.6); opacity:1; }
 }
 .login-logo {
   width: 80px; height: 80px;
@@ -7709,16 +7741,16 @@ body.mobile-drawer-open { overflow: hidden; }
   display: inline-flex; align-items: center; gap: 6px;
   padding: 6px 11px; margin: 0 2px;
   border-radius: 11px;
-  background: rgba(56, 189, 248, .08);
-  border: 1px solid rgba(56, 189, 248, .45);
-  box-shadow: 0 0 10px rgba(56,189,248,.25), inset 0 0 8px rgba(56,189,248,.08);
-  color: #38bdf8;
+  background: rgba(219, 32, 51, .08);
+  border: 1px solid rgba(219, 32, 51, .45);
+  box-shadow: 0 0 10px rgba(219,32,51,.25), inset 0 0 8px rgba(219,32,51,.08);
+  color: #ef4458;
   cursor: pointer;
   position: relative;
   transition: box-shadow .25s ease, transform .15s ease, border-color .25s ease;
   white-space: nowrap;
 }
-.paper-counter:hover { box-shadow: 0 0 16px rgba(56,189,248,.45), inset 0 0 10px rgba(56,189,248,.12); transform: translateY(-1px); border-color: rgba(56,189,248,.7); }
+.paper-counter:hover { box-shadow: 0 0 16px rgba(219,32,51,.45), inset 0 0 10px rgba(219,32,51,.12); transform: translateY(-1px); border-color: rgba(219,32,51,.7); }
 .paper-counter svg { width: 16px; height: 16px; flex-shrink: 0; }
 .paper-counter-num {
   font-size: 13.5px; font-weight: 800; letter-spacing: .3px;
@@ -8203,17 +8235,17 @@ html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
   display: inline-flex; align-items: center; gap: 6px;
   padding: 6px 11px; margin: 0 2px;
   border-radius: 11px;
-  background: rgba(56, 189, 248, .08);
-  border: 1px solid rgba(56, 189, 248, .45);
-  box-shadow: 0 0 10px rgba(56,189,248,.25), inset 0 0 8px rgba(56,189,248,.08);
-  color: #38bdf8;
+  background: rgba(219, 32, 51, .08);
+  border: 1px solid rgba(219, 32, 51, .45);
+  box-shadow: 0 0 10px rgba(219,32,51,.25), inset 0 0 8px rgba(219,32,51,.08);
+  color: #ef4458;
   cursor: pointer; position: relative;
   transition: box-shadow .25s ease, transform .15s ease, border-color .25s ease;
   white-space: nowrap;
 }
 .paper-counter:hover {
-  box-shadow: 0 0 16px rgba(56,189,248,.45), inset 0 0 10px rgba(56,189,248,.12);
-  transform: translateY(-1px); border-color: rgba(56,189,248,.7);
+  box-shadow: 0 0 16px rgba(219,32,51,.45), inset 0 0 10px rgba(219,32,51,.12);
+  transform: translateY(-1px); border-color: rgba(219,32,51,.7);
 }
 .paper-counter svg { width: 16px; height: 16px; flex-shrink: 0; }
 .paper-counter-num {
@@ -8252,6 +8284,76 @@ html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
     overflow-y: auto;
   }
 }
+
+/* ===== QURAN VERSE IN SMART ALERT ===== */
+.smart-alert-icon.quran-icon {
+  background: linear-gradient(135deg, #1a0a0e, #2d0f15);
+  border: 1px solid rgba(219,32,51,.35);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  padding: 6px;
+  transition: all .2s ease;
+}
+.smart-alert-icon.quran-icon:hover {
+  border-color: #db2033;
+  box-shadow: 0 0 12px rgba(219,32,51,.4);
+}
+.quran-ayah {
+  font-size: 11px;
+  font-family: 'Amiri', 'Traditional Arabic', serif;
+  color: #f59e0b;
+  text-align: center;
+  line-height: 1.5;
+  font-weight: 600;
+  direction: rtl;
+}
+
+/* ===== AI TASKS PANEL ===== */
+.ai-tasks-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.ai-tasks-header {
+  font-size: 14px; font-weight: 800; color: var(--text);
+  margin-bottom: 12px;
+}
+.ai-tasks-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.ai-task-btn {
+  padding: 14px 12px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(var(--primary-rgb),.10), rgba(var(--primary-rgb),.04));
+  border: 1px solid rgba(var(--primary-rgb),.3);
+  color: var(--text); font-size: 14px; font-weight: 700;
+  cursor: pointer; text-align: center;
+  transition: all .2s ease;
+}
+.ai-task-btn:hover {
+  background: linear-gradient(135deg, rgba(var(--primary-rgb),.22), rgba(var(--primary-rgb),.1));
+  border-color: var(--primary); color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(var(--primary-rgb),.2);
+}
+@media (max-width: 480px) { .ai-tasks-grid { grid-template-columns: 1fr; } }
+
+/* Topbar refresh button — mobile only */
+.topbar-refresh-btn { display: none; }
+@media (max-width: 768px) {
+  .topbar-refresh-btn {
+    display: inline-flex;
+    color: var(--text-muted);
+  }
+  .topbar-refresh-btn.spinning svg {
+    animation: spin360 .7s ease both;
+  }
+}
+@keyframes spin360 { from{transform:rotate(0)} to{transform:rotate(360deg)} }
 </style>
 </head>
 <body>
@@ -8321,6 +8423,9 @@ html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
       </button>
       <button class="icon-btn topbar-back-btn" id="topbar-back-btn" onclick="goBack()" title="رجوع للصفحة السابقة" style="display:none">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+      <button class="icon-btn topbar-refresh-btn" id="topbar-refresh-btn" onclick="topbarRefresh()" title="تحديث الصفحة">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
       </button>
       <div class="topbar-title" id="topbar-title">لوحة التحكم</div>
 
@@ -8704,6 +8809,25 @@ function logout() {
   const homeBtn = document.getElementById('topbar-home-btn'); if (homeBtn) homeBtn.style.display = 'none';
   const reciterInline = document.getElementById('reciter-inline'); if (reciterInline) reciterInline.style.display = 'none';
 }
+
+// ===== AUTO-LOGOUT AFTER 2 MINUTES IDLE =====
+let _idleTimer = null;
+const IDLE_TIMEOUT = 2 * 60 * 1000; // 2 minutes
+function resetIdleTimer() {
+  if (!currentUser) return;
+  clearTimeout(_idleTimer);
+  _idleTimer = setTimeout(() => {
+    if (currentUser) {
+      toast('تم تسجيل الخروج تلقائياً بسبب عدم النشاط', 'info');
+      setTimeout(logout, 1200);
+    }
+  }, IDLE_TIMEOUT);
+}
+// Track user activity
+['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(evt => {
+  document.addEventListener(evt, resetIdleTimer, { passive: true });
+});
+
 function restoreSession() {
   const uid = sessionStorage.getItem(SESSION_KEY);
   if (!uid) return false;
@@ -9132,6 +9256,13 @@ function navigate(page, isBack) {
   (renderers[page] || renderDashboard)();
   updateBackButton();
   window.scrollTo(0,0);
+}
+
+function topbarRefresh() {
+  const btn = document.getElementById('topbar-refresh-btn');
+  if (btn) { btn.classList.add('spinning'); setTimeout(()=>btn.classList.remove('spinning'),800); }
+  if (currentPage) navigate(currentPage);
+  else window.location.reload();
 }
 
 function goBack() {
@@ -10251,13 +10382,8 @@ function renderDashboard() {
     <div class="smart-alerts-bar" id="smart-alerts-bar">
       <div class="smart-alert pulse-${paperPulseInfo.level}" data-card="paper" title="اضغط للتفاصيل">
         <span class="pulse-dot pulse-${paperPulseInfo.level}"></span>
-        <div class="smart-alert-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="9" y1="13" x2="15" y2="13"/>
-            <line x1="9" y1="17" x2="15" y2="17"/>
-          </svg>
+        <div class="smart-alert-icon quran-icon" onclick="toggleReciter()" title="سورة يوسف - اضغط للاستماع">
+          <span class="quran-ayah">﴿وَاللَّهُ غَالِبٌ عَلَىٰ أَمْرِهِ﴾</span>
         </div>
         <div class="smart-alert-body">
           <div class="smart-alert-title">الورق <span class="smart-alert-qty">${fmt(paperTotalQty).split('.')[0]} ${paperUnit}</span></div>
@@ -18580,7 +18706,26 @@ function renderAIAssistant() {
     <div class="page-header">
       <div>
         <div class="page-title">🤖 المساعد الذكي</div>
-        <div class="page-subtitle">تحليلات ذكية وإجابات فورية عن بيانات الشركة</div>
+        <div class="page-subtitle">تحليلات ذكية + تنفيذ مهام مباشرة على بيانات الشركة</div>
+      </div>
+    </div>
+
+    <!-- TASK EXECUTION PANEL -->
+    <div class="ai-tasks-panel">
+      <div class="ai-tasks-header">⚡ تنفيذ مهام سريعة</div>
+      <div class="ai-tasks-grid">
+        <button class="ai-task-btn" onclick="aiTaskPrompt('stock_add')">
+          📦 أضف للمخزن
+        </button>
+        <button class="ai-task-btn" onclick="aiTaskPrompt('customer_add')">
+          👤 أضف عميل جديد
+        </button>
+        <button class="ai-task-btn" onclick="aiTaskPrompt('issuance')">
+          📄 صرف ورق وفاتورة
+        </button>
+        <button class="ai-task-btn" onclick="aiTaskPrompt('stock_query')">
+          🔍 استعلام مخزون
+        </button>
       </div>
     </div>
 
@@ -18589,7 +18734,7 @@ function renderAIAssistant() {
         <div class="ai-msg ai-msg-bot">
           <div class="ai-avatar">🤖</div>
           <div class="ai-bubble">
-            أهلاً! أنا المساعد الذكي. اسألني عن أي حاجة في بيانات شركتك — المبيعات، الأرباح، الديون، المخزون، أو العملاء. جرّب أحد الأسئلة السريعة تحت 👇
+            أهلاً! أنا المساعد الذكي. اقدر أجاوب على أسئلتك <b>وأنفّذ مهام</b> مباشرة زي إضافة للمخزن، إضافة عميل، وصرف ورق. استخدم الأزرار السريعة فوق أو اكتب أمرك. 👆
           </div>
         </div>
       </div>
@@ -18636,8 +18781,9 @@ function askAI(presetQuestion) {
       <div class="ai-bubble">${escapeHtml(q)}</div>
     </div>`);
 
-  // compute answer
-  const answer = aiAnswer(q);
+  // Try task execution first
+  const taskResult = aiExecuteTask(q);
+  const answer = taskResult !== null ? taskResult : aiAnswer(q);
 
   // typing indicator then answer
   messages.insertAdjacentHTML('beforeend', `
@@ -18660,6 +18806,138 @@ function askAI(presetQuestion) {
 }
 
 // The "brain": analyzes the real company data and answers in Arabic
+
+// ============================================================
+//  ⚡ AI TASK EXECUTION — تنفيذ المهام مباشرة
+// ============================================================
+function aiTaskPrompt(type) {
+  const messages = document.getElementById('ai-chat-messages');
+  const prompts = {
+    stock_add: 'مثال: "نفذ المهمة: أضف للمخزن 10000 ورقة A3" أو "أضف 500 فيلم بلاستك A3"',
+    customer_add: 'مثال: "نفذ المهمة: أضف عميل جديد اسمه محمد أحمد"',
+    issuance: 'مثال: "نفذ المهمة: صرف 3000 ورقة A4 للعميل [اسم العميل] بسعر 4 جنيه"',
+    stock_query: 'مثال: "كام ورقة A4 في المخزن؟" أو "إيه اللي في المخزن؟"'
+  };
+  const input = document.getElementById('ai-input');
+  if (input) {
+    input.value = '';
+    input.placeholder = prompts[type] || 'اكتب أمرك...';
+    input.focus();
+  }
+  messages.insertAdjacentHTML('beforeend', `
+    <div class="ai-msg ai-msg-bot">
+      <div class="ai-avatar">🤖</div>
+      <div class="ai-bubble">${prompts[type]}<br><br><small style="color:var(--text-muted)">اكتب الأمر في الخانة بالأسفل واضغط إرسال</small></div>
+    </div>`);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function aiExecuteTask(q) {
+  // ---- ADD TO STOCK ----
+  const addStock = q.match(/أضف.*?للمخزن.*?(\d[\d,]*)\s*(ورقة|ورق|فيلم|لفة|وحدة|رزمة)?\s*(.*?)(?:\s|$)/i)
+    || q.match(/(\d[\d,]*)\s*(ورقة|ورق|فيلم|لفة|وحدة|رزمة)?\s*(.*?)\s*(?:للمخزن|في المخزن)/i);
+
+  if (q.includes('أضف') && (q.includes('مخزن') || q.includes('مخزون') || q.includes('كمية'))) {
+    // Parse: أضف [qty] [unit] [name]
+    const numMatch = q.match(/(\d[\d,.]*)/);
+    const qty = numMatch ? parseFloat(numMatch[1].replace(',','')) : 0;
+    if (qty <= 0) return '❌ مش قادر أفهم الكمية. مثال: "أضف 10000 ورقة A3 للمخزن"';
+
+    // Extract product name — what comes after the number and unit
+    let name = q.replace(/نفذ المهمة[:\s]*/i,'').replace(/أضف.*?للمخزن|أضف.*?في المخزن/i,'')
+               .replace(/\d[\d,.]*/g,'').replace(/ورقة|ورق|فيلم|لفة|وحدة|رزمة/g,'')
+               .replace(/كمية|في|من|إلى|الى/g,'').trim();
+    if (!name) name = 'منتج جديد';
+
+    // Try to find existing product
+    const existing = DB.data.products.find(p =>
+      name.split(' ').some(w => w.length > 1 && (p.name||'').toLowerCase().includes(w.toLowerCase())));
+
+    if (existing) {
+      const before = existing.quantity;
+      existing.quantity += qty;
+      DB.data.stockMoves = DB.data.stockMoves || [];
+      DB.data.stockMoves.push({ id:'sm_'+uid(), productId:existing.id, type:'in',
+        quantity:qty, date:todayStr(), reference:'إضافة عبر المساعد الذكي', createdAt:Date.now() });
+      DB.save();
+      renderSidebar(); updateNotifBadge();
+      return `✅ <b>تم!</b> أضفت <b>${fmt(qty)}</b> وحدة لـ "<b>${escapeHtml(existing.name)}</b>"<br>الكمية: ${fmt(before)} ← <b>${fmt(existing.quantity)}</b>`;
+    } else {
+      // Create new product
+      const newProd = { id:'p_'+uid(), name: name, quantity: qty, cost:0, price:0,
+        unit:'وحدة', minQuantity:0, type:'ورق', createdAt:Date.now() };
+      DB.data.products = DB.data.products || [];
+      DB.data.products.push(newProd);
+      DB.data.stockMoves = DB.data.stockMoves || [];
+      DB.data.stockMoves.push({ id:'sm_'+uid(), productId:newProd.id, type:'in',
+        quantity:qty, date:todayStr(), reference:'إضافة عبر المساعد الذكي', createdAt:Date.now() });
+      DB.save();
+      renderSidebar(); updateNotifBadge();
+      return `✅ <b>تم!</b> أنشأت منتج جديد "<b>${escapeHtml(name)}</b>" بكمية <b>${fmt(qty)}</b> وحدة في المخزن.<br><small>يمكنك تعديل بياناته (السعر والتكلفة) من صفحة المخازن.</small>`;
+    }
+  }
+
+  // ---- ADD CUSTOMER ----
+  if (q.includes('أضف') && q.includes('عميل')) {
+    let name = q.replace(/نفذ المهمة[:\s]*/i,'').replace(/أضف.*?عميل.*?(?:اسمه|جديد|بـ)?/i,'').trim();
+    if (!name || name.length < 2) return '❌ مش قادر أفهم اسم العميل. مثال: "أضف عميل اسمه محمد أحمد"';
+    const exists = DB.data.customers.find(c => c.name === name);
+    if (exists) return `⚠️ العميل "<b>${escapeHtml(name)}</b>" موجود بالفعل.`;
+    const newCust = { id:'c_'+uid(), name:name, balance:0, creditLimit:0,
+      phone:'', address:'', customPrices:{}, createdAt:Date.now() };
+    DB.data.customers = DB.data.customers || [];
+    DB.data.customers.push(newCust);
+    DB.save(); renderSidebar();
+    return `✅ <b>تم!</b> أضفت العميل "<b>${escapeHtml(name)}</b>" بنجاح.<br><small>يمكنك إضافة رقم هاتفه وعنوانه من صفحة العملاء.</small>`;
+  }
+
+  // ---- ISSUANCE / INVOICE ----
+  if ((q.includes('صرف') || q.includes('فاتورة')) && q.includes('ورق') || q.includes('صرف')) {
+    const numMatch = q.match(/(\d[\d,.]*)/);
+    const qty = numMatch ? parseFloat(numMatch[1].replace(',','')) : 0;
+
+    // Try to find customer name in text
+    const custMatch = q.match(/(?:للعميل|لـ|لعميل)\s+([^،,\d]+)/i);
+    const custName = custMatch ? custMatch[1].trim() : '';
+    const customer = custName ? DB.data.customers.find(c =>
+      (c.name||'').toLowerCase().includes(custName.toLowerCase())) : null;
+
+    // Try to find price
+    const priceMatch = q.match(/(?:بسعر|سعر|بـ)\s*(\d[\d,.]*)/i);
+    const price = priceMatch ? parseFloat(priceMatch[1].replace(',','')) : 0;
+
+    if (qty <= 0) return '❌ مش قادر أفهم الكمية. مثال: "صرف 3000 ورقة A4 للعميل محمد بسعر 4 جنيه"';
+    if (!customer) {
+      const custList = (DB.data.customers||[]).slice(0,5).map(c=>c.name).join('، ');
+      return `❌ مش لاقي العميل. العملاء المتاحين: <b>${custList||'لا يوجد عملاء بعد'}</b><br>مثال: "صرف 3000 ورقة للعميل ${custList.split('،')[0]||'اسم العميل'} بسعر 4"`;
+    }
+
+    // Find paper product
+    const paper = (DB.data.products||[]).find(p =>
+      (p.type||'').includes('ورق') || (p.name||'').includes('ورق') || (p.name||'').includes('A4'));
+
+    if (!paper) return '❌ مفيش منتجات ورق في المخزن. أضف منتجات أولاً من المخازن.';
+    if (paper.quantity < qty) return `⚠️ الكمية المطلوبة (${fmt(qty)}) أكبر من المتاح (${fmt(paper.quantity)}). هل تريد المتابعة رغم ذلك؟ اكتب "نعم صرف" للتأكيد.`;
+
+    const total = qty * (price || paper.price || 0);
+    const invNum = ++DB.data.counters.invoice;
+    const invoiceId = 'inv_'+uid();
+    DB.data.invoices = DB.data.invoices || [];
+    DB.data.invoices.push({ id:invoiceId, number:invNum, customerId:customer.id,
+      date:todayStr(), items:[{productId:paper.id,productName:paper.name,qty,price:price||paper.price||0,total}],
+      subtotal:total, tax:0, discount:0, total, paid:0, status:'unpaid', paymentMethod:'آجل', createdAt:Date.now() });
+    paper.quantity -= qty;
+    customer.balance = (customer.balance||0) + total;
+    DB.data.stockMoves = DB.data.stockMoves || [];
+    DB.data.stockMoves.push({ id:'sm_'+uid(), productId:paper.id, type:'out',
+      quantity:qty, date:todayStr(), reference:'صرف عبر المساعد #'+invNum, createdAt:Date.now() });
+    DB.save(); renderSidebar(); updateNotifBadge();
+    return `✅ <b>تم تنفيذ الصرف!</b><br>• العميل: <b>${escapeHtml(customer.name)}</b><br>• الكمية: <b>${fmt(qty)} ${escapeHtml(paper.unit||'')}</b> من ${escapeHtml(paper.name)}<br>• الإجمالي: <b>${fmt(total)} ج.م</b><br>• فاتورة رقم: <b>#${invNum}</b> (آجل)<br><br><button class="btn btn-sm btn-primary" onclick="navigate('invoices')" style="margin-top:6px">📄 عرض الفاتورة</button>`;
+  }
+
+  return null; // not a task
+}
+
 function aiAnswer(qRaw) {
   const q = (qRaw || '').toLowerCase().trim();
   const cur = (DB.data.settings && DB.data.settings.currency) || 'جنيه';
@@ -18786,6 +19064,12 @@ function aiAnswer(qRaw) {
     const unpaid = invoices.filter(i=>i.status==='unpaid'||i.status==='partial').length;
     const monthInv = invoices.filter(i=>(i.date||'')>=monthStart).length;
     return `🧾 <b>الفواتير:</b><br>• الإجمالي: <b>${total}</b><br>• هذا الشهر: <b>${monthInv}</b><br>• غير مدفوعة/جزئية: <b>${unpaid}</b>`;
+  }
+
+  // ---- TASK COMMANDS (نفذ المهمة) ----
+  if (has('نفذ', 'نفذ المهمة', 'اضف', 'أضف', 'صرف')) {
+    const result = aiExecuteTask(q);
+    if (result) return result;
   }
 
   // ---- AVERAGE INVOICE VALUE (متوسط الفاتورة) ----
