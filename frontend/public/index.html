@@ -15327,27 +15327,6 @@ function renderInventory() {
       <div class="stat-card stat-warning"><div class="accent-stripe"></div><div class="icon-wrap">⚠</div><div class="label">منتجات منخفضة</div><div class="value">${lowStock.length}</div><span class="trend down">تحتاج تموين</span></div>
     </div>
 
-    <!-- BIG STOCK SUMMARY CARD -->
-    <div class="inv-stock-summary">
-      <div class="inv-stock-header">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-        إجمالي المخزون — حسب الفئة
-      </div>
-      <div class="inv-stock-grid">
-        ${catEntries.length === 0
-          ? '<div style="color:var(--text-muted);padding:16px">لا توجد منتجات مسجلة بعد</div>'
-          : catEntries.map(([cat, d]) => `
-          <div class="inv-stock-item" onclick="inventoryCatFilter='${cat}';renderInventory()">
-            <div class="inv-stock-icon">${{ورق:'📄',طابعات:'🖨️','أحبار وتنر':'🖊️','قطع غيار':'🔧',بلاستك:'📦',فوتو:'📷',أخرى:'🗂️'}[cat]||'📦'}</div>
-            <div class="inv-stock-info">
-              <div class="inv-stock-name">${escapeHtml(cat)}</div>
-              <div class="inv-stock-qty">${fmt(Math.round(d.qty))} <span>وحدة</span></div>
-              <div class="inv-stock-count">${d.count} صنف</div>
-            </div>
-          </div>`).join('')}
-      </div>
-    </div>
-
     <div class="filter-bar">
       <input class="form-control" type="text" id="inv-search" placeholder="🔍 بحث بالاسم..." value="${inventorySearch||''}" style="flex:1;min-width:160px">
       <select class="form-control" id="inv-cat-filter" style="min-width:140px;max-width:180px" onchange="inventoryCatFilter=this.value;renderInventory()">
