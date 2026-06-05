@@ -8304,7 +8304,8 @@ html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
 }
 
 /* ===== QURAN VERSE IN SMART ALERT ===== */
-.smart-alert-icon.quran-icon {
+.smart-alert-icon.quran-icon,
+.smart-alert-icon.paper-icon {
   background: linear-gradient(135deg, #1a0a0e, #2d0f15);
   border: 1px solid rgba(219,32,51,.35);
   cursor: pointer;
@@ -8312,7 +8313,8 @@ html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
   padding: 6px;
   transition: all .2s ease;
 }
-.smart-alert-icon.quran-icon:hover {
+.smart-alert-icon.quran-icon:hover,
+.smart-alert-icon.paper-icon:hover {
   border-color: #db2033;
   box-shadow: 0 0 12px rgba(219,32,51,.4);
 }
@@ -8709,7 +8711,7 @@ const SyncEngine = (() => {
       const fresh = await res.json();
       const newVer = fresh.__version || 0;
 
-      // Skip if we already have this version (we were the author)
+      // Skip if we already have this version
       if (newVer && newVer <= DB._serverVersion) {
         setStatus('connected');
         return;
@@ -8718,37 +8720,77 @@ const SyncEngine = (() => {
       DB._bootstrapData = fresh;
       DB._serverVersion = newVer;
 
-      // Preserve UI state before overwriting data
-      const savedPage   = typeof currentPage !== 'undefined' ? currentPage : 'dashboard';
-      const savedScroll = (document.getElementById('page-content') || {}).scrollTop || 0;
-      const savedSearch = typeof inventorySearch !== 'undefined' ? inventorySearch : '';
+      // ── SILENT BACKGROUND MERGE ─────────────────────────────
+      // Update DB.data in-place without re-render.
+      // The user sees NO flicker, NO reset, NO lost input.
+      silentMerge(fresh);
 
-      DB.load();
-
-      // Re-render current page with preserved state
-      if (typeof navigate === 'function') {
-        navigate(savedPage, true);
-        // Restore scroll after render
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            const pc = document.getElementById('page-content');
-            if (pc && savedScroll > 0) pc.scrollTop = savedScroll;
-          });
-        });
-      }
-
-      // Update live counters silently
-      if (typeof updateNotifBadge === 'function') updateNotifBadge();
+      // Only update badges/counters (these are tiny DOM ops, not full re-render)
+      if (typeof updateNotifBadge   === 'function') updateNotifBadge();
       if (typeof updatePaperCounter === 'function') updatePaperCounter();
 
+      // Update dashboard stats if currently on dashboard (only numbers, not full re-render)
+      const page = typeof currentPage !== 'undefined' ? currentPage : '';
+      if (page === 'dashboard') silentDashboardUpdate();
+
       setStatus('connected');
-      console.log(`[Sync] Applied remote update v${newVer} (${reason})`);
+      console.log(`[Sync] Silent merge v${newVer} (${reason})`);
     } catch (e) {
       console.error('[Sync] Pull failed:', e);
       setStatus('error');
     } finally {
       _isSyncing = false;
     }
+  }
+
+  // Merge fresh server data into DB.data without touching the DOM
+  function silentMerge(fresh) {
+    const skip = new Set(['__version']);
+    for (const key of Object.keys(fresh)) {
+      if (skip.has(key)) continue;
+      if (Array.isArray(fresh[key])) {
+        DB.data[key] = fresh[key];
+      } else if (fresh[key] && typeof fresh[key] === 'object') {
+        DB.data[key] = Object.assign({}, DB.data[key] || {}, fresh[key]);
+      } else if (fresh[key] !== undefined) {
+        DB.data[key] = fresh[key];
+      }
+    }
+    // Fix required arrays
+    const arrays = ['users','customers','products','invoices','payments','expenses',
+      'stockMoves','issuances','bankTransfers','suppliers','supplierPayments',
+      'notes','auditLog','employees','salaryRuns'];
+    for (const k of arrays) if (!Array.isArray(DB.data[k])) DB.data[k] = [];
+    if (!DB.data.settings) DB.data.settings = {};
+    if (!DB.data.counters) DB.data.counters = { invoice:1000, issuance:1000, purchase:1000 };
+    DB.data.customers.forEach(c => { if (!c.customPrices) c.customPrices = {}; });
+  }
+
+  // Update only the numeric stat elements on dashboard without full re-render
+  function silentDashboardUpdate() {
+    try {
+      const fmt = n => Number(n||0).toLocaleString('en-US');
+      const today = (typeof todayStr === 'function') ? todayStr() : new Date().toISOString().slice(0,10);
+      const monthStart = today.slice(0,7) + '-01';
+      const invs  = DB.data.invoices   || [];
+      const custs = DB.data.customers  || [];
+      const prods = DB.data.products   || [];
+
+      const monthSales = invs.filter(i=>(i.date||'')>=monthStart).reduce((s,i)=>s+(i.total||0),0);
+      const totalDebt  = custs.reduce((s,c)=>s+(c.balance||0),0);
+      const lowStock   = prods.filter(p=>(p.quantity||0)<=(p.minQuantity||0)).length;
+      const unpaidInv  = invs.filter(i=>i.status!=='paid').length;
+
+      // Patch individual stat-card values if they exist in DOM
+      const patch = (selector, val) => {
+        const el = document.querySelector(selector);
+        if (el) el.textContent = val;
+      };
+      patch('[data-live="month-sales"]', fmt(monthSales));
+      patch('[data-live="total-debt"]',  fmt(totalDebt));
+      patch('[data-live="low-stock"]',   lowStock);
+      patch('[data-live="unpaid-inv"]',  unpaidInv);
+    } catch (e) { /* non-critical */ }
   }
 
   function throttledPull(reason) {
@@ -9485,14 +9527,26 @@ function updateBackButton() {
   if (btn) btn.style.display = _navHistory.length > 0 ? 'grid' : 'none';
 }
 
-// Stock counter: total quantity of ALL products combined, with a green +delta on increase
+// Stock counter: paper/plastic/photo types only
 let _paperCountLast = null;
 function updatePaperCounter() {
   const el = document.getElementById('paper-counter');
   const numEl = document.getElementById('paper-counter-num');
   if (!el || !numEl || !DB.data || !DB.data.products) return;
-  // Sum the quantity of EVERY product/type together
-  const total = DB.data.products.reduce((s,p)=> s + (Number(p.quantity)||0), 0);
+  // Count only paper/plastic/photo — exclude ink/toner/cartridge
+  const excludeWords = ['حبر','تنر','تونر','ink','toner','كارتريدج','cartridge','ريبون','ribbon'];
+  const includeWords = ['ورق','بلاستك','بلاستيك','فوتو','photo','paper','a4','a3','a5','a6','b4','b5','فيلم','film','لفة','رزمة','رول'];
+  const paperProds = DB.data.products.filter(p => {
+    const name = (p.name || '').toLowerCase();
+    const unit = (p.unit || '').toLowerCase();
+    const type = (p.type || '').toLowerCase();
+    if (excludeWords.some(w => name.includes(w) || type.includes(w))) return false;
+    if (includeWords.some(w => name.includes(w) || type.includes(w) || unit.includes(w))) return true;
+    if (['ورقة','لفة','رزمة','رول'].some(w => unit.includes(w))) return true;
+    return false;
+  });
+  const total = (paperProds.length ? paperProds : DB.data.products)
+    .reduce((s,p)=> s + (Number(p.quantity)||0), 0);
 
   numEl.textContent = fmt(Math.round(total));
 
@@ -10394,8 +10448,10 @@ function renderDashboard() {
   // Helper: classify a product by name into category
   function categorizeProduct(p) {
     const n = (p.name || '').toLowerCase() + ' ' + (p.type || '').toLowerCase();
-    if (n.includes('حبر') || n.includes('ink') || n.includes('toner') || n.includes('خرطوش')) return 'ink';
-    if (n.includes('ورق') || n.includes('paper') || n.includes('a4') || n.includes('a3') || n.includes('فرخ') || n.includes('ريم')) return 'paper';
+    const isInk = n.includes('حبر') || n.includes('ink') || n.includes('toner') || n.includes('تونر') || n.includes('تنر') || n.includes('خرطوش') || n.includes('كارتريدج') || n.includes('ريبون');
+    if (isInk) return 'ink';
+    const isPaper = n.includes('ورق') || n.includes('paper') || n.includes('a4') || n.includes('a3') || n.includes('a5') || n.includes('a6') || n.includes('b4') || n.includes('b5') || n.includes('فرخ') || n.includes('ريم') || n.includes('فوتو') || n.includes('photo') || n.includes('بلاستك') || n.includes('بلاستيك') || n.includes('فيلم') || n.includes('film') || n.includes('لفة') || n.includes('رزمة') || n.includes('رول');
+    if (isPaper) return 'paper';
     return 'other';
   }
 
@@ -10600,6 +10656,16 @@ function renderDashboard() {
 
     <!-- Smart Alerts Bar (نابض) -->
     <div class="smart-alerts-bar" id="smart-alerts-bar">
+      <div class="smart-alert pulse-${paperPulseInfo.level}" data-card="paper" title="اضغط للتفاصيل">
+        <span class="pulse-dot pulse-${paperPulseInfo.level}"></span>
+        <div class="smart-alert-icon paper-icon" onclick="toggleReciter()" title="سورة يوسف - اضغط للاستماع">
+          <span class="quran-ayah">﴿وَاللَّهُ غَالِبٌ عَلَىٰ أَمْرِهِ﴾</span>
+        </div>
+        <div class="smart-alert-body">
+          <div class="smart-alert-title">الورق <span class="smart-alert-qty">${fmt(paperTotalQty).split('.')[0]} ${paperUnit}</span></div>
+          <div class="smart-alert-text">${paperPulseInfo.label}</div>
+        </div>
+      </div>
       <div class="smart-alert pulse-${inkPulseInfo.level}" data-card="ink" title="اضغط للتفاصيل">
         <span class="pulse-dot pulse-${inkPulseInfo.level}"></span>
         <div class="smart-alert-icon ink-icon">
