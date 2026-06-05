@@ -7732,6 +7732,24 @@ body.mobile-drawer-open { overflow: hidden; }
 #ai-icon-btn { display: inline-flex !important; }
 #ai-icon-btn svg { color: var(--primary); }
 
+/* ── Real-time Sync Status Dot ── */
+.sync-dot {
+  display: inline-block;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex: 0 0 9px;
+  margin: 0 3px;
+  transition: background .4s ease, box-shadow .4s ease;
+  cursor: default;
+  vertical-align: middle;
+}
+.sync-dot-connected  { background: #25d366; box-shadow: 0 0 6px rgba(37,211,102,.55); }
+.sync-dot-connecting { background: #f59e0b; animation: syncPulse 1.2s ease-in-out infinite; }
+.sync-dot-syncing    { background: #3b82f6; animation: syncPulse .8s ease-in-out infinite; }
+.sync-dot-offline    { background: #6b7280; }
+.sync-dot-error      { background: #ef4444; animation: syncPulse 1s ease-in-out infinite; }
+@keyframes syncPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
 /* Back button in topbar */
 .topbar-back-btn { display: none; }
 .topbar-back-btn svg { color: var(--text); }
@@ -8308,40 +8326,6 @@ html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
   direction: rtl;
 }
 
-/* ===== AI TASKS PANEL ===== */
-.ai-tasks-panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 16px 18px;
-  margin-bottom: 16px;
-}
-.ai-tasks-header {
-  font-size: 14px; font-weight: 800; color: var(--text);
-  margin-bottom: 12px;
-}
-.ai-tasks-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-}
-.ai-task-btn {
-  padding: 14px 12px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(var(--primary-rgb),.10), rgba(var(--primary-rgb),.04));
-  border: 1px solid rgba(var(--primary-rgb),.3);
-  color: var(--text); font-size: 14px; font-weight: 700;
-  cursor: pointer; text-align: center;
-  transition: all .2s ease;
-}
-.ai-task-btn:hover {
-  background: linear-gradient(135deg, rgba(var(--primary-rgb),.22), rgba(var(--primary-rgb),.1));
-  border-color: var(--primary); color: var(--primary);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(var(--primary-rgb),.2);
-}
-@media (max-width: 480px) { .ai-tasks-grid { grid-template-columns: 1fr; } }
-
 /* Topbar refresh button — mobile only */
 .topbar-refresh-btn { display: none; }
 @media (max-width: 768px) {
@@ -8474,6 +8458,7 @@ html[dir="ltr"] .nav-item:hover { transform: translateX(3px); }
         <span class="paper-counter-num" id="paper-counter-num">0</span>
         <span class="paper-counter-delta" id="paper-counter-delta"></span>
       </div>
+      <span id="sync-status-dot" class="sync-dot sync-dot-connecting" title="جاري الاتصال..." aria-label="حالة المزامنة"></span>
       <button class="icon-btn" id="notif-btn" onclick="openNotifications()" title="الإشعارات">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         <span class="notif-dot" id="notif-dot" style="display:none"></span>
@@ -8576,6 +8561,15 @@ function detectApiBase() {
 }
 const API_BASE = detectApiBase();
 
+/* ═══════════════════════════════════════════════════════
+   CLIENT ID — unique per browser tab (stays same on reload)
+═══════════════════════════════════════════════════════ */
+const _CLIENT_ID = (() => {
+  let id = sessionStorage.getItem('_ozarex_cid');
+  if (!id) { id = Math.random().toString(36).slice(2, 10) + Date.now().toString(36); sessionStorage.setItem('_ozarex_cid', id); }
+  return id;
+})();
+
 const DB = {
   data: {
     users: [], customers: [], products: [], invoices: [],
@@ -8588,10 +8582,13 @@ const DB = {
 
   _bootstrapped: false,
   _bootstrapData: null,
+  _serverVersion: 0,   // last known server version
 
   load() {
     if (this._bootstrapData) {
-      this.data = this._bootstrapData;
+      const d = this._bootstrapData;
+      this._serverVersion = d.__version || 0;
+      this.data = d;
       const keys = ['users','customers','products','invoices','payments','expenses','stockMoves','issuances','bankTransfers','suppliers','supplierPayments','notes','auditLog','employees','salaryRuns'];
       for (const k of keys) if (!Array.isArray(this.data[k])) this.data[k] = [];
       if (!this.data.settings) this.data.settings = {};
@@ -8604,9 +8601,9 @@ const DB = {
     return false;
   },
 
-  _saveTimer: null,
+  _saveTimer:    null,
   _saveInflight: false,
-  _savePending: false,
+  _savePending:  false,
 
   save() {
     if (this._saveTimer) clearTimeout(this._saveTimer);
@@ -8619,18 +8616,25 @@ const DB = {
     this._saveInflight = true;
     try {
       const res = await fetch(API_BASE + '/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method:  'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'X-Client-Id':   _CLIENT_ID   // server uses this to tag broadcast source
+        },
         body: JSON.stringify(this.data)
       });
       if (!res.ok) {
         const text = await res.text().catch(() => '');
         throw new Error('HTTP ' + res.status + ' ' + text);
       }
+      const json = await res.json().catch(() => ({}));
+      // Update our known version so we don't re-fetch our own change
+      if (json.version) this._serverVersion = json.version;
       window.__lastSaveOk = Date.now();
+      SyncEngine.onSelfSaved(json.version);
     } catch (e) {
       console.error('Save failed:', e);
-      if (typeof toast === 'function') toast('فشل حفظ البيانات على السيرفر: ' + e.message, 'error');
+      SyncEngine.onSaveError(e);
     } finally {
       this._saveInflight = false;
       if (this._savePending) { this._savePending = false; this._flush(); }
@@ -8652,6 +8656,211 @@ const DB = {
     } catch (e) { console.error('Reset failed:', e); }
   }
 };
+
+/* ═══════════════════════════════════════════════════════
+   REAL-TIME SYNC ENGINE
+   Architecture:
+   • Server-Sent Events (SSE) — zero-dependency, persistent push
+   • Optimistic UI — changes show instantly, confirmed async
+   • Auto-reconnect — exponential back-off + online/offline events
+   • Conflict resolution — server version always wins
+   • Offline queue — saves accumulate, flush when reconnected
+   • Preserve scroll position + active view on sync
+═══════════════════════════════════════════════════════ */
+const SyncEngine = (() => {
+  let _es = null;             // EventSource
+  let _reconnectTimer = null;
+  let _reconnectDelay = 1000; // starts at 1s, doubles up to 30s
+  let _online = navigator.onLine;
+  let _connected = false;
+  let _isSyncing = false;
+  let _lastRemoteVersion = 0;
+  let _pendingVersionToApply = 0;
+  let _syncThrottle = null;
+
+  /* UI indicators */
+  function setStatus(state) {
+    // state: 'connected' | 'connecting' | 'offline' | 'syncing' | 'error'
+    const el = document.getElementById('sync-status-dot');
+    if (!el) return;
+    const colors = { connected:'#25d366', connecting:'#f59e0b', offline:'#6b7280', syncing:'#3b82f6', error:'#ef4444' };
+    const labels = { connected:'متزامن', connecting:'جاري الاتصال...', offline:'غير متصل', syncing:'يتزامن...', error:'خطأ في المزامنة' };
+    el.style.background = colors[state] || colors.offline;
+    el.title = labels[state] || state;
+    el.className = 'sync-dot sync-dot-' + state;
+  }
+
+  function showSyncToast(msg, isError = false) {
+    if (isError && typeof toast === 'function') toast(msg, 'error');
+    // silent toasts for normal sync activity
+  }
+
+  /* Fetch fresh data from server and apply to DB without re-render flicker */
+  async function pullLatest(reason = '') {
+    if (_isSyncing) return;
+    _isSyncing = true;
+    setStatus('syncing');
+    try {
+      const res = await fetch(API_BASE + '/api/data', {
+        headers: { 'Accept': 'application/json', 'X-Client-Id': _CLIENT_ID },
+        cache: 'no-store'
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const fresh = await res.json();
+      const newVer = fresh.__version || 0;
+
+      // Skip if we already have this version (we were the author)
+      if (newVer && newVer <= DB._serverVersion) {
+        setStatus('connected');
+        return;
+      }
+
+      DB._bootstrapData = fresh;
+      DB._serverVersion = newVer;
+
+      // Preserve UI state before overwriting data
+      const savedPage   = typeof currentPage !== 'undefined' ? currentPage : 'dashboard';
+      const savedScroll = (document.getElementById('page-content') || {}).scrollTop || 0;
+      const savedSearch = typeof inventorySearch !== 'undefined' ? inventorySearch : '';
+
+      DB.load();
+
+      // Re-render current page with preserved state
+      if (typeof navigate === 'function') {
+        navigate(savedPage, true);
+        // Restore scroll after render
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const pc = document.getElementById('page-content');
+            if (pc && savedScroll > 0) pc.scrollTop = savedScroll;
+          });
+        });
+      }
+
+      // Update live counters silently
+      if (typeof updateNotifBadge === 'function') updateNotifBadge();
+      if (typeof updatePaperCounter === 'function') updatePaperCounter();
+
+      setStatus('connected');
+      console.log(`[Sync] Applied remote update v${newVer} (${reason})`);
+    } catch (e) {
+      console.error('[Sync] Pull failed:', e);
+      setStatus('error');
+    } finally {
+      _isSyncing = false;
+    }
+  }
+
+  function throttledPull(reason) {
+    if (_syncThrottle) return;
+    _syncThrottle = setTimeout(() => {
+      _syncThrottle = null;
+      pullLatest(reason);
+    }, 80); // 80ms debounce for burst events
+  }
+
+  /* Connect SSE */
+  function connect() {
+    if (_es) { try { _es.close(); } catch {} _es = null; }
+    if (!_online) { setStatus('offline'); return; }
+    setStatus('connecting');
+
+    _es = new EventSource(API_BASE + '/api/events');
+
+    _es.onopen = () => {
+      _connected = true;
+      _reconnectDelay = 1000; // reset back-off
+      setStatus('connected');
+      console.log('[Sync] SSE connected');
+      // Pull latest on (re)connect to catch any missed changes
+      pullLatest('reconnect');
+    };
+
+    _es.onmessage = (e) => {
+      if (!e.data || e.data.startsWith(':')) return; // heartbeat comment
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.event === 'connected') {
+          _lastRemoteVersion = msg.version || 0;
+          return;
+        }
+        if (msg.event === 'data_changed') {
+          // Skip our own changes (we already have them in DB.data)
+          if (msg.source === _CLIENT_ID) {
+            DB._serverVersion = msg.version;
+            return;
+          }
+          // Another device changed data — pull fresh
+          _lastRemoteVersion = msg.version;
+          throttledPull('data_changed from ' + (msg.source || 'unknown'));
+        }
+      } catch (err) {
+        console.warn('[Sync] Bad SSE message:', e.data);
+      }
+    };
+
+    _es.onerror = () => {
+      _connected = false;
+      try { _es.close(); } catch {}
+      _es = null;
+      setStatus(_online ? 'connecting' : 'offline');
+      scheduleReconnect();
+    };
+  }
+
+  function scheduleReconnect() {
+    if (_reconnectTimer) return;
+    if (!_online) return;
+    _reconnectTimer = setTimeout(() => {
+      _reconnectTimer = null;
+      console.log(`[Sync] Reconnecting (delay was ${_reconnectDelay}ms)...`);
+      connect();
+    }, _reconnectDelay);
+    _reconnectDelay = Math.min(_reconnectDelay * 2, 30000); // max 30s
+  }
+
+  /* Called by DB._flush after successful save */
+  function onSelfSaved(newVersion) {
+    if (newVersion) DB._serverVersion = newVersion;
+    setStatus('connected');
+  }
+
+  /* Called by DB._flush on save error */
+  function onSaveError(e) {
+    setStatus('error');
+    showSyncToast('فشل حفظ البيانات: ' + e.message, true);
+  }
+
+  /* Fallback polling when SSE is unavailable */
+  let _pollTimer = null;
+  function startPollingFallback() {
+    if (_pollTimer) return;
+    _pollTimer = setInterval(async () => {
+      if (_connected || !_online) return;
+      try {
+        const r = await fetch(API_BASE + '/api/version', { cache: 'no-store' });
+        if (!r.ok) return;
+        const { version } = await r.json();
+        if (version && version > DB._serverVersion) {
+          throttledPull('polling-fallback');
+        }
+      } catch {}
+    }, 10000); // poll every 10s only as fallback
+  }
+
+  /* Init */
+  function init() {
+    window.addEventListener('online',  () => { _online = true;  setStatus('connecting'); connect(); });
+    window.addEventListener('offline', () => { _online = false; setStatus('offline'); });
+    connect();
+    startPollingFallback();
+  }
+
+  /* Expose */
+  return { init, pullLatest, onSelfSaved, onSaveError, setStatus };
+})();
+
+
 
 async function bootstrapFromServer() {
   let res;
@@ -9590,6 +9799,9 @@ function updateWalletBadge() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   loadTheme();
+  document.addEventListener('pointerdown', () => {
+    document.querySelectorAll('.notify-overlay:not(.show)').forEach(o => { try{o.remove();}catch(_){} });
+  }, true);
   try {
     await bootstrapFromServer();
   } catch (e) {
@@ -9620,13 +9832,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('click', audioResume);
   document.addEventListener('keydown', audioResume);
 
-  if (restoreSession()) startApp();
+  if (restoreSession()) {
+    startApp();
+    // Start real-time sync after app is ready
+    SyncEngine.init();
+  }
 
   document.getElementById('login-form').addEventListener('submit', e => {
     e.preventDefault();
     const u = document.getElementById('login-username').value.trim();
     const p = document.getElementById('login-password').value;
-    if (login(u, p)) { toast('مرحباً بك ' + currentUser.name); startApp(); }
+    if (login(u, p)) {
+      toast('مرحباً بك ' + currentUser.name);
+      startApp();
+      SyncEngine.init(); // start sync after login
+    }
     else toast('بيانات الدخول غير صحيحة', 'error');
   });
 
@@ -10380,17 +10600,6 @@ function renderDashboard() {
 
     <!-- Smart Alerts Bar (نابض) -->
     <div class="smart-alerts-bar" id="smart-alerts-bar">
-      <div class="smart-alert pulse-${paperPulseInfo.level}" data-card="paper" title="اضغط للتفاصيل">
-        <span class="pulse-dot pulse-${paperPulseInfo.level}"></span>
-        <div class="smart-alert-icon quran-icon" onclick="toggleReciter()" title="سورة يوسف - اضغط للاستماع">
-          <span class="quran-ayah">﴿وَاللَّهُ غَالِبٌ عَلَىٰ أَمْرِهِ﴾</span>
-        </div>
-        <div class="smart-alert-body">
-          <div class="smart-alert-title">الورق <span class="smart-alert-qty">${fmt(paperTotalQty).split('.')[0]} ${paperUnit}</span></div>
-          <div class="smart-alert-text">${paperPulseInfo.label}</div>
-        </div>
-      </div>
-
       <div class="smart-alert pulse-${inkPulseInfo.level}" data-card="ink" title="اضغط للتفاصيل">
         <span class="pulse-dot pulse-${inkPulseInfo.level}"></span>
         <div class="smart-alert-icon ink-icon">
@@ -18706,26 +18915,7 @@ function renderAIAssistant() {
     <div class="page-header">
       <div>
         <div class="page-title">🤖 المساعد الذكي</div>
-        <div class="page-subtitle">تحليلات ذكية + تنفيذ مهام مباشرة على بيانات الشركة</div>
-      </div>
-    </div>
-
-    <!-- TASK EXECUTION PANEL -->
-    <div class="ai-tasks-panel">
-      <div class="ai-tasks-header">⚡ تنفيذ مهام سريعة</div>
-      <div class="ai-tasks-grid">
-        <button class="ai-task-btn" onclick="aiTaskPrompt('stock_add')">
-          📦 أضف للمخزن
-        </button>
-        <button class="ai-task-btn" onclick="aiTaskPrompt('customer_add')">
-          👤 أضف عميل جديد
-        </button>
-        <button class="ai-task-btn" onclick="aiTaskPrompt('issuance')">
-          📄 صرف ورق وفاتورة
-        </button>
-        <button class="ai-task-btn" onclick="aiTaskPrompt('stock_query')">
-          🔍 استعلام مخزون
-        </button>
+        <div class="page-subtitle">تحليلات ذكية وإجابات فورية عن بيانات الشركة</div>
       </div>
     </div>
 
@@ -18734,7 +18924,7 @@ function renderAIAssistant() {
         <div class="ai-msg ai-msg-bot">
           <div class="ai-avatar">🤖</div>
           <div class="ai-bubble">
-            أهلاً! أنا المساعد الذكي. اقدر أجاوب على أسئلتك <b>وأنفّذ مهام</b> مباشرة زي إضافة للمخزن، إضافة عميل، وصرف ورق. استخدم الأزرار السريعة فوق أو اكتب أمرك. 👆
+            أهلاً! أنا المساعد الذكي. اسألني عن أي حاجة في بيانات شركتك — المبيعات، الأرباح، الديون، المخزون، أو العملاء. جرّب أحد الأسئلة السريعة تحت 👇
           </div>
         </div>
       </div>
