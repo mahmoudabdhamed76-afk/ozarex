@@ -221,3 +221,19 @@ CREATE TABLE IF NOT EXISTS backups (
   created_at   TEXT NOT NULL,
   payload      TEXT NOT NULL
 );
+
+-- 4.7 · login sessions (only a hash of the cookie token is stored)
+CREATE TABLE IF NOT EXISTS sessions (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL,
+  created_at   INTEGER NOT NULL,
+  last_seen    INTEGER NOT NULL,
+  ua           TEXT,
+  ip           TEXT
+);
+
+-- 4.7 · changes already applied (a device that retries never applies one twice)
+CREATE TABLE IF NOT EXISTS applied_ops (
+  id           TEXT PRIMARY KEY,
+  at           INTEGER NOT NULL
+);

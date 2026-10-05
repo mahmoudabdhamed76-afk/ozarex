@@ -3,7 +3,7 @@
 const { db } = require('../db');
 
 const tables = {
-  users: { cols: ['id','username','password','name','role','created_at','updated_at'], json: [] },
+  users: { cols: ['id','username','password','name','role','data','created_at','updated_at'], json: ['data'] },
   customers: { cols: ['id','name','phone','address','email','notes','opening_balance','data','created_at','updated_at'], json: ['data'] },
   suppliers: { cols: ['id','name','phone','address','email','notes','opening_balance','data','created_at','updated_at'], json: ['data'] },
   products: { cols: ['id','name','sku','category','unit','price','cost','stock','min_stock','data','created_at','updated_at'], json: ['data'] },
@@ -283,7 +283,21 @@ function insertIssuance(iss) {
   }
 }
 
+/* users: a full import must never wipe or expose passwords —
+   keep the stored hash unless a new plain password was given (it gets hashed) */
+function userWithHash(item, existing) {
+  const auth = require('./auth');
+  const u = Object.assign({}, item);
+  const pw = u.password;
+  if (auth.isHash(pw)) { /* keep */ }
+  else if (pw !== undefined && pw !== null && String(pw) !== '') u.password = auth.hashPassword(pw);
+  else u.password = existing || auth.hashPassword(Math.random().toString(36));
+  return u;
+}
+
 function importBlob(blob) {
+  const oldHash = {};
+  try { for (const r of db.prepare('SELECT id, password FROM users').all()) oldHash[r.id] = r.password; } catch (_) {}
   db.exec('BEGIN');
   try {
     for (const tableName of Object.values(blobToTable)) {
@@ -298,7 +312,7 @@ function importBlob(blob) {
 
     for (const [blobKey, tableName] of Object.entries(blobToTable)) {
       const items = Array.isArray(blob[blobKey]) ? blob[blobKey] : [];
-      for (const item of items) insertGeneric(tableName, item, tables[tableName]);
+      for (const item of items) insertGeneric(tableName, blobKey === 'users' ? userWithHash(item, oldHash[item && item.id]) : item, tables[tableName]);
     }
     for (const inv of (blob.invoices || [])) insertInvoice(inv);
     for (const iss of (blob.issuances || [])) insertIssuance(iss);
@@ -347,4 +361,53 @@ function defaultBlob() {
   };
 }
 
-module.exports = { exportBlob, importBlob, defaultBlob };
+/* ═════ record-level writes (4.7) — one record at a time instead of
+   rewriting every table on every save ═════ */
+function insertAudit(a) {
+  if (!a || typeof a !== 'object') return;
+  const createdAt = a.createdAt || a.created_at ||
+    (typeof a.timestamp === 'number' ? new Date(a.timestamp).toISOString() : null) || a.date || new Date().toISOString();
+  db.prepare(`INSERT INTO audit_log (user_id, action, entity, entity_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(a.userId || a.user_id || null, a.operation || a.action || null, a.table || a.entity || null,
+      a.recordId || a.entityId || a.entity_id || null, JSON.stringify(a), createdAt);
+}
+function deleteAudit(id) { db.prepare(`DELETE FROM audit_log WHERE json_extract(details, '$.id') = ?`).run(String(id)); }
+function trimAudit(max) {
+  db.prepare(`DELETE FROM audit_log WHERE id NOT IN (SELECT id FROM audit_log ORDER BY id DESC LIMIT ?)`).run(max || 5000);
+}
+function upsertRecord(blobKey, rec) {
+  if (!rec || rec.id === undefined || rec.id === null) return;
+  if (blobKey === 'invoices') { db.prepare('DELETE FROM invoice_items WHERE invoice_id = ?').run(String(rec.id)); insertInvoice(rec); return; }
+  if (blobKey === 'issuances') { db.prepare('DELETE FROM issuance_items WHERE issuance_id = ?').run(String(rec.id)); insertIssuance(rec); return; }
+  if (blobKey === 'auditLog') { deleteAudit(rec.id); insertAudit(rec); return; }
+  const table = blobToTable[blobKey]; if (!table) return;
+  if (blobKey === 'users') { rec = userWithHash(rec, (db.prepare('SELECT password FROM users WHERE id = ?').get(String(rec.id)) || {}).password); }
+  insertGeneric(table, rec, tables[table]);
+}
+function deleteRecord(blobKey, id) {
+  if (id === undefined || id === null) return;
+  id = String(id);
+  if (blobKey === 'invoices') { db.prepare('DELETE FROM invoice_items WHERE invoice_id = ?').run(id); db.prepare('DELETE FROM invoices WHERE id = ?').run(id); return; }
+  if (blobKey === 'issuances') { db.prepare('DELETE FROM issuance_items WHERE issuance_id = ?').run(id); db.prepare('DELETE FROM issuances WHERE id = ?').run(id); return; }
+  if (blobKey === 'auditLog') { deleteAudit(id); return; }
+  const table = blobToTable[blobKey]; if (!table) return;
+  db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
+}
+function setSetting(key, v) {
+  if (v === undefined || v === null) { db.prepare('DELETE FROM settings WHERE key = ?').run(key); return; }
+  db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
+    .run(key, typeof v === 'string' ? v : JSON.stringify(v));
+}
+function setCounter(name, v) {
+  db.prepare('INSERT INTO counters (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value').run(name, Number(v) || 0);
+}
+const KNOWN_KEYS = new Set(Object.keys(blobToTable).concat(['invoices', 'issuances', 'auditLog']));
+
+/* Read one settings value without exporting the whole database. */
+function getSetting(key) {
+  const r = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key);
+  if (!r) return undefined;
+  try { return JSON.parse(r.value); } catch (_) { return r.value; }
+}
+
+module.exports = { exportBlob, importBlob, defaultBlob, getSetting, upsertRecord, deleteRecord, setSetting, setCounter, trimAudit, KNOWN_KEYS };

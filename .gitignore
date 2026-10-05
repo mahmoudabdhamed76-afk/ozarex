@@ -1,0 +1,13 @@
+# data — never commit the live database
+data/
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+
+# local
+node_modules/
+.env
+*.log
+.DS_Store
+Thumbs.db
