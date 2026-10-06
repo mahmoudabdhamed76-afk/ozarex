@@ -1,6 +1,6 @@
 /* Regression tests for the current sync, driven from real browsers:
    two devices live, the offline queue, and the large dataset (C4 + timings). */
-import { test, expect, openSignedIn, watchErrors, waitForApp, formLogin } from './fixtures.mjs';
+import { test, expect, openSignedIn, watchErrors, waitForApp, formLogin, offlineCopy } from './fixtures.mjs';
 import { login, adminLogin, send, ops, col, req } from '../helpers/api.mjs';
 import { ADMIN_PASSWORD } from '../helpers/server.mjs';
 
@@ -53,9 +53,11 @@ test('a change the server refuses is rolled back on the device', async ({ page, 
   expect(errors.filter(e => !/403/.test(e))).toEqual([]);
 });
 
-test('control: with normal data the offline copy is saved', async ({ app: page }) => {
-  await page.waitForTimeout(2500);
-  expect(await page.evaluate(() => (localStorage.getItem('em_offline_snap') || '').length)).toBeGreaterThan(100);
+test('control: with normal data the offline copy is saved (IndexedDB since Phase 3)', async ({ app: page }) => {
+  await page.waitForTimeout(1500);
+  expect((await page.evaluate(() => OfflineManager.snapshotSettled())).ok).toBe(true);
+  expect((await offlineCopy(page)).bytes).toBeGreaterThan(100);
+  expect(await page.evaluate(() => localStorage.getItem('em_offline_snap'))).toBeNull();
 });
 
 test('reopening while the server is down: the password is asked, then the saved copy opens (Phase 2 · I11)', async ({ page, server, context }) => {

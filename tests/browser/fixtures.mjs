@@ -95,3 +95,51 @@ export function watchErrors(page, { allow } = {}) {
 export async function horizontalOverflow(page) {
   return page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth);
 }
+
+/* ── Phase 3 · reading the device's own storage directly (not through the app) ── */
+/* one helper runs inside the page: opens the app's IndexedDB the same way the app does
+   (same version, same stores — so it can never leave a half-made database behind), then does `op` */
+function idb(page, op, arg) {
+  return page.evaluate(async ([op, arg]) => {
+    const db = await new Promise((res, rej) => { const r = indexedDB.open('erp-offline', 1);
+      r.onupgradeneeded = () => { const d = r.result;
+        if (!d.objectStoreNames.contains('sync_queue')) d.createObjectStore('sync_queue', { keyPath: 'id', autoIncrement: true });
+        if (!d.objectStoreNames.contains('data_snapshot')) d.createObjectStore('data_snapshot', { keyPath: 'key' }); };
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    const run = (store, mode, f) => new Promise((res, rej) => { const tx = db.transaction(store, mode); const q = f(tx.objectStore(store)); let v;
+      if (q) q.onsuccess = () => { v = q.result; }; tx.oncomplete = () => res(v); tx.onerror = () => rej(tx.error); });
+    try {
+      if (op === 'copy') {
+        const rec = await run('data_snapshot', 'readonly', s => s.get('snapshot'));
+        if (!rec) return null;
+        const out = { bytes: (rec.json || '').length, owner: rec.owner, ts: rec.ts, v: rec.v };
+        if (arg) out.json = rec.json;
+        return out;
+      }
+      if (op === 'clear') return await run('data_snapshot', 'readwrite', s => s.clear());
+      if (op === 'count') return await run('sync_queue', 'readonly', s => s.count());
+    } finally { db.close(); }
+  }, [op, arg]);
+}
+/* the offline copy in IndexedDB → { bytes, owner, ts, v, json? } or null */
+export const offlineCopy = (page, { withJson = false } = {}) => idb(page, 'copy', withJson);
+export const clearOfflineCopy = page => idb(page, 'clear');
+export const queuedCount = page => idb(page, 'count').catch(() => -1);
+/* everything this origin keeps in localStorage, in characters (keys + values) */
+export async function localStorageChars(page) {
+  return page.evaluate(() => { let n = 0; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); n += k.length + (localStorage.getItem(k) || '').length; } return n; });
+}
+/* while the server is unreachable: reload, type the password on the login form, wait for the saved copy */
+export async function reopenOffline(page, username, password, { timeout = 30_000 } = {}) {
+  await page.reload().catch(() => {});
+  await expect(page.locator('#login-page')).toBeVisible({ timeout: 15_000 });
+  await page.fill('#login-username', username);
+  await page.fill('#login-password', password);
+  const t0 = Date.now();
+  await page.click('#login-form button[type=submit], #login-form .lgn-btn');
+  await page.waitForFunction(() => {
+    const a = document.getElementById('app'), pc = document.getElementById('page-content');
+    return a && getComputedStyle(a).display !== 'none' && pc && pc.children.length > 0;
+  }, null, { timeout });
+  return Date.now() - t0;
+}

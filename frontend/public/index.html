@@ -9970,7 +9970,7 @@ const _CLIENT_ID = (() => {
 
 /* ═══════════════════════════════════════════════════════
    OFFLINE MANAGER
-   - localStorage snapshot (instant, survives offline refresh)
+   - IndexedDB snapshot (Phase 3 · C4 — was localStorage, capped at ~5 MB)
    - IndexedDB queue (survives tab close)
    - Service Worker BackgroundSync
    - flushQueue on reconnect
@@ -9978,7 +9978,9 @@ const _CLIENT_ID = (() => {
 const OfflineManager = (() => {
   const IDB_NAME = 'erp-offline';
   const QUEUE_STORE = 'sync_queue';
-  const LS_SNAP = 'em_offline_snap';
+  const SNAP_STORE = 'data_snapshot';      // same database, its own store — never mixed with the queue
+  const SNAP_KEY = 'snapshot';
+  const LS_SNAP = 'em_offline_snap';       // before Phase 3 the copy lived here — read only to migrate it
 
   let _db = null, _sw = null;
   let _online = navigator.onLine;
@@ -10047,12 +10049,110 @@ const OfflineManager = (() => {
     _pending = 0; updateUI();
   }
 
-  function saveSnap(data) {
-    /* Phase 2 · I11: the copy remembers whose it is — another user can never open it offline */
-    try { localStorage.setItem(LS_SNAP, JSON.stringify({ data, ts: Date.now(), owner: (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null })); } catch(_) {}
+  /* ── Phase 3 · C4 · the offline copy lives in IndexedDB ───────────────
+     One record { key:'snapshot', v:1, json, ts, owner, bytes } in the `data_snapshot` store.
+     The copy is kept as the same JSON text as before (identical content, any size the browser allows).
+     It is only a cache: online, the server is always loaded instead.
+     Every snapshot operation runs on one chain, in order; while a write is running only the newest
+     waiting copy is kept (older ones are skipped, never written after a newer one).
+     A failed save is never silent: console.error + one warning toast + OfflineManager.snapshotStatus. */
+  let _snapChain = Promise.resolve();
+  let _snapNext = null, _snapQueued = false;
+  let _snapBlocked = false;                 // after logout nothing is written until someone signs in again
+  let _snapStatus = { ok: null, ts: 0, bytes: 0, error: null };
+  let _snapWarnedAt = 0;
+  function snapOp(fn) { const p = _snapChain.then(fn, fn); _snapChain = p.catch(() => {}); return p; }
+  function idbReq(r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+  async function snapGet() {
+    const db = await openDB();
+    return idbReq(db.transaction(SNAP_STORE).objectStore(SNAP_STORE).get(SNAP_KEY));
   }
-  function loadSnap() {
-    try { const raw = localStorage.getItem(LS_SNAP); return raw ? JSON.parse(raw) : null; } catch(_) { return null; }
+  async function snapPut(rec) {
+    const db = await openDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(SNAP_STORE, 'readwrite');
+      tx.objectStore(SNAP_STORE).put(rec);
+      tx.oncomplete = res;
+      tx.onerror = () => rej(tx.error || new Error('IndexedDB write failed'));
+      tx.onabort = () => rej(tx.error || new Error('IndexedDB write aborted'));
+    });
+  }
+  function snapFailed(what, e) {
+    const msg = (e && (e.name ? e.name + ': ' : '') + (e.message || e)) || 'unknown';
+    _snapStatus = { ok: false, ts: Date.now(), bytes: _snapStatus.bytes, error: what + ' — ' + msg };
+    console.error('[Offline] ' + what + ':', e);
+    if (Date.now() - _snapWarnedAt > 10 * 60 * 1000 && typeof toast === 'function') {
+      _snapWarnedAt = Date.now();
+      toast('تنبيه: النسخة الأوف لاين متحفظتش على الجهاز ده (' + ((e && e.name) || 'خطأ تخزين') + ') — شغلك متسجل على السيرفر عادي، بس لو النت فصل مش هتقدر تفتح البيانات من الجهاز', 'warning', 9000);
+    }
+  }
+
+  /* old localStorage copy → IndexedDB. Idempotent: written, read back and compared, and only then is the
+     old copy removed. Any failure leaves the old copy exactly where it was (tried again next start). */
+  let _migrated = false;
+  function migrateLegacy() {
+    if (_migrated) return Promise.resolve(true);
+    return snapOp(async () => {
+      if (_migrated) return true;
+      let raw = null;
+      try { raw = localStorage.getItem(LS_SNAP); } catch (_) { return false; }
+      if (!raw) { _migrated = true; return true; }
+      let old;
+      try { old = JSON.parse(raw); } catch (e) { console.error('[Offline] old offline copy is unreadable — left in place:', e); return false; }
+      if (!old || typeof old !== 'object' || !old.data) { console.error('[Offline] old offline copy has no data — left in place'); return false; }
+      try {
+        const cur = await snapGet();
+        if (!(cur && cur.json && (cur.ts || 0) >= (old.ts || 0))) {      // IndexedDB already holds a newer copy → keep that one
+          const json = JSON.stringify(old.data);
+          await snapPut({ key: SNAP_KEY, v: 1, json, ts: old.ts || Date.now(), owner: old.owner || null, bytes: json.length, from: 'localStorage' });
+          const back = await snapGet();
+          if (!back || back.json !== json || (back.owner || null) !== (old.owner || null)) throw new Error('read-back check failed');
+        }
+        localStorage.removeItem(LS_SNAP);
+        _migrated = true;
+        console.info('[Offline] offline copy moved from localStorage to IndexedDB (' + raw.length + ' chars)');
+        return true;
+      } catch (e) {
+        console.error('[Offline] moving the offline copy to IndexedDB failed — the old copy is kept:', e);
+        return false;
+      }
+    });
+  }
+
+  function saveSnap(data) {
+    if (_snapBlocked) return Promise.resolve(false);
+    /* Phase 2 · I11: the copy remembers whose it is — another user can never open it offline */
+    let rec;
+    try {
+      const json = JSON.stringify(data);
+      rec = { key: SNAP_KEY, v: 1, json, ts: Date.now(), owner: (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null, bytes: json.length };
+    } catch (e) { snapFailed('offline copy could not be prepared', e); return Promise.resolve(false); }
+    _snapNext = rec;
+    if (_snapQueued) return _snapChain.then(() => _snapStatus.ok === true);
+    _snapQueued = true;
+    return snapOp(async () => {
+      _snapQueued = false;
+      const r = _snapNext; _snapNext = null;
+      if (!r || _snapBlocked) return false;
+      try {
+        await snapPut(r);
+        _snapStatus = { ok: true, ts: r.ts, bytes: r.bytes, error: null };
+        /* this copy is newer than anything left in localStorage */
+        try { if (localStorage.getItem(LS_SNAP) !== null) { localStorage.removeItem(LS_SNAP); _migrated = true; } } catch (_) {}
+        return true;
+      } catch (e) { snapFailed('offline copy NOT saved', e); return false; }
+    });
+  }
+  async function loadSnap() {
+    await migrateLegacy();
+    await _snapChain;                          // a save still being written is the newest copy
+    try {
+      const rec = await snapGet();
+      if (rec && rec.json) return { data: JSON.parse(rec.json), ts: rec.ts, owner: rec.owner || null };
+    } catch (e) { console.error('[Offline] reading the offline copy from IndexedDB failed:', e); }
+    /* migration not possible on this device (IndexedDB refused) → the old copy is still usable as it is */
+    try { const raw = localStorage.getItem(LS_SNAP); if (raw) return JSON.parse(raw); } catch (e) { console.error('[Offline] old offline copy unreadable:', e); }
+    return null;
   }
 
   /* → 'ok' | 'refused' | 'login' (throws on network errors) */
@@ -10083,7 +10183,7 @@ const OfflineManager = (() => {
   }
 
   async function trySave(data) {
-    saveSnap(data); // always snapshot first
+    saveSnap(data); // always snapshot first (written in the background, in order — see saveSnap)
     if (!_base || typeof AXCore === 'undefined') { setBase(data); return; }
     const r = AXCore.diff(_base, data, {});
     if (!r.df.n) return;
@@ -10163,6 +10263,8 @@ const OfflineManager = (() => {
   }
 
   async function init() {
+    _snapBlocked = false;                      // signed in again
+    migrateLegacy();
     await registerSW();
     window.addEventListener('online', () => {
       _online = true; updateUI();
@@ -10180,7 +10282,8 @@ const OfflineManager = (() => {
     updateUI();
   }
 
-  function getCachedData(owner) { const s = loadSnap(); return s && (!owner || !s.owner || s.owner === owner) ? s.data : null; }
+  /* Phase 3: async — the copy is read from IndexedDB */
+  async function getCachedData(owner) { const s = await loadSnap(); return s && s.data && (!owner || !s.owner || s.owner === owner) ? s.data : null; }
   /* Phase 2 · I11: before signing out — wait for a send already running, try once more, then count what is really left */
   async function settle() {
     for (let i = 0; i < 50 && _flushing; i++) await new Promise(r => setTimeout(r, 200));
@@ -10190,13 +10293,20 @@ const OfflineManager = (() => {
     return _pending;
   }
   async function wipe() {
+    _snapBlocked = true; _snapNext = null;     // a save still waiting can't bring the copy back after this
+    try { await _snapChain; } catch (_) {}
     try { localStorage.removeItem(LS_SNAP); } catch (_) {}
     await clearQueue();
-    try { const db = await openDB(); await new Promise(res => { const tx = db.transaction('data_snapshot', 'readwrite'); tx.objectStore('data_snapshot').clear(); tx.oncomplete = res; tx.onerror = res; }); } catch (_) {}
+    try {
+      const db = await openDB();
+      await new Promise((res, rej) => { const tx = db.transaction(SNAP_STORE, 'readwrite'); tx.objectStore(SNAP_STORE).clear(); tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+    } catch (e) { console.error('[Offline] could not clear the offline copy at logout:', e); }
+    _snapStatus = { ok: null, ts: 0, bytes: 0, error: null };
   }
   function getLastSaveAt() { return _lastSaveAt; }
 
   return { init, trySave, flushQueue, getCachedData, getLastSaveAt, setBase, wipe, settle, get pending(){ return _pending; }, get isOnline(){ return _online; },
+    get snapshotStatus(){ return Object.assign({}, _snapStatus); }, snapshotSettled(){ return _snapChain.then(() => Object.assign({}, _snapStatus)); },
     _debug() { try { return { base: !!_base, diff: _base ? AXCore.diff(_base, DB.data, {}).df.n : null, pending: _pending, online: _online }; } catch (e) { return { err: e.message }; } } };
 })();
 
@@ -10474,8 +10584,8 @@ async function bootstrapFromServer() {
   } catch (e) {
     console.warn('[Bootstrap] server unreachable, trying offline snapshot:', e.message);
   }
-  // Offline fallback: localStorage snapshot
-  const snap = OfflineManager.getCachedData();
+  // Offline fallback: the copy saved on this device (IndexedDB since Phase 3)
+  const snap = await OfflineManager.getCachedData();
   if (snap) {
     console.info('[Bootstrap] loaded offline snapshot');
     DB._bootstrapData = snap;
@@ -11683,8 +11793,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     startApp(); SyncEngine.init(); OfflineManager.init();
     DB.save();
   };
-  const loadOffline = (owner) => {
-    const snap = OfflineManager.getCachedData(owner);
+  const loadOffline = async (owner) => {
+    const snap = await OfflineManager.getCachedData(owner);
     if (!snap) return false;
     DB._bootstrapData = snap; DB._bootstrapped = true;
     prepareData(); showOfflineBanner();
@@ -11694,7 +11804,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let me = await Auth.me();
   if (me && me !== 'offline') {
     try { await bootstrapFromServer(); prepareData(); launch(me); }
-    catch (e) { console.error(e); if (loadOffline(me.id)) launch(me); else alert('فشل تحميل البيانات من السيرفر: ' + e.message); }
+    catch (e) { console.error(e); if (await loadOffline(me.id)) launch(me); else alert('فشل تحميل البيانات من السيرفر: ' + e.message); }
   } else if (me === 'offline') {
     /* Phase 2 · I11: no automatic entry when the server can't be reached — the login form checks the
        password against this device's offline record (see the submit handler below) */
@@ -11734,7 +11844,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       else {
         // server unreachable → offline login with the verifier saved on this device
         const ou = await OfflineAuth.check(u, p);
-        if (ou && loadOffline(ou.id)) { launch(ou); toast('دخلت أوف لاين — التعديلات هتترفع أول ما النت يرجع', 'warning', 6000); }
+        if (ou && await loadOffline(ou.id)) { launch(ou); toast('دخلت أوف لاين — التعديلات هتترفع أول ما النت يرجع', 'warning', 6000); }
         else toast('مفيش اتصال بالسيرفر' + (ou ? '' : ' — ولازم تكون دخلت مرة من الجهاز ده وإنت أونلاين'), 'error', 6000);
       }
     } finally { if (btn) btn.disabled = false; }

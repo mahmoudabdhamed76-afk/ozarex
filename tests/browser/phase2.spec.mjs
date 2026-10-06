@@ -1,5 +1,5 @@
 /* Phase 2 from real browsers: restricted users keep working pages; logout / offline / live-stream security. */
-import { test, expect, PAGES, watchErrors, waitForApp, formLogin, openSignedIn, horizontalOverflow, ADMIN_PASSWORD, SALES, CLERK } from './fixtures.mjs';
+import { test, expect, PAGES, watchErrors, waitForApp, formLogin, openSignedIn, horizontalOverflow, ADMIN_PASSWORD, SALES, CLERK, offlineCopy } from './fixtures.mjs';
 import { login, adminLogin, req } from '../helpers/api.mjs';
 
 const USERS = {
@@ -38,7 +38,10 @@ for (const [who, cred] of Object.entries(USERS)) {
 test('C1: the restricted user\'s device never receives hidden data, and the offline copy holds none of it', async ({ page, context, server }) => {
   await formLogin(page, server.base, USERS.restricted.username, USERS.restricted.password);
   await page.waitForTimeout(2000);
-  const seen = await page.evaluate(() => ({ live: JSON.stringify(DB.data), snap: localStorage.getItem('em_offline_snap') || '' }));
+  await page.evaluate(() => OfflineManager.snapshotSettled());
+  const copy = await offlineCopy(page, { withJson: true });            // Phase 3: the offline copy is in IndexedDB
+  expect(copy && copy.bytes).toBeGreaterThan(100);
+  const seen = { live: await page.evaluate(() => JSON.stringify(DB.data)), snap: copy.json };
   for (const blob of [seen.live, seen.snap]) {
     expect(blob).not.toContain('"cost"');
     expect(blob).not.toContain('"_auditLock"');
@@ -97,6 +100,7 @@ test('I11: after logout, the device cannot reopen the account offline — not ev
   await page.waitForTimeout(1500);
   await expect(page.locator('#app')).toBeHidden();
   expect(await page.evaluate(() => !!localStorage.getItem('em_offline_snap'))).toBe(false);
+  expect(await offlineCopy(page)).toBeNull();
   await context.setOffline(false);
 });
 

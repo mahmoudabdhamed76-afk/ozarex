@@ -1,5 +1,5 @@
 /* Real clicks: login form, sidebar, back button, mobile menu + bottom bar, logout. */
-import { test, expect, PAGES, watchErrors, waitForApp, formLogin, ADMIN_PASSWORD } from './fixtures.mjs';
+import { test, expect, PAGES, watchErrors, waitForApp, formLogin, ADMIN_PASSWORD, offlineCopy, queuedCount } from './fixtures.mjs';
 
 test('login through the form, wrong password first', async ({ page, server }) => {
   const errors = watchErrors(page, { allow: /status of 401/ });   // the wrong password and the first "who am I" are 401 by design
@@ -77,9 +77,16 @@ test('logout returns to the login screen and the session no longer works', async
 test('I11 (fixed in Phase 2): logout removes the company data kept on the device', async ({ page, server }) => {
   await formLogin(page, server.base, 'admin', ADMIN_PASSWORD);
   await page.waitForTimeout(1500);
-  expect(await page.evaluate(() => !!localStorage.getItem('em_offline_snap') && !!localStorage.getItem('emx_offline_auth'))).toBe(true);
+  await page.evaluate(() => OfflineManager.snapshotSettled());
+  expect(await offlineCopy(page)).not.toBeNull();                     // Phase 3: the copy is in IndexedDB
+  expect(await page.evaluate(() => !!localStorage.getItem('emx_offline_auth'))).toBe(true);
+  /* a save is still being written when the user signs out — it must not bring the copy back afterwards */
+  await page.evaluate(() => { DB.data.customers.push({ id: 'c_lastsave', name: 'آخر حفظة', balance: 0, customPrices: {} }); DB.save(); });
   await page.evaluate(() => logout());
   await expect(page.locator('#login-page')).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(1500);
   const left = await page.evaluate(() => ['em_offline_snap', 'emx_offline_auth', 'emx_last_user', 'emx_tok'].filter(k => localStorage.getItem(k)));
   expect(left).toEqual([]);
+  expect(await offlineCopy(page)).toBeNull();
+  expect(await queuedCount(page)).toBe(0);
 });
