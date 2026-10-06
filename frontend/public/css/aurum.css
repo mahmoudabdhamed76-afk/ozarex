@@ -3019,6 +3019,13 @@ html.aurum .pm-f button.pri { background: var(--ax-ink); color: var(--ax-on-ink)
   html.aurum .topbar .search-box { min-width: 170px !important; }
   html.aurum .topbar-title { flex: 0 0 auto; max-width: 34vw; }
 }
+/* Phase 6 · desktop top bar must fit: it pushed the theme / notification icons off-screen at 1366 px on pages
+   with long titles (the page scrolled sideways). Title and icons never shrink; the live price tape gives way
+   (see .fx-tape below). Under 1300 px a little less gap and search box, so the tape keeps some room. */
+@media (max-width: 1300px) and (min-width: 769px) {
+  html.aurum .topbar { column-gap: 8px !important; }
+  html.aurum .topbar .search-box { min-width: 150px !important; }
+}
 @media (max-width: 1599px) and (min-width: 769px) { html.aurum .topbar .pm .pm-lab { display: none; } }
 @media (max-width: 1250px) and (min-width: 769px) { html.aurum .topbar .pm .pm-sub, html.aurum .topbar .pm .pm-chev { display: none; } }
 
@@ -4290,7 +4297,9 @@ html.aurum .pxs-gval .ax-hl.ax-hl-draw { animation-duration: .85s; }
    57. 4.19 · شريط الدولار والدهب المباشر مكان «رصيد الورق» (js/fxtape.js)
 ════════════════════════════════════════════════════════════════════ */
 html.aurum .topbar #paper-counter { display: none !important; }
-html.aurum .topbar .fx-tape { flex: 0 1 380px; min-width: 240px; height: 46px; margin: 0 2px; border-radius: 15px; overflow: hidden; }
+/* Phase 6: no 240 px floor — a scrolling strip (overflow hidden) that shares the shrinking with the search box,
+   so the title and the icons always fit (was: icons pushed off-screen at 1366 px) */
+html.aurum .topbar .fx-tape { flex: 0 1 380px; min-width: 0; height: 46px; margin: 0 2px; border-radius: 15px; overflow: hidden; }
 html.aurum .topbar .fx-tape .axtk--bar { height: 100%; border-radius: inherit; }
 html.aurum .fx-tape .axtk-it em { font-size: 12.5px; }
 html.aurum .fx-tape .axtk-it b { font-size: 16px; }

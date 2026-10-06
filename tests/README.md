@@ -50,11 +50,13 @@ throw-away `DATA_DIR`, so tests never touch your real data and can run in parall
 | `browser/phase3.spec.mjs` | Phase 3 · C4: old localStorage copy migrated (verified, then removed), stale copy only removed, failed migration keeps the old copy (opens offline, reported, retried), queued changes survive an offline reopen and are sent once, failed save reported |
 | `browser/phase4.spec.mjs` | Phase 4 · sync race: the pull's answer is held inside the page (`installGate`) while the device edits — saved / save-waiting / not-saved edits, several edits, another device during a save, several refresh notices, balance delta applied once, renumbered invoice, offline queue + live refresh (records never vanish). Stress: `npx playwright test browser/phase4.spec.mjs --repeat-each=25` |
 | `browser/phase5.spec.mjs` | Phase 5: long lists in steps (every row arrives in order while scrolling, none missing/twice; refresh keeps the place; filters restart; short lists whole); the incremental highlighter leaves exactly what a full pass would, on all 25 pages |
+| `browser/phase6.spec.mjs` | Phase 6: 1920 / 1600 / 1440 / 1366 / 1280 px — all 25 pages fit (no sideways page scroll), top-bar icons on screen, title not cut, sidebar full + collapsed + menu button, wide tables scroll inside their own box; light theme |
 | `browser/phase1.spec.mjs` | Phase 1 from a real browser: UUID ids, backup date, renumbered invoice reaches the device, refused record removed, offline queue not blocked |
 
 Fixed in Phase 1 (markers removed, tests now guard the fix): C2, C5, I10, I14, the «NaN/10/6» backup date.
 Fixed in Phase 2: C1, C3, I11.
 Fixed in Phase 3: C4 (offline copy in IndexedDB — see `docs/OFFLINE-STORAGE.md`).
+Fixed in Phase 6: the desktop top bar (10 pages scrolled sideways at 1366 px; more at 1440 / 1280).
 Phase 5: Issuances / Invoices / Customers open with 150 rows and load more while scrolling; the highlighter only looks at what changed.
 Fixed in Phase 4: the sync race (an edit made while a pull was downloading could be overwritten and never sent).
 
@@ -67,7 +69,12 @@ the runner prints "fixed? … remove the todo" (API) or Playwright reports
 
 | ID | Test |
 |---|---|
-| new | desktop 1366 px: 10 pages scroll sideways (top bar too wide) |
+| — | none left (C4 fixed in Phase 3, the desktop top bar in Phase 6) |
+
+## Layout probe (Phase 6)
+
+`node bench/layout-probe.mjs [--widths=1366x768,1280x720] [--pages=users,audit] [--large]` — for each page that is
+wider than the screen: the outermost elements sticking out, with the CSS that explains why.
 
 ## Page benchmark (Phase 5)
 

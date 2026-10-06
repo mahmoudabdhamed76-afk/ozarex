@@ -8,8 +8,8 @@ import { test, expect, PAGES, openSignedIn, horizontalOverflow } from './fixture
 import { login } from '../helpers/api.mjs';
 import { ADMIN_PASSWORD } from '../helpers/server.mjs';
 
-/* top bar too wide at 1366 px for pages with long titles → page scrolls sideways, icons cut off (found in Phase 0) */
-const KNOWN_OVERFLOW = { desktop: ['issuances', 'forecast', 'payments', 'transfers', 'purchases', 'monthly', 'requests', 'users', 'audit', 'security'], iphone: [] };
+/* (top bar too wide at 1366 px for 10 pages with long titles — fixed in Phase 6; more widths in phase6.spec.mjs) */
+const KNOWN_OVERFLOW = { desktop: [], iphone: [] };
 /* (security page «NaN/10/6» in the backup list — fixed in Phase 1) */
 const KNOWN_BAD_TEXT = [];
 

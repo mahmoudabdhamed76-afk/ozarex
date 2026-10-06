@@ -6,7 +6,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 const APP_GLOBALS = Object.fromEntries(['uid', 'userPages', 'currentUser', 'navigate', 'currentPage', 'DB', 'OfflineManager', 'SyncEngine', 'AXCore', 'closeModal', 'openCustomerForm', 'logout',
-  'renderDashboard', 'renderInvoices', 'renderIssuances', 'renderPayments', 'renderCustomers', 'renderReports', 'issuanceFilters', 'AXMarker'].map(n => [n, 'readonly']));
+  'renderDashboard', 'renderInvoices', 'renderIssuances', 'renderPayments', 'renderCustomers', 'renderReports', 'issuanceFilters', 'AXMarker', 'AX', 'toggleSidebar'].map(n => [n, 'readonly']));
 
 export default [
   { ignores: ['tests/node_modules/**', 'tests/test-results/**', 'tests/playwright-report/**', 'frontend/public/vendor/**'] },
@@ -25,5 +25,5 @@ export default [
   /* the browser modules are classic <script>s sharing globals across 37 files — no-undef can't judge them one file at a time */
   { files: ['frontend/public/**/*.js'], rules: { 'no-undef': 'off' } },
   { files: ['**/*.mjs'], languageOptions: { sourceType: 'module' } },
-  { files: ['tests/browser/**/*.mjs', 'tests/bench/page-profile.mjs'], languageOptions: { globals: APP_GLOBALS }, rules: { 'no-empty-pattern': 'off' } }
+  { files: ['tests/browser/**/*.mjs', 'tests/bench/page-profile.mjs', 'tests/bench/layout-probe.mjs'], languageOptions: { globals: APP_GLOBALS }, rules: { 'no-empty-pattern': 'off' } }
 ];
