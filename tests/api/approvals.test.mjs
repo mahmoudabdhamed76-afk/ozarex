@@ -2,14 +2,15 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer } from '../helpers/server.mjs';
-import { adminLogin, send, ops, col, data, createUser, seedOps, SALES } from '../helpers/api.mjs';
+import { adminLogin, send, ops, col, data, createUser, seedOps, SALES, CLERK } from '../helpers/api.mjs';
 
-let s, admin, sales, other;
+let s, admin, sales, other, clerk;
 before(async () => {
   s = await startServer();
   admin = (await adminLogin(s.base)).token;
   await send(s.base, admin, seedOps());
   sales = await createUser(s.base, admin, SALES);
+  clerk = await createUser(s.base, admin, CLERK);
   other = await createUser(s.base, admin, { id: 'u_other', username: 'other', password: 'Other-User-Pass-1', name: 'تاني', role: 'sales' });
 });
 after(() => s.stop());
@@ -53,7 +54,7 @@ for (const key of ['_approvals', '_requests']) {
 }
 
 test('an approved change is applied by the admin and goes through', async () => {
-  const r = await send(s.base, sales, ops({ cols: { customers: col({ removed: ['c2'] }) } }));
+  const r = await send(s.base, clerk, ops({ cols: { customers: col({ removed: ['c2'] }) } }));
   assert.equal(r.status, 403);
   assert.equal(r.json.error, 'needs_approval');
   /* the admin applies it (what «موافقة» does in the browser) */

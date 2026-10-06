@@ -1,9 +1,9 @@
 import { test as base, expect } from '@playwright/test';
 import { startServer, ADMIN_PASSWORD } from '../helpers/server.mjs';
-import { adminLogin, login, send, ops, col, seedOps, createUser, SALES } from '../helpers/api.mjs';
+import { adminLogin, login, send, ops, col, seedOps, createUser, SALES, CLERK } from '../helpers/api.mjs';
 import { XSS } from '../fixtures/gen-large-dataset.mjs';
 
-export { expect, ADMIN_PASSWORD, SALES };
+export { expect, ADMIN_PASSWORD, SALES, CLERK };
 
 /* the 25 pages and the title each one must show in the top bar */
 export const PAGES = {
@@ -32,6 +32,9 @@ export async function seedSmall(baseUrl) {
     expenses: col({ added: [{ id: 'e_xss', description: XSS, category: XSS, amount: 25, date: '2026-10-03' }] })
   }, counters: { invoice: 1002, issuance: 1001 } }));
   await createUser(baseUrl, admin, SALES);
+  await createUser(baseUrl, admin, CLERK);
+  await createUser(baseUrl, admin, { id: 'u_acct', username: 'acct', password: 'Acct-Test-Pass-1', name: 'محاسب', role: 'accountant' });
+  await createUser(baseUrl, admin, { id: 'u_keep', username: 'keeper', password: 'Keep-Test-Pass-1', name: 'أمين مخزن', role: 'sales', pages: ['stock'] });
   return admin;
 }
 

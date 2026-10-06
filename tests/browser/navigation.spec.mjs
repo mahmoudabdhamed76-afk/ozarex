@@ -1,5 +1,5 @@
 /* Real clicks: login form, sidebar, back button, mobile menu + bottom bar, logout. */
-import { test, expect, PAGES, watchErrors, waitForApp, ADMIN_PASSWORD } from './fixtures.mjs';
+import { test, expect, PAGES, watchErrors, waitForApp, formLogin, ADMIN_PASSWORD } from './fixtures.mjs';
 
 test('login through the form, wrong password first', async ({ page, server }) => {
   const errors = watchErrors(page, { allow: /status of 401/ });   // the wrong password and the first "who am I" are 401 by design
@@ -74,11 +74,12 @@ test('logout returns to the login screen and the session no longer works', async
   expect(r.status).toBe(401);
 });
 
-test('[KNOWN BUG I11] logout must remove the company data kept on the device', async ({ app: page }) => {
-  test.fail(true, 'KNOWN BUG I11: offline copy + login verifier stay in localStorage after logout');
+test('I11 (fixed in Phase 2): logout removes the company data kept on the device', async ({ page, server }) => {
+  await formLogin(page, server.base, 'admin', ADMIN_PASSWORD);
   await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => !!localStorage.getItem('em_offline_snap') && !!localStorage.getItem('emx_offline_auth'))).toBe(true);
   await page.evaluate(() => logout());
   await expect(page.locator('#login-page')).toBeVisible({ timeout: 15_000 });
-  const left = await page.evaluate(() => ['em_offline_snap', 'emx_offline_auth'].filter(k => localStorage.getItem(k)));
+  const left = await page.evaluate(() => ['em_offline_snap', 'emx_offline_auth', 'emx_last_user', 'emx_tok'].filter(k => localStorage.getItem(k)));
   expect(left).toEqual([]);
 });

@@ -2,14 +2,15 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startServer } from '../helpers/server.mjs';
-import { req, adminLogin, send, ops, col, data, createUser, seedOps, SALES } from '../helpers/api.mjs';
+import { req, adminLogin, send, ops, col, data, createUser, seedOps, SALES, CLERK } from '../helpers/api.mjs';
 
-let s, admin, sales;
+let s, admin, sales, clerk;
 before(async () => {
   s = await startServer();
   admin = (await adminLogin(s.base)).token;
   await send(s.base, admin, seedOps());
   sales = await createUser(s.base, admin, SALES);
+  clerk = await createUser(s.base, admin, CLERK);
 });
 after(() => s.stop());
 
@@ -80,7 +81,7 @@ test('balance / quantity / paid: two devices changing at once → both differenc
 
 test('other fields: the last write wins', async () => {
   await send(s.base, admin, ops({ cols: { customers: col({ modified: [{ id: 'c2', before: { phone: '01000000002' }, after: { phone: '0111' } }] }) } }));
-  await send(s.base, sales, ops({ cols: { customers: col({ modified: [{ id: 'c2', before: { phone: '01000000002' }, after: { phone: '0122' } }] }) } }));
+  await send(s.base, clerk, ops({ cols: { customers: col({ modified: [{ id: 'c2', before: { phone: '01000000002' }, after: { phone: '0122' } }] }) } }));
   assert.equal((await data(s.base, admin)).customers.find(c => c.id === 'c2').phone, '0122');
 });
 

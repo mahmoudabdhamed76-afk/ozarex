@@ -45,7 +45,7 @@ test('offline: changes are queued on the device and sent when the connection ret
 
 test('a change the server refuses is rolled back on the device', async ({ page, server, context }) => {
   const errors = watchErrors(page);
-  await openSignedIn(page, context, server.base, (await login(server.base, 'sara', 'Sales-Test-Pass-77')).token);
+  await openSignedIn(page, context, server.base, (await login(server.base, 'clerk', 'Clerk-Test-Pass-55')).token);
   await page.waitForTimeout(1500);
   await page.evaluate(() => { DB.data.customers = DB.data.customers.filter(c => c.id !== 'c2'); DB.save(); });   // delete → needs approval
   await expect(page.locator('#toast-container')).toContainText('موافقة', { timeout: 10_000 });
@@ -58,12 +58,18 @@ test('control: with normal data the offline copy is saved', async ({ app: page }
   expect(await page.evaluate(() => (localStorage.getItem('em_offline_snap') || '').length)).toBeGreaterThan(100);
 });
 
-test('control: reopening while the server is down opens the saved copy', async ({ page, server, context }) => {
+test('reopening while the server is down: the password is asked, then the saved copy opens (Phase 2 · I11)', async ({ page, server, context }) => {
   await formLogin(page, server.base, 'admin', ADMIN_PASSWORD);
   await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, null, { timeout: 15_000 });
   await page.waitForTimeout(1500);
   await context.setOffline(true);
   await page.reload().catch(() => {});
+  await expect(page.locator('#login-page')).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(1000);
+  await expect(page.locator('#app')).toBeHidden();
+  await page.fill('#login-username', 'admin');
+  await page.fill('#login-password', ADMIN_PASSWORD);
+  await page.click('#login-form button[type=submit], #login-form .lgn-btn');
   await waitForApp(page);
   await expect(page.locator('#offline-banner')).toHaveClass(/show/);
   expect(await page.evaluate(() => DB.data.customers.length)).toBeGreaterThan(0);

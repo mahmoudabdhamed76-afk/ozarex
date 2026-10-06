@@ -33,8 +33,15 @@ test('C5: a device that used a number another device took gets the server\'s new
   /* this device (not refreshed yet) saves its own invoice with the same number */
   const mine = 'inv_mine_' + Date.now();
   await page.evaluate(([id, n]) => { DB.data.invoices.push({ id, number: n, customerId: 'c1', date: '2026-10-06', total: 2, paid: 0, items: [], createdAt: Date.now() }); DB.data.counters.invoice = n; DB.save(); }, [mine, next]);
-  await expect.poll(() => page.evaluate(id => (DB.data.invoices.find(i => i.id === id) || {}).number, mine), { timeout: 15_000 }).toBe(next + 1);
-  expect(await page.evaluate(() => DB.data.counters.invoice)).toBeGreaterThanOrEqual(next + 1);
+  /* the device ends up with the number the server gave (the next free one — other tests may have used some) */
+  const admin = (await adminLogin(server.base)).token;
+  const onServer = async () => (await req(server.base, 'GET', '/api/data', { token: admin })).json.invoices.find(i => i.id === mine);
+  await expect.poll(async () => (await onServer() || {}).number, { timeout: 15_000 }).toBeGreaterThan(next);
+  const given = (await onServer()).number;
+  await expect.poll(() => page.evaluate(id => (DB.data.invoices.find(i => i.id === id) || {}).number, mine), { timeout: 15_000 }).toBe(given);
+  const nums = (await req(server.base, 'GET', '/api/data', { token: admin })).json.invoices.map(i => i.number).filter(n => n !== null && n !== undefined && n !== '').map(Number);
+  expect(nums.filter((n, i) => nums.indexOf(n) !== i), 'duplicate invoice numbers').toEqual([]);
+  expect(await page.evaluate(() => DB.data.counters.invoice)).toBeGreaterThanOrEqual(given);
   expect(errors).toEqual([]);
 });
 

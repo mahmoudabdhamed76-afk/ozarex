@@ -9792,17 +9792,30 @@ const OfflineAuth = {
   KEY: 'emx_offline_auth', LAST: 'emx_last_user',
   _all() { try { return JSON.parse(localStorage.getItem(this.KEY) || '{}') || {}; } catch (_) { return {}; } },
   _hash(salt, u, p) { let h = sha256hex(salt + ':' + String(u).toLowerCase() + ':' + p); for (let i = 0; i < 2000; i++) h = sha256hex(h + salt); return h; },
-  save(username, password, user) {
+  /* Phase 2 · I11: PBKDF2 (210,000 rounds) when the browser has WebCrypto (https); the old SHA loop otherwise */
+  async _kdf(salt, u, p) {
     try {
-      const all = this._all(), salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
-      all[String(username).toLowerCase()] = { salt, h: this._hash(salt, username, password), user, at: Date.now() };
+      if (window.crypto && crypto.subtle && window.isSecureContext) {
+        const enc = new TextEncoder(), key = await crypto.subtle.importKey('raw', enc.encode(String(p)), 'PBKDF2', false, ['deriveBits']);
+        const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(salt + ':' + String(u).toLowerCase()), iterations: 210000 }, key, 256);
+        return 'p2$' + Array.from(new Uint8Array(bits), b => b.toString(16).padStart(2, '0')).join('');
+      }
+    } catch (_) {}
+    return this._hash(salt, u, p);
+  },
+  async save(username, password, user) {
+    try {
+      const all = this._all(), salt = uid();
+      all[String(username).toLowerCase()] = { salt, h: await this._kdf(salt, username, password), user, at: Date.now() };
       localStorage.setItem(this.KEY, JSON.stringify(all));
       localStorage.setItem(this.LAST, user.id);
     } catch (_) {}
   },
-  check(username, password) {
+  async check(username, password) {
     const r = this._all()[String(username).toLowerCase()];
-    if (!r || this._hash(r.salt, username, password) !== r.h) return null;
+    if (!r) return null;
+    const h = String(r.h).startsWith('p2$') ? await this._kdf(r.salt, username, password) : this._hash(r.salt, username, password);
+    if (h !== r.h) return null;
     try { localStorage.setItem(this.LAST, r.user.id); } catch (_) {}
     return r.user;
   },
@@ -9837,6 +9850,29 @@ const Auth = {
     try { await fetch(API_BASE + '/api/logout', { method: 'POST', credentials: 'same-origin' }); } catch (_) {}
     OfflineAuth.forgetLast();
     DeviceToken.set('');
+    /* Phase 2 · I11: nothing of the company stays on this device after signing out —
+       the offline copy, the offline password check, the queue (already sent or knowingly dropped) */
+    ['em_offline_snap', 'emx_offline_auth', 'emx_last_user', 'emx_tok', 'erp_client_ip', 'ax_tk_inv'].forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
+    try { sessionStorage.removeItem('emx_weak'); } catch (_) {}
+    try { await OfflineManager.wipe(); } catch (_) {}
+  },
+  /* before signing out: send what is still waiting; if it can't be sent, ask (never drop it silently) */
+  async settleBeforeLogout() {
+    try { if (DB._saveTimer || DB._saveInflight) { clearTimeout(DB._saveTimer); await DB._flush(); } } catch (_) {}
+    let n = 0;
+    try { n = await OfflineManager.settle(); } catch (_) { n = OfflineManager.pending; }
+    if (!n) return true;
+    return new Promise(resolve => {
+      let done = false;
+      const finish = v => { if (done) return; done = true; window.__logoutAnswer = null; closeModal(); resolve(v); };
+      window.__logoutAnswer = finish;
+      openModal('⚠️ فيه تعديلات لسه مترفعتش',
+        '<p class="ax-modal-lead">فيه ' + n + ' تعديل اتعمل على الجهاز ده ولسه موصلش للسيرفر (مفيش نت). لو خرجت دلوقتي هيتمسحوا من الجهاز. الأفضل تستنى لما النت يرجع.</p>',
+        '<button class="btn btn-primary" id="logout-wait" onclick="window.__logoutAnswer && window.__logoutAnswer(false)">استنى — متخرجش</button>' +
+        '<button class="btn btn-danger" id="logout-drop" onclick="window.__logoutAnswer && window.__logoutAnswer(true)">اخرج وامسحهم</button>');
+      const ov = document.getElementById('modal-overlay');
+      const watch = setInterval(() => { if (done) return clearInterval(watch); if (!ov.classList.contains('show')) { clearInterval(watch); finish(false); } }, 300);
+    });
   },
   _expired: false,
   async expired() {
@@ -10012,7 +10048,8 @@ const OfflineManager = (() => {
   }
 
   function saveSnap(data) {
-    try { localStorage.setItem(LS_SNAP, JSON.stringify({ data, ts: Date.now() })); } catch(_) {}
+    /* Phase 2 · I11: the copy remembers whose it is — another user can never open it offline */
+    try { localStorage.setItem(LS_SNAP, JSON.stringify({ data, ts: Date.now(), owner: (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null })); } catch(_) {}
   }
   function loadSnap() {
     try { const raw = localStorage.getItem(LS_SNAP); return raw ? JSON.parse(raw) : null; } catch(_) { return null; }
@@ -10037,7 +10074,8 @@ const OfflineManager = (() => {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const json = await res.json().catch(() => ({}));
     // another device changed something since our last pull → fetch it (our own change is already in)
-    const missed = json.prev && DB._serverVersion && json.prev !== DB._serverVersion;
+    /* the server gave a different document number (Phase 1 · C5) → take its copy right away */
+    const missed = (json.prev && DB._serverVersion && json.prev !== DB._serverVersion) || (Array.isArray(json.renumbered) && json.renumbered.length > 0);
     if (json.version) DB._serverVersion = json.version;
     SyncEngine.onSelfSaved(json.version);
     if (missed) setTimeout(() => SyncEngine.pullLatest('missed', true), 250);
@@ -10142,10 +10180,23 @@ const OfflineManager = (() => {
     updateUI();
   }
 
-  function getCachedData() { const s = loadSnap(); return s ? s.data : null; }
+  function getCachedData(owner) { const s = loadSnap(); return s && (!owner || !s.owner || s.owner === owner) ? s.data : null; }
+  /* Phase 2 · I11: before signing out — wait for a send already running, try once more, then count what is really left */
+  async function settle() {
+    for (let i = 0; i < 50 && _flushing; i++) await new Promise(r => setTimeout(r, 200));
+    try { if (_online && navigator.onLine && (await dequeue()).length) await flushQueue(); } catch (_) {}
+    for (let i = 0; i < 50 && _flushing; i++) await new Promise(r => setTimeout(r, 200));
+    try { _pending = (await dequeue()).length; updateUI(); } catch (_) {}
+    return _pending;
+  }
+  async function wipe() {
+    try { localStorage.removeItem(LS_SNAP); } catch (_) {}
+    await clearQueue();
+    try { const db = await openDB(); await new Promise(res => { const tx = db.transaction('data_snapshot', 'readwrite'); tx.objectStore('data_snapshot').clear(); tx.oncomplete = res; tx.onerror = res; }); } catch (_) {}
+  }
   function getLastSaveAt() { return _lastSaveAt; }
 
-  return { init, trySave, flushQueue, getCachedData, getLastSaveAt, setBase, get pending(){ return _pending; }, get isOnline(){ return _online; },
+  return { init, trySave, flushQueue, getCachedData, getLastSaveAt, setBase, wipe, settle, get pending(){ return _pending; }, get isOnline(){ return _online; },
     _debug() { try { return { base: !!_base, diff: _base ? AXCore.diff(_base, DB.data, {}).df.n : null, pending: _pending, online: _online }; } catch (e) { return { err: e.message }; } } };
 })();
 
@@ -10157,6 +10208,7 @@ const SyncEngine = (() => {
   let _online = navigator.onLine, _connected = false;
   let _isSyncing = false, _syncThrottle = null, _pollTimer = null;
   let _lastMsgAt = 0;
+  let _again = null;
 
   function setStatus(state) {
     const el = document.getElementById('sync-status-dot');
@@ -10238,7 +10290,8 @@ const SyncEngine = (() => {
     // A local save is still queued / in flight: merging now would overwrite
     // what the user just did before it reaches the server. Try again after it.
     if (DB._saveTimer || DB._saveInflight) { setTimeout(() => pullLatest(reason, force), 400); return; }
-    if (_isSyncing) return;
+    /* a pull asked for while another is running is not dropped: it runs right after (that one may hold older data) */
+    if (_isSyncing) { _again = { reason, force: force || (_again && _again.force) }; return; }
     _isSyncing = true; setStatus('syncing');
     try {
       const res = await fetch(API_BASE + '/api/data', {
@@ -10259,7 +10312,10 @@ const SyncEngine = (() => {
     } catch (e) {
       console.error('[Sync] pull failed:', e);
       setStatus(_online ? 'error' : 'offline');
-    } finally { _isSyncing = false; }
+    } finally {
+      _isSyncing = false;
+      if (_again) { const a = _again; _again = null; setTimeout(() => pullLatest(a.reason, a.force), 30); }
+    }
   }
 
   function throttledPull(reason) {
@@ -10271,7 +10327,21 @@ const SyncEngine = (() => {
     if (_es) { try { _es.close(); } catch(_) {} _es = null; }
     if (!_online) { setStatus('offline'); return; }
     setStatus('connecting');
-    { const _t = DeviceToken.get(); _es = new EventSource(API_BASE + '/api/events' + (_t ? '?t=' + _t : '')); }
+    const myTry = ++_connectSeq;
+    streamUrl().then(u => { if (myTry === _connectSeq && _online) open(u); });
+  }
+  /* Phase 2 · I11: a one-time ticket (60 s) from /api/me — the reusable session token never goes in a URL */
+  let _connectSeq = 0;
+  async function streamUrl() {
+    try {
+      const r = await fetch(API_BASE + '/api/me', { cache: 'no-store', credentials: 'same-origin' });
+      if (r.ok) { const j = await r.json(); if (j && j.streamTicket) return API_BASE + '/api/events?st=' + encodeURIComponent(j.streamTicket); }
+    } catch (_) {}
+    return API_BASE + '/api/events';            // the session cookie alone
+  }
+  function open(url) {
+    if (_es) { try { _es.close(); } catch(_) {} _es = null; }
+    _es = new EventSource(url);
     _es.onopen = () => {
       _connected = true; _reconnectDelay = 1000; _lastMsgAt = Date.now();
       setStatus('connected');
@@ -10561,6 +10631,7 @@ function openUserMenu() {
 }
 
 async function logout() {
+  if (!(await Auth.settleBeforeLogout())) return;          // Phase 2 · I11 — unsent changes: send, or ask
   pauseReciter();
   if (_autoSaveInterval) clearInterval(_autoSaveInterval);
   if (_snapshotInterval) clearInterval(_snapshotInterval);
@@ -11612,8 +11683,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     startApp(); SyncEngine.init(); OfflineManager.init();
     DB.save();
   };
-  const loadOffline = () => {
-    const snap = OfflineManager.getCachedData();
+  const loadOffline = (owner) => {
+    const snap = OfflineManager.getCachedData(owner);
     if (!snap) return false;
     DB._bootstrapData = snap; DB._bootstrapped = true;
     prepareData(); showOfflineBanner();
@@ -11623,13 +11694,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   let me = await Auth.me();
   if (me && me !== 'offline') {
     try { await bootstrapFromServer(); prepareData(); launch(me); }
-    catch (e) { console.error(e); if (loadOffline()) launch(me); else alert('فشل تحميل البيانات من السيرفر: ' + e.message); }
+    catch (e) { console.error(e); if (loadOffline(me.id)) launch(me); else alert('فشل تحميل البيانات من السيرفر: ' + e.message); }
   } else if (me === 'offline') {
-    const lastId = OfflineAuth.lastUser();
-    if (loadOffline() && lastId) {
-      const u = (DB.data.users || []).find(x => x.id === lastId);
-      if (u) launch(u);
-    }
+    /* Phase 2 · I11: no automatic entry when the server can't be reached — the login form checks the
+       password against this device's offline record (see the submit handler below) */
+    setTimeout(() => toast('مفيش اتصال بالسيرفر — اكتب كلمة السر عشان تشتغل أوف لاين', 'warning', 6000), 300);
   }
   dismissBoot();
 
@@ -11652,7 +11721,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const j = await Auth.login(u, p);
       if (j.token) DeviceToken.set(j.token);
-      OfflineAuth.save(u, p, j.user);
+      await OfflineAuth.save(u, p, j.user);
       await bootstrapFromServer();
       prepareData();
       launch(j.user);
@@ -11664,8 +11733,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (err.status === 401 || err.status === 429) toast(err.message || 'بيانات الدخول غير صحيحة', 'error');
       else {
         // server unreachable → offline login with the verifier saved on this device
-        const ou = OfflineAuth.check(u, p);
-        if (ou && loadOffline()) { launch(ou); toast('دخلت أوف لاين — التعديلات هتترفع أول ما النت يرجع', 'warning', 6000); }
+        const ou = await OfflineAuth.check(u, p);
+        if (ou && loadOffline(ou.id)) { launch(ou); toast('دخلت أوف لاين — التعديلات هتترفع أول ما النت يرجع', 'warning', 6000); }
         else toast('مفيش اتصال بالسيرفر' + (ou ? '' : ' — ولازم تكون دخلت مرة من الجهاز ده وإنت أونلاين'), 'error', 6000);
       }
     } finally { if (btn) btn.disabled = false; }

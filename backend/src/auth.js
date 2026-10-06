@@ -11,8 +11,12 @@ const crypto = require('node:crypto');
 const { db } = require('../db');
 
 const COOKIE = 'emx_sid';
-const SESSION_DAYS = 365;   // 4.13 · stays signed in (sliding: every use pushes it a year ahead)
-const SESSION_MS = SESSION_DAYS * 864e5;
+/* Phase 2 · I11 — was 365 days sliding. Now: signed out after 30 days without use (sliding — a device used
+   every day never notices), and after 90 days in any case (one fresh login per quarter) */
+const IDLE_DAYS = Number(process.env.SESSION_IDLE_DAYS) || 30;
+const MAX_DAYS = Number(process.env.SESSION_MAX_DAYS) || 90;
+const SESSION_MS = IDLE_DAYS * 864e5;
+const SESSION_MAX_MS = MAX_DAYS * 864e5;
 
 /* ── passwords ── */
 function hashPassword(pw) {
@@ -51,14 +55,14 @@ const sha = t => crypto.createHash('sha256').update(String(t)).digest('hex');
 const cache = new Map();   // sha(token) → { userId, lastSeen }
 function loadSessions() {
   const cut = Date.now() - SESSION_MS;
-  db.prepare('DELETE FROM sessions WHERE last_seen < ?').run(cut);
-  for (const r of db.prepare('SELECT id, user_id, last_seen FROM sessions').all()) cache.set(r.id, { userId: r.user_id, lastSeen: r.last_seen });
+  db.prepare('DELETE FROM sessions WHERE last_seen < ? OR created_at < ?').run(cut, Date.now() - SESSION_MAX_MS);
+  for (const r of db.prepare('SELECT id, user_id, created_at, last_seen FROM sessions').all()) cache.set(r.id, { userId: r.user_id, lastSeen: r.last_seen, createdAt: r.created_at });
 }
 function createSession(userId, req) {
   const token = crypto.randomBytes(32).toString('hex'), id = sha(token), now = Date.now();
   db.prepare('INSERT INTO sessions (id, user_id, created_at, last_seen, ua, ip) VALUES (?, ?, ?, ?, ?, ?)')
     .run(id, userId, now, now, String(req.headers['user-agent'] || '').slice(0, 200), clientIp(req));
-  cache.set(id, { userId, lastSeen: now });
+  cache.set(id, { userId, lastSeen: now, createdAt: now });
   return token;
 }
 function dropSession(token) { const id = sha(token); cache.delete(id); db.prepare('DELETE FROM sessions WHERE id = ?').run(id); }
@@ -92,7 +96,7 @@ function sessionUserId(req) {
   const t = tokenOf(req); if (!t) return null;
   const id = sha(t), s = cache.get(id); if (!s) return null;
   const now = Date.now();
-  if (now - s.lastSeen > SESSION_MS) { dropSessionById(id); return null; }
+  if (now - s.lastSeen > SESSION_MS || now - (s.createdAt || now) > SESSION_MAX_MS) { dropSessionById(id); return null; }
   if (now - s.lastSeen > 3600e3) { s.lastSeen = now; db.prepare('UPDATE sessions SET last_seen = ? WHERE id = ?').run(now, id); }
   return s.userId;
 }
@@ -100,6 +104,24 @@ function isHttps(req) { return !!(req.socket && req.socket.encrypted) || String(
 function cookieHeader(req, token) {
   const base = COOKIE + '=' + (token || '') + '; Path=/; HttpOnly; SameSite=Lax' + (isHttps(req) ? '; Secure' : '');
   return token ? base + '; Max-Age=' + Math.floor(SESSION_MS / 1000) : base + '; Max-Age=0';
+}
+
+/* ── one-time tickets for the live stream (EventSource can't send headers) ──
+   valid 60 s, used once, never stored on disk — so no reusable token ends up in a URL */
+const tickets = new Map();   // ticket → { userId, exp }
+function issueTicket(userId) {
+  const now = Date.now();
+  if (tickets.size > 5000) for (const [k, v] of tickets) if (v.exp < now) tickets.delete(k);
+  const t = crypto.randomBytes(24).toString('base64url');
+  tickets.set(t, { userId, exp: now + 60e3 });
+  return t;
+}
+function redeemTicket(t) {
+  const v = tickets.get(t); if (!v) return null;
+  tickets.delete(t);
+  if (v.exp < Date.now()) return null;
+  const s = [...cache.values()].some(x => x.userId === v.userId);   // the user still has a live session somewhere
+  return s ? v.userId : null;
 }
 /* 4.20 · the real caller: Railway's proxy APPENDS the connecting address to X-Forwarded-For,
    so the last entry is the one a client can't forge (the first one is whatever the client sent) */
@@ -169,5 +191,5 @@ async function verifyPasswordAsync(pw, stored) {
 module.exports = {
   COOKIE, hashPassword, isHash, verifyPassword, verifyPasswordAsync, migratePasswords, storedHash,
   loadSessions, createSession, dropSession, dropUserSessions, dropSessionById, listSessions,
-  tokenOf, sessionUserId, cookieHeader, clientIp, throttled, failed, succeeded, sha, isHttps
+  tokenOf, sessionUserId, cookieHeader, clientIp, throttled, failed, succeeded, sha, isHttps, issueTicket, redeemTicket, SESSION_MS, SESSION_MAX_MS
 };

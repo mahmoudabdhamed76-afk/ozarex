@@ -14,6 +14,7 @@ export default defineConfig({
     { name: 'desktop', testIgnore: /large\.spec/, use: { viewport: { width: 1366, height: 860 } } },
     { name: 'iphone', use: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
       userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' }, testIgnore: /large\.spec/ },
-    { name: 'large-dataset', testMatch: /large\.spec/, use: { viewport: { width: 1366, height: 860 } } }
+    /* runs after the other two, alone — the 6 MB dataset needs the machine's memory to itself */
+    { name: 'large-dataset', testMatch: /large\.spec/, dependencies: ['desktop', 'iphone'], use: { viewport: { width: 1366, height: 860 } } }
   ]
 });

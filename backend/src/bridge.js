@@ -304,7 +304,8 @@ function importBlob(blob) {
     db.prepare(`DELETE FROM invoices`).run();
     db.prepare(`DELETE FROM issuance_items`).run();
     db.prepare(`DELETE FROM issuances`).run();
-    db.prepare(`DELETE FROM audit_log`).run();
+    /* Phase 2 · C3: the audit log is append-only — a restore / reset never deletes it, and never
+       brings in entries from a file (they would be unverifiable); the server logs the restore itself */
     db.prepare(`DELETE FROM settings`).run();
 
     for (const [blobKey, tableName] of Object.entries(blobToTable)) {
@@ -313,24 +314,6 @@ function importBlob(blob) {
     }
     for (const inv of (blob.invoices || [])) insertInvoice(inv);
     for (const iss of (blob.issuances || [])) insertIssuance(iss);
-
-    const auditStmt = db.prepare(`INSERT INTO audit_log (user_id, action, entity, entity_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)`);
-    for (const a of (blob.auditLog || [])) {
-      if (!a || typeof a !== 'object') continue;
-      // Store the entire frontend entry as JSON so nothing is lost.
-      const fullJson = JSON.stringify(a);
-      const createdAt = a.createdAt || a.created_at ||
-        (typeof a.timestamp === 'number' ? new Date(a.timestamp).toISOString() : null) ||
-        a.date || new Date().toISOString();
-      auditStmt.run(
-        a.userId || a.user_id || null,
-        a.operation || a.action || null,
-        a.table || a.entity || null,
-        a.recordId || a.entityId || a.entity_id || null,
-        fullJson,
-        createdAt
-      );
-    }
 
     if (blob.settings && typeof blob.settings === 'object') {
       const sst = db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`);
@@ -368,15 +351,12 @@ function insertAudit(a) {
     .run(a.userId || a.user_id || null, a.operation || a.action || null, a.table || a.entity || null,
       a.recordId || a.entityId || a.entity_id || null, JSON.stringify(a), createdAt);
 }
-function deleteAudit(id) { db.prepare(`DELETE FROM audit_log WHERE json_extract(details, '$.id') = ?`).run(String(id)); }
-function trimAudit(max) {
-  db.prepare(`DELETE FROM audit_log WHERE id NOT IN (SELECT id FROM audit_log ORDER BY id DESC LIMIT ?)`).run(max || 5000);
-}
+/* (Phase 2: no function deletes or trims audit rows — the log is append-only) */
 function upsertRecord(blobKey, rec) {
   if (!rec || rec.id === undefined || rec.id === null) return;
   if (blobKey === 'invoices') { db.prepare('DELETE FROM invoice_items WHERE invoice_id = ?').run(String(rec.id)); insertInvoice(rec); return; }
   if (blobKey === 'issuances') { db.prepare('DELETE FROM issuance_items WHERE issuance_id = ?').run(String(rec.id)); insertIssuance(rec); return; }
-  if (blobKey === 'auditLog') { deleteAudit(rec.id); insertAudit(rec); return; }
+  if (blobKey === 'auditLog') return;   // audit entries are written by the server only (audit.js)
   const table = blobToTable[blobKey]; if (!table) return;
   if (blobKey === 'users') { rec = userWithHash(rec, (db.prepare('SELECT password FROM users WHERE id = ?').get(String(rec.id)) || {}).password); }
   insertGeneric(table, rec, tables[table]);
@@ -386,7 +366,7 @@ function deleteRecord(blobKey, id) {
   id = String(id);
   if (blobKey === 'invoices') { db.prepare('DELETE FROM invoice_items WHERE invoice_id = ?').run(id); db.prepare('DELETE FROM invoices WHERE id = ?').run(id); return; }
   if (blobKey === 'issuances') { db.prepare('DELETE FROM issuance_items WHERE issuance_id = ?').run(id); db.prepare('DELETE FROM issuances WHERE id = ?').run(id); return; }
-  if (blobKey === 'auditLog') { deleteAudit(id); return; }
+  if (blobKey === 'auditLog') return;   // append-only
   const table = blobToTable[blobKey]; if (!table) return;
   db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
 }
@@ -407,4 +387,4 @@ function getSetting(key) {
   try { return JSON.parse(r.value); } catch (_) { return r.value; }
 }
 
-module.exports = { exportBlob, importBlob, defaultBlob, getSetting, upsertRecord, deleteRecord, setSetting, setCounter, trimAudit, KNOWN_KEYS };
+module.exports = { exportBlob, importBlob, defaultBlob, getSetting, upsertRecord, deleteRecord, setSetting, setCounter, insertAudit, KNOWN_KEYS };

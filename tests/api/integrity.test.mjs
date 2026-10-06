@@ -151,7 +151,7 @@ test('C5: numbers never repeat inside one change either, and the next number ski
 });
 
 test('C5: an issuance made with its invoice keeps pointing at the invoice\'s new number', async () => {
-  const r = await send(s.base, sales, ops({ cols: {
+  const r = await send(s.base, admin, ops({ cols: {
     invoices: col({ added: [inv('n_f', 5000)] }),
     issuances: col({ added: [{ id: 'is_f', number: 3100, customerId: 'c1', date: '2026-10-06', invoiceId: 'n_f', invoiceNumber: 5000, items: [] }] }),
     bankTransfers: col({ added: [{ id: 'bt_f', amount: 10, date: '2026-10-06', invoiceId: 'n_f', invoiceNumber: 5000 }] })

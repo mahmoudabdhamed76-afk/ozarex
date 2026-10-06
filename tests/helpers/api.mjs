@@ -48,7 +48,10 @@ export async function createUser(base, adminToken, user) {
   return l.token;
 }
 
+/* a RESTRICTED user: only Dashboard + Issuances (Phase 2 · C1 tests) */
 export const SALES = { id: 'u_sales', username: 'sara', password: 'Sales-Test-Pass-77', name: 'سارة', role: 'sales', pages: ['dashboard', 'issuances'], approval: 'sensitive' };
+/* a normal sales user with the role's default pages (customers, invoices, payments… — approval-rule tests) */
+export const CLERK = { id: 'u_clerk', username: 'clerk', password: 'Clerk-Test-Pass-55', name: 'كريم', role: 'sales', approval: 'sensitive' };
 
 /* a small business: 2 customers, 2 products, 1 supplier, 1 invoice, 1 payment */
 export function seedOps() {

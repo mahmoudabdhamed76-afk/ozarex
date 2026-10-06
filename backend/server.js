@@ -176,7 +176,9 @@ function opDone(id) {
 
 /* who is calling */
 function currentUser(req) {
-  const id = auth.sessionUserId(req);
+  let id = auth.sessionUserId(req);
+  /* Phase 2 · the live stream may carry a one-time ticket instead of the session token (no reusable token in URLs) */
+  if (!id && /^\/(?:[^?]*\/)?api\/events(?:\?|$)/.test(String(req.url || ''))) { const m = String(req.url).match(/[?&]st=([A-Za-z0-9_-]{20,80})/); if (m) id = auth.redeemTicket(m[1]); }
   if (!id) return null;
   const u = store.user(id);
   return u && u.disabled !== true ? u : null;
@@ -249,7 +251,8 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/me' && req.method === 'GET') {
       const u = currentUser(req);
       /* 4.13 · renew the cookie on every visit, so an active device never gets signed out */
-      return u ? sendJSON(res, 200, { user: publicUser(u), token: auth.tokenOf(req), mustChange: mustChange(u.id) }, { 'Set-Cookie': auth.cookieHeader(req, auth.tokenOf(req)) }) : sendJSON(res, 401, { error: 'login' });
+      /* streamTicket: one-time, 60 s — the live stream uses it instead of putting the session token in its URL */
+      return u ? sendJSON(res, 200, { user: publicUser(u), token: auth.tokenOf(req), mustChange: mustChange(u.id), streamTicket: auth.issueTicket(u.id) }, { 'Set-Cookie': auth.cookieHeader(req, auth.tokenOf(req)) }) : sendJSON(res, 401, { error: 'login' });
     }
 
     /* ── everything below needs a logged-in user ── */
@@ -270,7 +273,7 @@ const server = http.createServer(async (req, res) => {
 
       /* data */
       if (pathname === '/api/data' && req.method === 'GET') {
-        const blob = store.publicData();
+        const blob = store.dataFor(me);            // Phase 2 · C1 — only what this user's pages need
         return sendJSON(res, 200, Object.assign({}, blob, { __version: _dataVersion }));
       }
       if (pathname === '/api/ops' && req.method === 'POST') {
@@ -286,6 +289,7 @@ const server = http.createServer(async (req, res) => {
           if (e instanceof store.Refused) return sendJSON(res, e.status || 403, Object.assign({ error: e.code, message: e.message }, e.extra));
           throw e;
         }
+        if (out && out.noop) return sendJSON(res, 200, { ok: true, version: _dataVersion, prev, noop: true });   // e.g. only audit entries from an old client
         notifyDataChanged({ source: req.headers['x-client-id'] || b.cid || 'unknown', by: me.id });
         /* «renumbered»: numbers the server changed to keep them unique (extra field — old clients ignore it
            and still get the new number, because the version jump makes them pull the latest data) */
@@ -377,6 +381,7 @@ const server = http.createServer(async (req, res) => {
         if (weakPw(next, me.username)) return sendJSON(res, 400, { error: 'weak', message: 'كلمة السر دي سهلة التخمين — اختار حاجة أصعب' });
         db.prepare('UPDATE users SET password = ? WHERE id = ?').run(auth.hashPassword(next), me.id);
         setMustChange(me.id, false);
+        store.logEvent(me, { operation: 'edit', table: 'users', recordId: me.id, recordLabel: me.name || me.username, before: { password: '•••' }, after: { password: '(اتغيّرت — بنفسه)' } });
         auth.dropUserSessions(me.id, auth.tokenOf(req));
         return sendJSON(res, 200, { ok: true });
       }
@@ -388,6 +393,7 @@ const server = http.createServer(async (req, res) => {
         const keepUsers = store.data().users;
         const blob = defaultBlob(); blob.users = keepUsers;     // never lock everyone out
         store.full(blob);
+        store.logEvent(me, { operation: 'reset', table: 'system', recordLabel: 'مسح كل البيانات (Reset)' });
         notifyDataChanged({ type: 'reset' });
         return sendJSON(res, 200, { ok: true });
       }

@@ -46,6 +46,12 @@ test.describe('large dataset', () => {
 
   test('[KNOWN BUG C4] the offline copy is saved on the device even with a large dataset', async ({ page, context }) => {
     test.fail(true, 'KNOWN BUG C4: localStorage (~5 MB) is full → offline copy silently not saved');
+    /* make sure the data is clearly above the browser's ~5 MB limit (since Phase 2 a restore no longer
+       imports the 5,000 audit entries from the file, which had pushed the fixture over the edge) */
+    const t = (await adminLogin(big.base)).token;
+    const pad = Array.from({ length: 2500 }, (_, i) => ({ id: 'pad_' + i, title: 'ملاحظة ' + i, body: 'س'.repeat(800) }));
+    const r = await req(big.base, 'POST', '/api/ops', { token: t, body: { opId: 'pad-notes', ops: { cols: { notes: { added: pad, removed: [], modified: [] } }, sets: {}, keys: {}, counters: null } } });
+    if (r.status !== 200) throw new Error('padding ' + r.status);
     await openSignedIn(page, context, big.base, (await login(big.base, 'admin', ADMIN_PASSWORD)).token);
     await page.waitForTimeout(3000);
     expect(await page.evaluate(() => (localStorage.getItem('em_offline_snap') || '').length)).toBeGreaterThan(1_000_000);

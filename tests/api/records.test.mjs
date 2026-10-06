@@ -144,21 +144,4 @@ test('C5 (fixed in Phase 1): two devices must not both save invoice number 1500'
   assert.ok(b.status === 409 || nums.length === 1, `second save → ${b.status}; invoices numbered 1500: ${nums.map(i => i.id).join(', ')}`);
 });
 
-/* ── C3 · audit log (decision: created by the server, append-only) ── */
-test('control: a non-admin cannot remove audit entries or add them in someone else\'s name', async () => {
-  await send(s.base, admin, ops({ cols: { auditLog: col({ added: [{ id: 'au1', timestamp: Date.now(), userId: 'u1', operation: 'add', table: 'customers', recordId: 'c1' }] }) } }));
-  await send(s.base, sales, ops({ cols: { auditLog: col({ added: [{ id: 'au_fake', timestamp: Date.now(), userId: 'u1', operation: 'delete', table: 'invoices' }], removed: ['au1'] }) } }));
-  const log = (await data(s.base, admin)).auditLog;
-  assert.ok(log.some(x => x.id === 'au1'));
-  assert.equal(log.some(x => x.id === 'au_fake'), false);
-});
-test('[KNOWN BUG C3] the server records an audit entry for a change even if the device sends none', { todo: 'C3 — audit written by the browser' }, async () => {
-  const r = await send(s.base, sales, ops({ cols: { expenses: col({ added: [{ id: 'e_noaudit', description: 'بدون سجل', amount: 99, date: '2026-10-06' }] }) } }));
-  assert.equal(r.status, 200);
-  const log = (await data(s.base, admin)).auditLog;
-  assert.ok(log.some(x => JSON.stringify(x).includes('e_noaudit')), 'no audit entry for e_noaudit');
-});
-test('[KNOWN BUG C3] audit entries are append-only (not even the admin can delete them through sync)', { todo: 'C3 — audit log can be wiped' }, async () => {
-  await send(s.base, admin, ops({ cols: { auditLog: col({ removed: ['au1'] }) } }));
-  assert.ok((await data(s.base, admin)).auditLog.some(x => x.id === 'au1'), 'admin deleted au1');
-});
+/* ── C3 · audit log: see api/audit.test.mjs (Phase 2) ── */

@@ -20,6 +20,8 @@ const zlib = require('node:zlib');
 const { db, DATA_DIR } = require('../db');
 const bridge = require('./bridge');
 const integrity = require('./integrity');
+const permissions = require('./permissions');
+const audit = require('./audit');
 const AX = require(process.env.PUBLIC_DIR ? path.join(process.env.PUBLIC_DIR, 'js', 'axcore.js') : path.join(__dirname, '..', '..', 'frontend', 'public', 'js', 'axcore.js'));
 
 let MEM = null;
@@ -46,6 +48,8 @@ function load() {
 function data() { if (!MEM) load(); return MEM; }
 /* what a device receives: no password hashes, ever */
 function publicData() { const d = data(); return Object.assign({}, d, { users: (d.users || []).map(strip) }); }
+/* Phase 2 · C1 — what ONE user receives: only what his pages need (admin: everything) */
+function dataFor(u) { return permissions.filterData(publicData(), u); }
 function user(id) { return (data().users || []).find(u => u.id === id) || null; }
 function userByName(name) {
   const n = String(name || '').trim().toLowerCase();
@@ -157,6 +161,20 @@ function apply(u, w) {
   const admin = u.role === 'admin';
   const s = d.settings || {};
 
+  /* Phase 2 · C3 — the audit log is written by the server only. Entries a device sends (old clients) are
+     ignored — only a typed «reason» is kept; deleting / editing the log is refused. */
+  const fromDevice = w.cols.auditLog;
+  delete w.cols.auditLog;
+  if (fromDevice && ((fromDevice.removed || []).length || (fromDevice.modified || []).length) && audit.isEmpty(w))
+    throw new Refused('audit_append_only', 'سجل التعديلات ثابت — مينفعش يتمسح أو يتعدل');
+  if (audit.isEmpty(w)) return { users: 0, renumbered: [], noop: true };
+
+  /* Phase 2 · C1 — pages decide what this user may change (before anything else looks at it) */
+  let policy;
+  try { policy = permissions.checkWrite(d, w, u); }
+  catch (e) { if (e instanceof permissions.Forbidden) throw new Refused(e.code, e.message, e.extra); throw e; }
+  permissions.keepHiddenCosts(d, w, policy);
+
   /* Phase 1 · checked for everyone, before anything is changed */
   let renumbered;
   try {
@@ -174,8 +192,6 @@ function apply(u, w) {
       const cur = s[k], nv = w.keys[k].a;
       if ((AX.isIdArr(cur) && cur.length) || (AX.isIdArr(nv) && nv.length)) throw new Refused('forbidden', 'القايمة دي بتتعدل عنصر عنصر بس: ' + k);
     });
-    /* the audit log: a user can only add his own entries */
-    if (w.cols.auditLog) w.cols.auditLog = { added: (w.cols.auditLog.added || []).filter(e => e && e.userId === u.id), removed: [], modified: [] };
     checkApprovals(u, w.sets._approvals);
     checkRequests(u, w.sets._requests);
     const df = AX.enrich(d, w);
@@ -216,6 +232,9 @@ function apply(u, w) {
     (w.cols.users.modified || []).forEach(x => { if (x.k === 'i:' + id && !x.f.includes('passwordMissing')) { x.f.push('passwordMissing'); x.a.passwordMissing = undefined; } });
   });
 
+  /* C3 · what really changes, judged on the server's own data (before → after), written in the same transaction */
+  const entries = audit.entriesFor(d, w, u, { reasons: audit.reasonsFrom(fromDevice), passwords: Object.keys(pwById), recent: d.auditLog });
+
   const undo = snapshot(d, w);
   AX.applyDiff(d, w, 'acc');
   if (Array.isArray(d.users)) d.users = d.users.map(strip);
@@ -239,7 +258,7 @@ function apply(u, w) {
     Object.keys(w.sets).forEach(k => bridge.setSetting(k, d.settings[k]));
     Object.keys(w.keys).forEach(k => bridge.setSetting(k, d.settings[k]));
     if (w.counters && w.counters.a) Object.keys(w.counters.a).forEach(n => bridge.setCounter(n, d.counters[n]));
-    if (Array.isArray(d.auditLog) && d.auditLog.length > AUDIT_MAX) { d.auditLog.length = AUDIT_MAX; bridge.trimAudit(AUDIT_MAX); }
+    entries.forEach(e => bridge.insertAudit(e));                 // append-only: nothing in the database is ever trimmed
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');
@@ -249,11 +268,29 @@ function apply(u, w) {
     if (/constraint|cannot be bound|datatype mismatch/i.test(String(e.message))) throw new Refused('db_rejected', 'السيرفر محفظش التعديل: ' + String(e.message).slice(0, 140));
     throw e;
   }
+  remember(entries);
   /* 4.20 · a password the admin changed signs that user out everywhere */
   const changedPw = Object.keys(pwById).filter(id => !(w.cols.users.added || []).some(r => r && String(r.id) === id));
   if (changedPw.length) { const auth = require('./auth'); changedPw.forEach(id => auth.dropUserSessions(id)); }
   dirty = true;
   return { users: Object.keys(pwById).length, renumbered };
+}
+
+/* the newest entries go to the top of the in-memory list (the screens show the latest AUDIT_MAX) */
+function remember(entries) {
+  if (!entries || !entries.length) return;
+  const d = data();
+  if (!Array.isArray(d.auditLog)) d.auditLog = [];
+  d.auditLog.unshift(...entries.slice().reverse());
+  sortAudit();
+  if (d.auditLog.length > AUDIT_MAX) d.auditLog.length = AUDIT_MAX;
+}
+/* a server event (restore, reset, password change) written straight into the log */
+function logEvent(u, e) {
+  const entry = audit.event(u, e, data().auditLog);
+  bridge.insertAudit(entry);
+  remember([entry]);
+  return entry;
 }
 
 /* memory as it was before a change — cheap: only the touched records are copied */
@@ -292,6 +329,8 @@ function restore(blob, me) {
   const r = integrity.prepareRestore(blob, current, meNow, auth.isHash, auth.hashPassword);
   if (r.problems.length) return r;
   full(r.blob);
+  logEvent(me, { operation: 'restore', table: 'system', recordLabel: 'استرجاع نسخة احتياطية',
+    after: { customers: (r.blob.customers || []).length, invoices: (r.blob.invoices || []).length, users: (r.blob.users || []).length, usersWithoutPassword: r.usersWithoutPassword.length } });
   if (r.usersWithoutPassword.length) console.warn('[restore] users without a password (switched off until the admin sets one):', r.usersWithoutPassword.map(x => x.username).join(', '));
   return r;
 }
@@ -361,4 +400,4 @@ async function daily() {
 }
 function markDirty() { dirty = true; }
 
-module.exports = { load, data, publicData, user, userByName, full, restore, apply, Refused, listBackups, backupPath, writeDaily, gzBlob, sendTelegram, telegramStatus, daily, markDirty };
+module.exports = { load, data, publicData, dataFor, logEvent, user, userByName, full, restore, apply, Refused, listBackups, backupPath, writeDaily, gzBlob, sendTelegram, telegramStatus, daily, markDirty };
