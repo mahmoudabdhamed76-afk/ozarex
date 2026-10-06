@@ -2,8 +2,8 @@
    400 customers · 6,000 invoices · 6,000 issuances · 6,000 payments · 5,000 audit entries.
    Runs once, on a desktop screen (project «large-dataset»). Timings are recorded, not asserted —
    they are the "before" numbers for the performance phases. */
-import { test, expect, openSignedIn, watchErrors, formLogin, offlineCopy, queuedCount, localStorageChars, reopenOffline } from './fixtures.mjs';
-import { login, adminLogin, req } from '../helpers/api.mjs';
+import { test, expect, openSignedIn, watchErrors, formLogin, offlineCopy, queuedCount, localStorageChars, reopenOffline, installGate } from './fixtures.mjs';
+import { login, adminLogin, req, send, ops, col } from '../helpers/api.mjs';
 import { startServer, ADMIN_PASSWORD } from '../helpers/server.mjs';
 import { loadLargeDataset } from '../fixtures/load.mjs';
 
@@ -113,6 +113,54 @@ test.describe('large dataset', () => {
     await expect.poll(() => page.evaluate(() => OfflineManager.pending), { timeout: 60_000 }).toBe(0);
     const d = (await req(big.base, 'GET', '/api/data', { token: admin })).json;
     expect(d.customers.filter(c => ids.includes(c.id)).length).toBe(2);    // sent once each, not duplicated
+    expect(errors).toEqual([]);
+  });
+
+  /* Phase 4 — the real thing, no held answers: with this much data a pull takes seconds; edits land in it */
+  test('Phase 4: edits made while a multi-second pull downloads are never lost and are sent once (8 rounds)', async ({ page, context }) => {
+    test.setTimeout(600_000);
+    await openSignedIn(page, context, big.base, (await login(big.base, 'admin', ADMIN_PASSWORD)).token);
+    const errors = watchErrors(page);
+    await page.waitForTimeout(3000);
+    await installGate(page);
+    /* a slow connection: every pull's answer reaches the app ~3 s after the server sent it (as a slow download
+       of the whole company would). One-shot: when the next pull starts, make the edit 30 ms later (saved) — or 2.9 s later (not saved: just
+       before the old answer lands, so the 5-second autosave can't rescue it by luck). */
+    await page.evaluate(() => {
+      const f = window.fetch;
+      window.fetch = function (u, o) {
+        const isPull = /\/api\/data(\?|$)/.test(String(u)) && !(o && o.method && o.method !== 'GET');
+        const p = isPull ? f.apply(this, arguments).then(r => new Promise(res => setTimeout(() => res(r), 3000))) : f.apply(this, arguments);
+        const a = window.__arm;
+        if (a && isPull) {
+          window.__arm = null;
+          let answered = false; const t0 = performance.now();
+          p.then(() => { answered = true; a.result.pullMs = Math.round(performance.now() - t0); }, () => { answered = true; });
+          setTimeout(() => { DB.data.customers.push({ id: a.id, name: 'أثناء التحميل', balance: 0, customPrices: {} }); if (a.saved) DB.save(); a.result.inFlight = !answered; a.result.done = true; }, a.saved ? 30 : 2900);
+        }
+        return p;
+      };
+    });
+    const admin = (await adminLogin(big.base)).token;
+    const rounds = [];
+    for (let r = 0; r < 8; r++) {
+      const other = 'big_o' + r + '_' + Date.now().toString(36), mine = 'big_m' + r + '_' + Date.now().toString(36);
+      const saved = r % 2 === 0;
+      await page.evaluate(([id, s]) => { window.__armResult = {}; window.__arm = { id, saved: s, result: window.__armResult }; }, [mine, saved]);
+      expect((await send(big.base, admin, ops({ cols: { customers: col({ added: [{ id: other, name: 'جهاز تاني ' + r, balance: 0, customPrices: {} }] }) } }))).status).toBe(200);
+      await page.waitForFunction(() => window.__armResult.done && window.__armResult.pullMs, null, { timeout: 60_000 });
+      const { inFlight, pullMs } = await page.evaluate(() => window.__armResult);
+      await expect.poll(async () => { const d = (await req(big.base, 'GET', '/api/data', { token: admin })).json; return d.customers.filter(c => c.id === mine).length; }, { timeout: 60_000 }).toBe(1);
+      await expect.poll(() => page.evaluate(([m, o]) => [m, o].map(i => DB.data.customers.filter(c => c.id === i).length).join(','), [mine, other]), { timeout: 60_000 }).toBe('1,1');
+      await page.waitForFunction(() => window.__gate.done.data === window.__gate.started.data && !DB._saveTimer && !DB._saveInflight, null, { timeout: 60_000 });
+      rounds.push({ r, saved, editDuringPull: inFlight, pullMs });
+    }
+    const d = (await req(big.base, 'GET', '/api/data', { token: admin })).json;
+    expect(d.customers.filter(c => c.id.startsWith('big_m')).length).toBe(8);              // each exactly once
+    expect(rounds.every(x => x.editDuringPull)).toBe(true);                                  // the race really happened every time
+    expect(Math.min(...rounds.map(x => x.pullMs))).toBeGreaterThan(2000);                    // …during multi-second pulls
+    test.info().annotations.push({ type: 'phase4', description: JSON.stringify(rounds) });
+    console.log('[large dataset phase 4]', JSON.stringify(rounds));
     expect(errors).toEqual([]);
   });
 });

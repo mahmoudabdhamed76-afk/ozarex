@@ -5,7 +5,7 @@
 import js from '@eslint/js';
 import globals from 'globals';
 
-const APP_GLOBALS = Object.fromEntries(['uid', 'userPages', 'currentUser', 'navigate', 'currentPage', 'DB', 'OfflineManager', 'AXCore', 'closeModal', 'openCustomerForm', 'logout',
+const APP_GLOBALS = Object.fromEntries(['uid', 'userPages', 'currentUser', 'navigate', 'currentPage', 'DB', 'OfflineManager', 'SyncEngine', 'AXCore', 'closeModal', 'openCustomerForm', 'logout',
   'renderDashboard', 'renderInvoices', 'renderIssuances', 'renderPayments', 'renderCustomers', 'renderReports'].map(n => [n, 'readonly']));
 
 export default [

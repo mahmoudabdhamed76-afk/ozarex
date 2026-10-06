@@ -10009,6 +10009,9 @@ const OfflineManager = (() => {
      edited fields. Offline, each difference is queued in order and sent
      when the connection is back (the server skips one it already has). */
   let _base = null;
+  let _changeSeq = 0;
+  /* Phase 4: is there anything in DB.data this device has not turned into an operation yet? */
+  function hasUnsent() { try { return !!(_base && AXCore.diff(_base, DB.data, {}).df.n); } catch (_) { return false; } }
   function setBase(d) { try { _base = AXCore.snapshot(d || DB.data, {}); } catch (_) { _base = null; } }
   function opId() { return Date.now().toString(36) + '-' + uid(); }   // unique per change (the server skips an opId it already applied)
 
@@ -10189,6 +10192,7 @@ const OfflineManager = (() => {
     if (!r.df.n) return;
     const item = { ops: AXCore.wire(r.df), opId: opId() };
     _base = r.cur;
+    _changeSeq++;                              // Phase 4: a pull that started before this change must not overwrite it
     /* plain passwords never stay on this device (the server keeps a hash) */
     if (r.df.cols.users && Array.isArray(data.users) && data.users.some(u => u && u.password)) {
       data.users.forEach(u => { if (u) delete u.password; });
@@ -10306,7 +10310,9 @@ const OfflineManager = (() => {
   function getLastSaveAt() { return _lastSaveAt; }
 
   return { init, trySave, flushQueue, getCachedData, getLastSaveAt, setBase, wipe, settle, get pending(){ return _pending; }, get isOnline(){ return _online; },
-    get snapshotStatus(){ return Object.assign({}, _snapStatus); }, snapshotSettled(){ return _snapChain.then(() => Object.assign({}, _snapStatus)); },
+    get snapshotStatus(){ return Object.assign({}, _snapStatus); },
+    get changeSeq(){ return _changeSeq; }, hasUnsent, get busy(){ return _flushing || _pending > 0; },   /* unsent offline changes still in the queue */
+    snapshotSettled(){ return _snapChain.then(() => Object.assign({}, _snapStatus)); },
     _debug() { try { return { base: !!_base, diff: _base ? AXCore.diff(_base, DB.data, {}).df.n : null, pending: _pending, online: _online }; } catch (e) { return { err: e.message }; } } };
 })();
 
@@ -10319,6 +10325,14 @@ const SyncEngine = (() => {
   let _isSyncing = false, _syncThrottle = null, _pollTimer = null;
   let _lastMsgAt = 0;
   let _again = null;
+  /* Phase 4: a pull that has to wait for this device's own changes — one timer, requests merged, none dropped */
+  let _waitTimer = null, _waiting = null, _queueWaits = 0, _localWaits = 0;
+  function pullAfter(ms, reason, force) {
+    _waiting = { reason: (_waiting && _waiting.reason) || reason, force: !!(force || (_waiting && _waiting.force)) };
+    if (_waitTimer) return;
+    _waitTimer = setTimeout(() => { _waitTimer = null; const w = _waiting; _waiting = null; pullLatest(w.reason, w.force); }, ms);
+  }
+  const savePending = () => !!(DB._saveTimer || DB._saveInflight);
 
   function setStatus(state) {
     const el = document.getElementById('sync-status-dot');
@@ -10399,10 +10413,13 @@ const SyncEngine = (() => {
   async function pullLatest(reason = '', force) {
     // A local save is still queued / in flight: merging now would overwrite
     // what the user just did before it reaches the server. Try again after it.
-    if (DB._saveTimer || DB._saveInflight) { setTimeout(() => pullLatest(reason, force), 400); return; }
+    if (savePending()) { pullAfter(400, reason, force); return; }
+    /* Phase 4: unsent offline changes are being sent — take the server's copy after them (bounded: ~16 s) */
+    if (OfflineManager.busy && _queueWaits < 40) { _queueWaits++; pullAfter(400, reason, force); return; }
     /* a pull asked for while another is running is not dropped: it runs right after (that one may hold older data) */
     if (_isSyncing) { _again = { reason, force: force || (_again && _again.force) }; return; }
     _isSyncing = true; setStatus('syncing');
+    const seq0 = OfflineManager.changeSeq;
     try {
       const res = await fetch(API_BASE + '/api/data', {
         headers: { 'Accept': 'application/json', 'X-Client-Id': _CLIENT_ID },
@@ -10411,6 +10428,21 @@ const SyncEngine = (() => {
       if (res.status === 401) { setStatus('error'); Auth.expired(); return; }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const fresh = await res.json();
+      /* Phase 4 · the race: this copy was requested BEFORE anything this device changed while it downloaded.
+         Merging it would overwrite those edits and setBase() would then treat them as already on the server,
+         so they would never be sent. Instead: send them first (normal save), then pull again. */
+      /* …and the same for changes still waiting in the offline queue (the pull may have started a moment
+         before the device noticed it was back online) — bounded like above */
+      if (OfflineManager.busy && _queueWaits < 40) { _queueWaits++; pullAfter(400, reason, true); setStatus('connected'); return; }
+      const unsent = !savePending() && OfflineManager.hasUnsent();
+      if (unsent || savePending() || OfflineManager.changeSeq !== seq0) {
+        if (unsent) DB.save();                 // edits not saved yet (autosave would catch them within 5 s) → now
+        _localWaits++;
+        pullAfter(_localWaits > 10 ? 3000 : 50, reason, true);   // forced: our own save moves the version on
+        setStatus('connected');
+        return;
+      }
+      _queueWaits = 0; _localWaits = 0;
       const newVer = fresh.__version || 0;
       if (!force && newVer && newVer <= DB._serverVersion) { setStatus('connected'); return; }
       DB._bootstrapData = fresh;

@@ -143,3 +143,32 @@ export async function reopenOffline(page, username, password, { timeout = 30_000
   }, null, { timeout });
   return Date.now() - t0;
 }
+
+/* ── Phase 4 · a gate inside the page: holds the RESPONSE of /api/data (a pull) or /api/ops (a save)
+   after the server has answered, until the test releases it — so a race happens exactly, every time ── */
+export async function installGate(page) {
+  await page.evaluate(() => {
+    if (window.__gate) return;
+    const g = window.__gate = { hold: { data: false, ops: false }, held: { data: 0, ops: 0 }, started: { data: 0, ops: 0 }, done: { data: 0, ops: 0 }, waiting: { data: [], ops: [] } };
+    const kindOf = u => /\/api\/data(\?|$)/.test(u) ? 'data' : /\/api\/ops(\?|$)/.test(u) ? 'ops' : null;
+    const f = window.fetch;
+    window.fetch = function (u, o) {
+      const k = kindOf(String((u && u.url) || u));
+      const p = f.apply(this, arguments);
+      if (!k || (o && o.method && o.method !== 'GET' && k === 'data')) return p;
+      g.started[k]++;
+      (g.log ||= []).push([Math.round(performance.now()), k, 'start', OfflineManager.pending, OfflineManager.busy]);
+      return p.then(r => {
+        g.log.push([Math.round(performance.now()), k, 'answer', OfflineManager.pending, OfflineManager.busy]);
+        if (!g.hold[k]) { g.done[k]++; return r; }
+        g.held[k]++;
+        return new Promise(res => g.waiting[k].push(() => { g.done[k]++; res(r); }));
+      }, e => { g.done[k]++; throw e; });        // a network error (offline) also ends the request
+    };
+  });
+}
+export const gate = (page, kind, on) => page.evaluate(([k, v]) => { window.__gate.hold[k] = v; }, [kind, on]);
+export const heldCount = (page, kind) => page.evaluate(k => window.__gate.waiting[k].length, kind);
+export const gateStats = page => page.evaluate(() => JSON.parse(JSON.stringify({ held: window.__gate.held, started: window.__gate.started, done: window.__gate.done })));
+/* lets every held response through (and keeps letting through whatever arrives while `kind` is still held, if on=false) */
+export const releaseAll = (page, kind) => page.evaluate(k => { const w = window.__gate.waiting[k].splice(0); w.forEach(f => f()); return w.length; }, kind);

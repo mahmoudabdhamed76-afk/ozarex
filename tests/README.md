@@ -45,14 +45,16 @@ throw-away `DATA_DIR`, so tests never touch your real data and can run in parall
 | `browser/layout.spec.mjs` | each page: **no horizontal overflow**, no `NaN` / `undefined` printed |
 | `browser/navigation.spec.mjs` | login form, every sidebar item by click, back button, mobile menu, iPhone bottom bar, add-customer form → server, logout |
 | `browser/sync.spec.mjs` | live update from another device, two browsers, offline queue → flush, refused change rolled back, offline reopen |
-| `browser/large.spec.mjs` | large dataset: pages open without errors + timings recorded (baseline); C4: >5 MB offline copy saved in IndexedDB, offline reopen with queued changes, reconnect |
+| `browser/large.spec.mjs` | large dataset: pages open without errors + timings recorded (baseline); C4: >5 MB offline copy saved in IndexedDB, offline reopen with queued changes, reconnect; Phase 4: edits during 3-second pulls of the large dataset (8 rounds) |
 | `browser/phase2.spec.mjs` | Phase 2 from real browsers: 4 kinds of users open all their pages cleanly, hidden data never reaches the device, forbidden change rolled back, stream ticket, logout wipes the device, offline needs the password, one user can't open another's copy, unsent changes at logout |
 | `browser/phase3.spec.mjs` | Phase 3 · C4: old localStorage copy migrated (verified, then removed), stale copy only removed, failed migration keeps the old copy (opens offline, reported, retried), queued changes survive an offline reopen and are sent once, failed save reported |
+| `browser/phase4.spec.mjs` | Phase 4 · sync race: the pull's answer is held inside the page (`installGate`) while the device edits — saved / save-waiting / not-saved edits, several edits, another device during a save, several refresh notices, balance delta applied once, renumbered invoice, offline queue + live refresh (records never vanish). Stress: `npx playwright test browser/phase4.spec.mjs --repeat-each=25` |
 | `browser/phase1.spec.mjs` | Phase 1 from a real browser: UUID ids, backup date, renumbered invoice reaches the device, refused record removed, offline queue not blocked |
 
 Fixed in Phase 1 (markers removed, tests now guard the fix): C2, C5, I10, I14, the «NaN/10/6» backup date.
 Fixed in Phase 2: C1, C3, I11.
 Fixed in Phase 3: C4 (offline copy in IndexedDB — see `docs/OFFLINE-STORAGE.md`).
+Fixed in Phase 4: the sync race (an edit made while a pull was downloading could be overwritten and never sent).
 
 ## Known bugs (expected to fail today)
 
