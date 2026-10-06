@@ -23,6 +23,8 @@
     return { ok: r.ok, status: r.status, j: j || {} };
   }
   function lds(d) { return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
+  /* the day inside a backup file name (erp-2026-10-06.json.gz, or the older emdadx-…) — never a fixed position */
+  function fileDate(name) { var m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(name || '')); return m ? m[0] : ''; }
   function dmy(ds) { if (!ds) return ''; var p = String(ds).slice(0, 10).split('-'); return (+p[2]) + '/' + (+p[1]) + '/' + p[0]; }
   function when(ts) {
     if (!ts) return '—';
@@ -120,7 +122,7 @@
         '</div>' +
         (ui.loading && !ui.bk ? '<div class="sec-empty">بيحمّل…</div>' :
           files.length ? '<ul class="sec-files">' + files.slice(0, 30).map(function (f) {
-            return '<li><span>' + dmy(f.file.slice(7, 17)) + '</span><em>' + size(f.size) + ' · اتحدّثت ' + when(f.at) + '</em>' +
+            return '<li><span>' + dmy(fileDate(f.file)) + '</span><em>' + size(f.size) + ' · اتحدّثت ' + when(f.at) + '</em>' +
               '<a href="' + base() + '/api/backup/download?file=' + encodeURIComponent(f.file) + '" download>' + IC.down + ' تنزيل</a></li>';
           }).join('') + '</ul>' : '<div class="sec-empty">لسه مفيش نسخ — أول نسخة بتتعمل أوتوماتيك بعد تشغيل السيرفر بثواني.</div>') +
         '<details class="sec-tg"' + (tg.configured ? '' : ' open') + '><summary>' + IC.send + ' تليجرام: ' + (tg.configured ? 'شغّال ✓' : 'مش متفعّل') + '</summary>' +

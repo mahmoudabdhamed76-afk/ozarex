@@ -27,7 +27,7 @@ async function spawnApp(port, dataDir, extraEnv) {
     ADMIN_PASSWORD, TRUST_PROXY: '0'
   }, extraEnv || {});
   for (const k of ['RAILWAY_ENVIRONMENT', 'RAILWAY_ENVIRONMENT_NAME', 'RAILWAY_PROJECT_ID', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID']) delete env[k];
-  const child = spawn(process.execPath, [path.join(ROOT, 'backend', 'server.js')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [path.join(process.env.ERP_APP_ROOT || ROOT, 'backend', 'server.js')]   /* ERP_APP_ROOT: run the same tests against another checkout (benchmarks) */, { env, stdio: ['ignore', 'pipe', 'pipe'] });
   const out = { child, log: '' };
   child.stdout.on('data', d => { out.log += d; });
   child.stderr.on('data', d => { out.log += d; });

@@ -10,8 +10,8 @@ import { ADMIN_PASSWORD } from '../helpers/server.mjs';
 
 /* top bar too wide at 1366 px for pages with long titles → page scrolls sideways, icons cut off (found in Phase 0) */
 const KNOWN_OVERFLOW = { desktop: ['issuances', 'forecast', 'payments', 'transfers', 'purchases', 'monthly', 'requests', 'users', 'audit', 'security'], iphone: [] };
-/* security page: backup list shows «NaN/10/6» — js/security.js:123 slices the file name at a fixed offset (broken by the erp- rename) */
-const KNOWN_BAD_TEXT = ['security'];
+/* (security page «NaN/10/6» in the backup list — fixed in Phase 1) */
+const KNOWN_BAD_TEXT = [];
 
 test.describe.configure({ mode: 'serial' });
 let page;

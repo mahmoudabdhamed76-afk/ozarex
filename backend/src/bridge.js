@@ -218,8 +218,9 @@ function insertGeneric(tableName, item, cfg) {
     try {
       stmt.run(...values);
     } catch (err2) {
-      console.error(`[insertGeneric ${tableName}] skipped a bad row:`, err2.message);
-      // Skip this row rather than failing the entire request.
+      /* Phase 1 · C2: never skip silently — the caller's transaction is rolled back and the device is told */
+      err2.message = `[${tableName} ${row.id}] ${err2.message}`;
+      throw err2;
     }
   }
 }
@@ -245,17 +246,15 @@ function insertInvoice(inv) {
         str(inv.updatedAt || inv.updated_at) || new Date().toISOString()
       );
   } catch (err) {
-    console.error('[insertInvoice] skipped:', err.message);
-    return;
+    err.message = `[invoices ${inv.id}] ${err.message}`;   // C2: no silent skip
+    throw err;
   }
   const itemStmt = db.prepare(`INSERT INTO invoice_items (invoice_id, product_id, name, qty, price, total, data) VALUES (?, ?, ?, ?, ?, ?, ?)`);
   for (const it of (inv.items || [])) {
     const known = new Set(['productId','product_id','name','qty','price','total']);
     const d = {};
     for (const k of Object.keys(it)) { if (!known.has(k)) d[k] = it[k]; }
-    try {
-      itemStmt.run(str(inv.id), str(it.productId ?? it.product_id), str(it.name ?? it.productName), num(it.qty ?? it.quantity), num(it.price), num(it.total), Object.keys(d).length ? JSON.stringify(d) : null);
-    } catch (err) { console.error('[invoice_item] skipped:', err.message); }
+    itemStmt.run(str(inv.id), str(it.productId ?? it.product_id), str(it.name ?? it.productName), num(it.qty ?? it.quantity), num(it.price), num(it.total), Object.keys(d).length ? JSON.stringify(d) : null);
   }
 }
 
@@ -271,15 +270,13 @@ function insertIssuance(iss) {
         Object.keys(headerData).length ? JSON.stringify(headerData) : null,
         str(iss.createdAt || iss.created_at) || new Date().toISOString(),
         str(iss.updatedAt || iss.updated_at) || new Date().toISOString());
-  } catch (err) { console.error('[insertIssuance] skipped:', err.message); return; }
+  } catch (err) { err.message = `[issuances ${iss.id}] ${err.message}`; throw err; }   // C2: no silent skip
   const itemStmt = db.prepare(`INSERT INTO issuance_items (issuance_id, product_id, name, qty, data) VALUES (?, ?, ?, ?, ?)`);
   for (const it of (iss.items || [])) {
     const k2 = new Set(['productId','product_id','name','qty']);
     const d = {};
     for (const k of Object.keys(it)) { if (!k2.has(k)) d[k] = it[k]; }
-    try {
-      itemStmt.run(str(iss.id), str(it.productId ?? it.product_id), str(it.name ?? it.productName), num(it.qty ?? it.quantity), Object.keys(d).length ? JSON.stringify(d) : null);
-    } catch (err) { console.error('[issuance_item] skipped:', err.message); }
+    itemStmt.run(str(iss.id), str(it.productId ?? it.product_id), str(it.name ?? it.productName), num(it.qty ?? it.quantity), Object.keys(d).length ? JSON.stringify(d) : null);
   }
 }
 

@@ -95,32 +95,30 @@ test('non-admin re-sending an existing id as "new" is treated as an edit and jud
   assert.equal((await data(s.base, admin)).customers.find(c => c.id === 'c1').name, 'مركز النور');
 });
 
-test('[KNOWN BUG I10] a "new" record whose id already exists must not overwrite the old one', { todo: 'I10 — id collisions overwrite records' }, async () => {
+test('I10 (fixed in Phase 1): a "new" record whose id already exists must not overwrite the old one', async () => {
   await send(s.base, admin, ops({ cols: { customers: col({ added: [{ id: 'c_dup', name: 'الأصلي', balance: 750 }] }) } }));
   const r = await send(s.base, admin, ops({ cols: { customers: col({ added: [{ id: 'c_dup', name: 'سجل تاني بنفس الرقم' }] }) } }));
   const c = (await data(s.base, admin)).customers.find(x => x.id === 'c_dup');
   assert.ok(r.status === 409 || (c.name === 'الأصلي' && c.balance === 750), `status ${r.status}, now: ${c.name} / balance ${c.balance}`);
 });
 
-/* ── C2 · required fields ── */
-async function rejectedOrKept(o, table, id) {
+/* ── C2 · required fields (fixed in Phase 1: refused with 403 invalid_record, never kept) ── */
+async function refusedAndAbsent(o, table, id) {
   const r = await send(s.base, admin, o);
-  if (r.status >= 400) return { ok: true };
+  assert.equal(r.status, 403, `server answered ${r.status}`);
+  assert.equal(r.json.error, 'invalid_record');
+  assert.equal((await data(s.base, admin))[table].some(x => x.id === id), false, 'kept in memory');
   await s.restart(); await relogin();
-  const kept = (await data(s.base, admin))[table].some(x => x.id === id);
-  return { ok: kept, msg: `server said ${r.status} but after a restart the ${table} record is ${kept ? 'there' : 'GONE'}` };
+  assert.equal((await data(s.base, admin))[table].some(x => x.id === id), false, 'found after restart');
 }
-test('[KNOWN BUG C2] a customer without a name is either refused or really saved', { todo: 'C2 — silent data loss' }, async () => {
-  const x = await rejectedOrKept(ops({ cols: { customers: col({ added: [{ id: 'c_noname', phone: '0100', balance: 500 }] }) } }), 'customers', 'c_noname');
-  assert.ok(x.ok, x.msg);
+test('C2 (fixed): a customer without a name is refused, not silently lost', async () => {
+  await refusedAndAbsent(ops({ cols: { customers: col({ added: [{ id: 'c_noname', phone: '0100', balance: 500 }] }) } }), 'customers', 'c_noname');
 });
-test('[KNOWN BUG C2] a payment without a date is either refused or really saved', { todo: 'C2 — silent data loss' }, async () => {
-  const x = await rejectedOrKept(ops({ cols: { payments: col({ added: [{ id: 'pay_nodate', customerId: 'c1', amount: 300 }] }) } }), 'payments', 'pay_nodate');
-  assert.ok(x.ok, x.msg);
+test('C2 (fixed): a payment without a date is refused, not silently lost', async () => {
+  await refusedAndAbsent(ops({ cols: { payments: col({ added: [{ id: 'pay_nodate', customerId: 'c1', amount: 300 }] }) } }), 'payments', 'pay_nodate');
 });
-test('[KNOWN BUG C2] a product without a name is either refused or really saved', { todo: 'C2 — silent data loss' }, async () => {
-  const x = await rejectedOrKept(ops({ cols: { products: col({ added: [{ id: 'p_noname', quantity: 10, cost: 1 }] }) } }), 'products', 'p_noname');
-  assert.ok(x.ok, x.msg);
+test('C2 (fixed): a product without a name is refused, not silently lost', async () => {
+  await refusedAndAbsent(ops({ cols: { products: col({ added: [{ id: 'p_noname', quantity: 10, cost: 1 }] }) } }), 'products', 'p_noname');
 });
 test('control: an invoice without a date gets today (current behavior) and persists', async () => {
   await send(s.base, admin, ops({ cols: { invoices: col({ added: [{ id: 'i_nodate', number: 1003, customerId: 'c1', total: 1, items: [] }] }) } }));
@@ -138,7 +136,7 @@ test('counters only move up (max wins), never back', async () => {
   assert.equal((await data(s.base, admin)).counters.invoice, 1010);
 });
 
-test('[KNOWN BUG C5] two devices must not both save invoice number 1500', { todo: 'C5 — numbers are assigned in the browser' }, async () => {
+test('C5 (fixed in Phase 1): two devices must not both save invoice number 1500', async () => {
   const a = await send(s.base, admin, ops({ cols: { invoices: col({ added: [{ id: 'iA', number: 1500, customerId: 'c1', date: '2026-10-06', total: 10, paid: 0, items: [] }] }) }, counters: { invoice: 1500 } }));
   const b = await send(s.base, sales, ops({ cols: { invoices: col({ added: [{ id: 'iB', number: 1500, customerId: 'c2', date: '2026-10-06', total: 10, paid: 0, items: [] }] }) }, counters: { invoice: 1500 } }));
   assert.equal(a.status, 200);

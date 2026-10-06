@@ -19,6 +19,7 @@ const path = require('node:path');
 const zlib = require('node:zlib');
 const { db, DATA_DIR } = require('../db');
 const bridge = require('./bridge');
+const integrity = require('./integrity');
 const AX = require(process.env.PUBLIC_DIR ? path.join(process.env.PUBLIC_DIR, 'js', 'axcore.js') : path.join(__dirname, '..', '..', 'frontend', 'public', 'js', 'axcore.js'));
 
 let MEM = null;
@@ -61,9 +62,13 @@ function full(blob) {
   sortAudit();
 }
 
+/* a change the server will not apply. status 403 on purpose: every client version (and the
+   service worker queue) treats 403 as «refused — take the server's copy back», so nothing
+   gets stuck retrying in an offline queue */
 class Refused extends Error {
-  constructor(code, msg, extra) { super(msg); this.code = code; this.extra = extra || {}; }
+  constructor(code, msg, extra, status) { super(msg); this.code = code; this.extra = extra || {}; this.status = status || 403; }
 }
+const asRefused = e => (e instanceof integrity.IntegrityError ? new Refused(e.code, e.message, e.extra) : e);
 
 /* ── approvals list: a non-admin may only add his own pending request
       or withdraw his own pending request ── */
@@ -148,9 +153,17 @@ function sanitize(w) {
 function apply(u, w) {
   const d = data();
   w = sanitize(w);
-  Object.keys(w.cols).forEach(k => { if (!bridge.KNOWN_KEYS.has(k)) delete w.cols[k]; });
+  Object.keys(w.cols).forEach(k => { if (!bridge.KNOWN_KEYS.has(k)) { console.warn('[ops] unknown collection ignored:', k); delete w.cols[k]; } });
   const admin = u.role === 'admin';
   const s = d.settings || {};
+
+  /* Phase 1 · checked for everyone, before anything is changed */
+  let renumbered;
+  try {
+    integrity.checkIds(d, w);                 // I10 — a «new» id that already exists is refused
+    integrity.checkRequired(d, w);            // C2  — never accept what the database would drop
+    renumbered = integrity.assignNumbers(d, w);   // C5 — numbers stay unique
+  } catch (e) { throw asRefused(e); }
 
   if (!admin) {
     if (w.cols.users) throw new Refused('forbidden', 'المستخدمين للمدير بس');
@@ -198,6 +211,12 @@ function apply(u, w) {
     });
   }
 
+  /* a set password ends the «restored without a password» state */
+  Object.keys(pwById).forEach(id => {
+    (w.cols.users.modified || []).forEach(x => { if (x.k === 'i:' + id && !x.f.includes('passwordMissing')) { x.f.push('passwordMissing'); x.a.passwordMissing = undefined; } });
+  });
+
+  const undo = snapshot(d, w);
   AX.applyDiff(d, w, 'acc');
   if (Array.isArray(d.users)) d.users = d.users.map(strip);
   sortAudit();
@@ -224,14 +243,57 @@ function apply(u, w) {
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');
-    load();   // memory back in line with the database
+    /* C2 · nothing stays in memory that the database did not take */
+    try { undo(); } catch (x) { console.error('[ops] undo failed, reloading', x.message); load(); }
+    console.error('[ops] not saved:', e.message);
+    if (/constraint|cannot be bound|datatype mismatch/i.test(String(e.message))) throw new Refused('db_rejected', 'السيرفر محفظش التعديل: ' + String(e.message).slice(0, 140));
     throw e;
   }
   /* 4.20 · a password the admin changed signs that user out everywhere */
   const changedPw = Object.keys(pwById).filter(id => !(w.cols.users.added || []).some(r => r && String(r.id) === id));
   if (changedPw.length) { const auth = require('./auth'); changedPw.forEach(id => auth.dropUserSessions(id)); }
   dirty = true;
-  return { users: Object.keys(pwById).length };
+  return { users: Object.keys(pwById).length, renumbered };
+}
+
+/* memory as it was before a change — cheap: only the touched records are copied */
+function snapshot(d, w) {
+  const cols = {}, sets = {}, keys = {};
+  const st = d.settings || (d.settings = {});
+  /* the old array is kept as is (applyDiff builds a new one); only the records it edits in place are copied */
+  Object.keys(w.cols || {}).forEach(k => {
+    const arr = d[k], saved = [];
+    if (Array.isArray(arr)) {
+      const mod = new Set(((w.cols[k] || {}).modified || []).map(x => x.k));
+      if (mod.size) for (const r of arr) if (r && r.id != null && mod.has('i:' + r.id)) saved.push([r, AX.clone(r)]);
+    }
+    cols[k] = { arr, saved };
+  });
+  Object.keys(w.sets || {}).forEach(k => { sets[k] = { had: own(st, k), v: AX.clone(st[k]) }; });
+  Object.keys(w.keys || {}).forEach(k => { keys[k] = { had: own(st, k), v: AX.clone(st[k]) }; });
+  const counters = AX.clone(d.counters || {}), users = d.users, auditLog = d.auditLog;
+  return function undo() {
+    Object.keys(cols).forEach(k => {
+      cols[k].saved.forEach(([obj, copy]) => { Object.keys(obj).forEach(f => { delete obj[f]; }); Object.assign(obj, copy); });
+      d[k] = cols[k].arr;
+    });
+    [sets, keys].forEach(g => Object.keys(g).forEach(k => { if (g[k].had) d.settings[k] = g[k].v; else delete d.settings[k]; }));
+    d.counters = counters;
+    if (!cols.users) d.users = users;
+    if (!cols.auditLog) d.auditLog = auditLog;
+  };
+}
+
+/* ── I14 · restore: validated first; the admin doing it always keeps his login ── */
+function restore(blob, me) {
+  const auth = require('./auth');
+  const current = { users: (data().users || []).map(strip), hashOf: id => auth.storedHash(id) };
+  const meNow = me ? Object.assign({}, user(me.id) || me) : null;
+  const r = integrity.prepareRestore(blob, current, meNow, auth.isHash, auth.hashPassword);
+  if (r.problems.length) return r;
+  full(r.blob);
+  if (r.usersWithoutPassword.length) console.warn('[restore] users without a password (switched off until the admin sets one):', r.usersWithoutPassword.map(x => x.username).join(', '));
+  return r;
 }
 
 /* ═════ backups ═════ */
@@ -299,4 +361,4 @@ async function daily() {
 }
 function markDirty() { dirty = true; }
 
-module.exports = { load, data, publicData, user, userByName, full, apply, Refused, listBackups, backupPath, writeDaily, gzBlob, sendTelegram, telegramStatus, daily, markDirty };
+module.exports = { load, data, publicData, user, userByName, full, restore, apply, Refused, listBackups, backupPath, writeDaily, gzBlob, sendTelegram, telegramStatus, daily, markDirty };

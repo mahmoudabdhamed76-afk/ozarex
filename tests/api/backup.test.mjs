@@ -74,7 +74,7 @@ test('reset empties the data but keeps the users', async () => {
   assert.equal((await login(s.base, 'admin', ADMIN_PASSWORD)).status, 200);
 });
 
-test('[KNOWN BUG I14] restoring a file that has no users must not lock everyone out', { todo: 'I14 — restore can lock out the admin' }, async () => {
+test('I14 (fixed in Phase 1): restoring a file that has no users must not lock everyone out', async () => {
   const x = await startServer();
   try {
     const t = (await adminLogin(x.base)).token;
@@ -84,7 +84,7 @@ test('[KNOWN BUG I14] restoring a file that has no users must not lock everyone 
   } finally { await x.stop(); }
 });
 
-test('[KNOWN BUG I14] a daily backup restored on a NEW server keeps users able to log in', { todo: 'I14 — backups have no password hashes' }, async () => {
+test('I14 (fixed in Phase 1): a hash-less backup on a NEW server keeps employees, switched off and listed — never a silent random password', async () => {
   const a = await startServer();
   const b = await startServer();
   try {
@@ -94,8 +94,21 @@ test('[KNOWN BUG I14] a daily backup restored on a NEW server keeps users able t
     const f = await fetch(a.base + '/api/backup/download', { headers: { Authorization: 'Bearer ' + ta } });
     const blob = JSON.parse(gunzipSync(Buffer.from(await f.arrayBuffer())).toString('utf8'));
     const tb = (await adminLogin(b.base)).token;
-    assert.equal((await req(b.base, 'POST', '/api/data', { token: tb, body: blob })).status, 200);
-    assert.equal((await login(b.base, SALES.username, SALES.password)).status, 200, 'the sales user cannot log in on the restored server');
+    const r = await req(b.base, 'POST', '/api/data', { token: tb, body: blob });
+    assert.equal(r.status, 200);
+    assert.deepEqual(r.json.usersWithoutPassword.map(u => u.username), [SALES.username], 'employees without a known password are reported');
+    assert.equal(r.json.adminKept, 'admin');
+    assert.equal((await login(b.base, 'admin', ADMIN_PASSWORD)).status, 200, 'the admin who restored can still log in');
+    const tb2 = (await adminLogin(b.base)).token;
+    const u = (await data(b.base, tb2)).users.find(x => x.username === SALES.username);
+    assert.equal(u.disabled, true);
+    assert.equal(u.passwordMissing, true);
+    assert.equal((await login(b.base, SALES.username, SALES.password)).status, 401);
+    /* the admin sets a password and switches him back on → he can log in, the flag is gone */
+    const set = await send(b.base, tb2, { cols: { users: { added: [], removed: [], modified: [{ k: 'i:' + u.id, f: ['password', 'disabled'], b: {}, a: { password: 'Brand-New-Pass-9', disabled: false } }] } }, sets: {}, keys: {}, counters: null });
+    assert.equal(set.status, 200);
+    assert.equal((await login(b.base, SALES.username, 'Brand-New-Pass-9')).status, 200);
+    assert.equal((await data(b.base, tb2)).users.find(x => x.username === SALES.username).passwordMissing, undefined);
   } finally { await a.stop(); await b.stop(); }
 });
 

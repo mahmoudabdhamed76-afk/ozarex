@@ -278,25 +278,30 @@ const server = http.createServer(async (req, res) => {
         if (!b || typeof b !== 'object' || !b.ops || typeof b.ops !== 'object') return sendJSON(res, 400, { error: 'bad_request' });
         if (opSeen(b.opId)) return sendJSON(res, 200, { ok: true, dup: true, version: _dataVersion });
         const prev = _dataVersion;
+        let out;
         try {
-          store.apply(me, b.ops);
+          out = store.apply(me, b.ops);
           opDone(b.opId);
         } catch (e) {
-          if (e instanceof store.Refused) return sendJSON(res, 403, Object.assign({ error: e.code, message: e.message }, e.extra));
+          if (e instanceof store.Refused) return sendJSON(res, e.status || 403, Object.assign({ error: e.code, message: e.message }, e.extra));
           throw e;
         }
         notifyDataChanged({ source: req.headers['x-client-id'] || b.cid || 'unknown', by: me.id });
-        return sendJSON(res, 200, { ok: true, version: _dataVersion, prev });
+        /* «renumbered»: numbers the server changed to keep them unique (extra field — old clients ignore it
+           and still get the new number, because the version jump makes them pull the latest data) */
+        return sendJSON(res, 200, Object.assign({ ok: true, version: _dataVersion, prev }, out && out.renumbered && out.renumbered.length ? { renumbered: out.renumbered } : {}));
       }
       /* full replace — restore / import (admin only) */
       if (pathname === '/api/data' && req.method === 'POST') {
         if (!admin) return adminOnly();
         const body = await readBody(req, 60);
         if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Invalid body' });
+        /* I14 · checked first; nothing is replaced when the file has broken records */
         takeBackup(true);
-        store.full(body);
+        const r = store.restore(body, me);
+        if (r.problems.length) return sendJSON(res, 400, { error: 'invalid_backup', message: 'الملف فيه سجلات ناقصة — مترجعش حاجة', count: r.problems.length, problems: r.problems.slice(0, 20) });
         notifyDataChanged({ source: req.headers['x-client-id'] || 'unknown', type: 'replace' });
-        return sendJSON(res, 200, { ok: true, version: _dataVersion });
+        return sendJSON(res, 200, { ok: true, version: _dataVersion, adminKept: r.adminKept, usersWithoutPassword: r.usersWithoutPassword });
       }
 
       /* live updates */

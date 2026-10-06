@@ -37,11 +37,15 @@ throw-away `DATA_DIR`, so tests never touch your real data and can run in parall
 | `api/backup.test.mjs` | manual + daily backup files, download (and path safety), restore, internal snapshot, reset, large fixture restore + restart |
 | `api/sync.test.mjs` | versions, opId idempotency (also after restart), concurrent balance/quantity deltas, last-write-wins, deleted-meanwhile, live stream (auth, events, refused changes silent, 6-per-user cap), polling fallback |
 | `api/http.test.mjs` | security headers, every page asset exists, service worker headers, SPA fallback, path traversal, brand endpoint, customer portal |
+| `api/integrity.test.mjs` | Phase 1: required fields + DB-refusal rollback (C2), id collisions (I10), unique document numbers (C5), restore safety (I14) |
 | `browser/pages.spec.mjs` | each of the 25 pages: correct title, content rendered, **no JS errors**, injection probes never run |
 | `browser/layout.spec.mjs` | each page: **no horizontal overflow**, no `NaN` / `undefined` printed |
 | `browser/navigation.spec.mjs` | login form, every sidebar item by click, back button, mobile menu, iPhone bottom bar, add-customer form → server, logout |
 | `browser/sync.spec.mjs` | live update from another device, two browsers, offline queue → flush, refused change rolled back, offline reopen |
 | `browser/large.spec.mjs` | large dataset: pages open without errors + timings recorded (baseline) |
+| `browser/phase1.spec.mjs` | Phase 1 from a real browser: UUID ids, backup date, renumbered invoice reaches the device, refused record removed, offline queue not blocked |
+
+Fixed in Phase 1 (markers removed, tests now guard the fix): C2, C5, I10, I14, the «NaN/10/6» backup date.
 
 ## Known bugs (expected to fail today)
 
@@ -53,15 +57,15 @@ the runner prints "fixed? … remove the todo" (API) or Playwright reports
 | ID | Test |
 |---|---|
 | C1 | restricted user downloads costs/users/portal tokens/lock hash; writes expenses & suppliers |
-| C2 | customer/product without name, payment without date → 200 but lost after restart |
 | C3 | no server audit entry; admin can delete audit entries |
 | C4 | large dataset → offline copy not saved |
-| C5 | two invoices with the same number accepted |
-| I10 | re-sent existing id overwrites the record |
 | I11 | logout leaves company data in localStorage |
-| I14 | restore without users locks admin out; backups lose passwords on a new server |
 | new | desktop 1366 px: 10 pages scroll sideways (top bar too wide) |
-| new | security page shows «NaN/10/6» in the backup list (`js/security.js:123`, caused by the `erp-` file-name rename) |
+
+## Server benchmark
+
+`node bench/ops-bench.mjs` — restore / restart / GET /api/data / 200 single saves on the large fixture.
+`node bench/ops-bench.mjs /path/to/other/checkout` runs the same against another version (before/after).
 
 ## Lint ratchet
 

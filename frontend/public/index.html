@@ -9972,7 +9972,7 @@ const OfflineManager = (() => {
      when the connection is back (the server skips one it already has). */
   let _base = null;
   function setBase(d) { try { _base = AXCore.snapshot(d || DB.data, {}); } catch (_) { _base = null; } }
-  function opId() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10); }
+  function opId() { return Date.now().toString(36) + '-' + uid(); }   // unique per change (the server skips an opId it already applied)
 
   async function enqueue(item) {
     const db = await openDB();
@@ -10460,7 +10460,13 @@ function seedData() {
 // local calendar date (was UTC → records after midnight were dated to the previous day in Egypt)
 function dateStr(d) { return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0,10); }
 function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d; }
-function uid() { return Math.random().toString(36).slice(2, 10); }
+/* Phase 1 · I10: record ids are random UUIDs (crypto), not 8 Math.random characters.
+   crypto.randomUUID needs https; on plain http (LAN / Synology) getRandomValues still works. */
+function uid() {
+  try { if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID(); } catch (_) {}
+  try { const a = crypto.getRandomValues(new Uint8Array(16)); return Array.from(a, b => b.toString(16).padStart(2, '0')).join(''); } catch (_) {}
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 12);
+}
 function fmt(n) { return Number(n||0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtCurrency(n) { return fmt(n) + ' ' + (DB.data.settings.currency || 'ج'); }
 function todayStr() { return dateStr(new Date()); }
