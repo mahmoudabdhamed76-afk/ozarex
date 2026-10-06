@@ -1,0 +1,7 @@
+{
+  "no-unused-vars": 13,
+  "no-useless-assignment": 6,
+  "no-useless-escape": 5,
+  "no-prototype-builtins": 1,
+  "no-control-regex": 1
+}

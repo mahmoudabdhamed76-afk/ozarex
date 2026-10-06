@@ -1,0 +1,19 @@
+{
+  "name": "erp-tests",
+  "private": true,
+  "description": "Phase 0 safety net — test-only tooling. Lives outside the app so the deployed runtime (zero dependencies) is unchanged.",
+  "type": "module",
+  "scripts": {
+    "test": "node run-all.mjs",
+    "test:api": "node --test --test-concurrency=4 \"api/*.test.mjs\"",
+    "test:browser": "playwright test",
+    "lint": "node lint/check-syntax.mjs && node lint/run-eslint.mjs",
+    "fixture": "node fixtures/gen-large-dataset.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.56.0",
+    "eslint": "10.12.0",
+    "globals": "17.13.0"
+  }
+}
