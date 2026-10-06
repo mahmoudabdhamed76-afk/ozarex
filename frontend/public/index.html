@@ -9633,7 +9633,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">نظام الحسابات</span></div>
-      <div class="version">الإصدار 1.0</div>
+      <div class="version">الإصدار 1.1</div>
     </footer>
   </div>
 </div>
@@ -11136,48 +11136,36 @@ function notify(opts) {
   const overlay = document.createElement('div');
   overlay.id = 'notify-overlay';
   overlay.className = 'notify-overlay';
+  const kicker = { success:'تمت العملية', error:'محصلش', warning:'تنبيه', info:'معلومة' }[type] || 'تمت العملية';
+  const okText = opts.okText || (type === 'error' ? 'تمام، فهمت' : 'تمام');
   overlay.innerHTML = `
-    <div class="notify-card notify-${type}" role="alertdialog" aria-live="assertive">
-      <button class="notify-close" aria-label="إغلاق">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-
-      <div class="notify-icon-wrap">
-        <span class="notify-icon-glow"></span>
-        <span class="notify-spark"></span><span class="notify-spark"></span><span class="notify-spark"></span>
-        <span class="notify-spark"></span><span class="notify-spark"></span><span class="notify-spark"></span>
-        <span class="notify-icon-ring">
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-            <path d="${t.icon}" class="notify-icon-path"/>
-          </svg>
-        </span>
+    <div class="nk nk-${type}" role="alertdialog" aria-live="assertive" aria-labelledby="nk-t">
+      <div class="nk-band">
+        <span class="nk-orb nk-orb1"></span><span class="nk-orb nk-orb2"></span>
+        <button class="notify-close nk-x" aria-label="إغلاق">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <span class="nk-kick">${kicker}</span>
+        <div class="nk-seal">
+          <svg class="nk-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46"/></svg>
+          <span class="nk-disc">
+            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="${t.icon}" class="nk-path"/></svg>
+          </span>
+        </div>
+        ${autoClose ? `<div class="nk-time"><i id="notify-progress-bar"></i></div>` : ''}
       </div>
-
-      <div class="notify-title">${escapeHtml(title)}</div>
-      ${message ? `<div class="notify-message">${message}</div>` : ''}
-
-      ${showMeta ? `
-      <div class="notify-meta">
-        <div class="notify-meta-row">
-          <span class="notify-meta-label"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> التاريخ</span>
-          <span class="notify-meta-value">${dateStr}</span>
-        </div>
-        <div class="notify-meta-row">
-          <span class="notify-meta-label"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> الوقت</span>
-          <span class="notify-meta-value">${timeStr}</span>
-        </div>
-        <div class="notify-meta-row">
-          <span class="notify-meta-label"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> المستخدم</span>
-          <span class="notify-meta-value">${escapeHtml(userName)}</span>
-        </div>
-      </div>` : ''}
-
-      <button class="notify-ok-btn">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-        حسناً
-      </button>
-
-      ${autoClose ? `<div class="notify-progress"><div class="notify-progress-bar" id="notify-progress-bar"></div></div>` : ''}
+      <div class="nk-body">
+        <div class="nk-title" id="nk-t">${escapeHtml(title)}</div>
+        ${message ? `<div class="nk-msg">${message}</div>` : ''}
+        ${showMeta ? `
+        <div class="nk-perf" aria-hidden="true"></div>
+        <div class="nk-meta">
+          <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>التاريخ</span><b>${dateStr}</b></div>
+          <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>الوقت</span><b>${timeStr}</b></div>
+          <div><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>بواسطة</span><b>${escapeHtml(userName)}</b></div>
+        </div>` : ''}
+        <button class="notify-ok-btn nk-ok">${escapeHtml(okText)}</button>
+      </div>
     </div>
   `;
   document.body.appendChild(overlay);
@@ -26414,8 +26402,32 @@ function exportSuppliersCSV() {
 </nav>
 
 <!-- AI FAB — floating on dashboard -->
-<button id="ai-fab" onclick="navigate('aiassistant')" title="المساعد الذكي" aria-label="المساعد الذكي">
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
+<button id="ai-fab" class="axbot ax-hl-off" onclick="navigate('aiassistant')" title="مساعدك الذكي" aria-label="مساعدك الذكي">
+  <span class="axbot-jump">
+    <span class="axbot-tag" aria-hidden="true"><span class="axbot-txt">مساعدك الذكي</span><i class="axbot-caret"></i></span>
+    <span class="axbot-orb">
+      <span class="axbot-gl axbot-gl1"></span><span class="axbot-gl axbot-gl2"></span><span class="axbot-gl axbot-gl3"></span>
+      <svg class="axbot-bot" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <radialGradient id="axbot-ball" cx="38%" cy="32%" r="70%"><stop offset="0" stop-color="#FFF6A8"/><stop offset=".55" stop-color="#FFD83A"/><stop offset="1" stop-color="#F2A900"/></radialGradient>
+          <linearGradient id="axbot-ear" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFC24A"/><stop offset="1" stop-color="#FF8A1E"/></linearGradient>
+          <linearGradient id="axbot-head" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFDF6"/><stop offset="1" stop-color="#FFF0CC"/></linearGradient>
+        </defs>
+        <rect x="31" y="12.5" width="2" height="7.5" rx="1" fill="#4A2E1C"/>
+        <circle class="axbot-ant" cx="32" cy="11" r="4.4" fill="url(#axbot-ball)"/>
+        <rect x="12.5" y="26" width="7.5" height="14" rx="3.6" fill="url(#axbot-ear)"/>
+        <rect x="44" y="26" width="7.5" height="14" rx="3.6" fill="url(#axbot-ear)"/>
+        <rect x="16.5" y="19" width="31" height="26.5" rx="9.5" fill="url(#axbot-head)"/>
+        <rect x="20.8" y="23.4" width="22.4" height="16.8" rx="6.2" fill="#121C22"/>
+        <g class="axbot-face" fill="none" stroke="#45E6B5" stroke-width="2" stroke-linecap="round">
+          <path class="axbot-eye" d="M25.2 32 q2.3 -2.8 4.6 0"/>
+          <path class="axbot-eye" d="M34.2 32 q2.3 -2.8 4.6 0"/>
+          <path d="M29.6 35.2 q2.4 2.2 4.8 0"/>
+        </g>
+      </svg>
+    </span>
+  </span>
+  <span class="axbot-shd" aria-hidden="true"></span>
 </button>
 
 <!-- OFFLINE BANNER -->
@@ -26460,6 +26472,10 @@ function exportSuppliersCSV() {
 <script src="js/auditx.js"></script>
 <script src="js/fxtape.js"></script>
 <script src="js/forcepw.js"></script>
+<script src="js/centerstmt.js"></script>
+<script src="js/navsmart.js"></script>
+<script src="js/deskmore.js"></script>
+<script src="js/aibot.js"></script>
 <script src="js/settingsx.js"></script>
 </body>
 </html>

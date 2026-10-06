@@ -6,7 +6,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 const APP_GLOBALS = Object.fromEntries(['uid', 'userPages', 'currentUser', 'navigate', 'currentPage', 'DB', 'OfflineManager', 'SyncEngine', 'AXCore', 'closeModal', 'openCustomerForm', 'logout',
-  'renderDashboard', 'renderInvoices', 'renderIssuances', 'renderPayments', 'renderCustomers', 'renderReports', 'issuanceFilters', 'AXMarker', 'AX', 'toggleSidebar'].map(n => [n, 'readonly']));
+  'renderDashboard', 'renderInvoices', 'renderIssuances', 'renderPayments', 'renderCustomers', 'renderReports', 'issuanceFilters', 'AXMarker', 'AX', 'toggleSidebar', 'AXA', 'AXStmt', 'AXDeskMore', 'notify'].map(n => [n, 'readonly']));
 
 export default [
   { ignores: ['tests/node_modules/**', 'tests/test-results/**', 'tests/playwright-report/**', 'frontend/public/vendor/**'] },

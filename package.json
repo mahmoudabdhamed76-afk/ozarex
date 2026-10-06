@@ -1,6 +1,6 @@
 {
   "name": "accounts-erp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "نظام الحسابات — إدارة التوريدات والمحاسبة",
   "private": true,
   "main": "backend/server.js",

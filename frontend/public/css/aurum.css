@@ -3599,7 +3599,7 @@ html.aurum #bottom-nav .bn-mine, html.aurum #bottom-nav .bn-more { position: rel
   html.aurum[data-theme="dark"] #bottom-nav .bn-item.active::after { background: #fff; }
   html.aurum #bottom-nav .bn-sell svg { color: var(--ax-gold); }
   html.aurum[data-theme="dark"] #bottom-nav .bn-sell svg { color: #FFBD5C; }
-  html.aurum #ai-fab { display: none !important; }
+  /* 4.22: the floating assistant is back on the phone (dashboard only) */
 
   /* iOS: 16px inputs never zoom the page */
   html.aurum input.form-control, html.aurum select.form-control, html.aurum textarea.form-control, html.aurum #global-search, html.aurum .modal input, html.aurum .modal select, html.aurum .modal textarea { font-size: 16px !important; }
@@ -4325,11 +4325,11 @@ html.aurum .fx-tape .axtk-it small { color: rgba(255, 255, 255, .45); }
 
 /* ════════════════════════════════════════════════════════════════════
    58. 4.20 · القسم المفتوح في القايمة الجانبية = ضربة ماركر (اقتراح ٣)
-   أبيض في الوضع الغامق، كحلي في الفاتح — حواف غير منتظمة، مايلة سنة،
-   وبتترسم من اليمين لما تفتح القسم.
+   4.21: رجع أخضر فسفوري (زي اقتراح ٣) بكلام غامق في الوضعين — حواف غير
+   منتظمة، مايلة سنة، وبتترسم من اليمين لما تفتح القسم.
 ════════════════════════════════════════════════════════════════════ */
-html.aurum { --mkc: 0, 32, 85; }
-html.aurum[data-theme="dark"] { --mkc: 255, 255, 255; }
+html.aurum { --mkc: 74, 222, 128; --mkt: #04210E; }
+html.aurum[data-theme="dark"] { --mkc: 74, 222, 128; }
 html.aurum .nav-item.active {
   background-color: transparent !important;
   background-image:
@@ -4339,10 +4339,11 @@ html.aurum .nav-item.active {
   border-radius: 1.1em .35em 1.2em .4em / .55em 1.2em .5em 1.1em !important;
   transform: rotate(-.6deg);
   box-shadow: none !important;
-  color: var(--ax-on-ink) !important;
+  color: var(--mkt) !important;
   animation: navMk .55s cubic-bezier(.3, .7, .2, 1) both;
 }
-html.aurum .nav-item.active .icon { color: var(--ax-on-ink) !important; background: transparent !important; }
+html.aurum .nav-item.active .icon { color: var(--mkt) !important; background: transparent !important; }
+html.aurum .nav-item.active .icon svg { stroke: currentColor; }
 html.aurum .nav-item.active .badge { transform: rotate(.6deg); }
 @keyframes navMk { from { background-size: 0% 100%, 0% 100%; } to { background-size: 100% 100%, 100% 100%; } }
 @media (prefers-reduced-motion: reduce) { html.aurum .nav-item.active { animation: none; } }
@@ -4375,3 +4376,388 @@ html.aurum .axs-group[data-g="danger"] .card-title { color: var(--ax-bad) !impor
   html.aurum .axs-tab span { margin: 0; font-size: 18px; }
   html.aurum .axs-tab:last-child:nth-child(odd) { grid-column: 1 / -1; }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   60. 4.21 · رسالة «تم بنجاح» بشكل جديد — كارت زي الإيصال
+   شريط ملوّن فوق فيه ختم ✓ بيترسم وحلقة بتلف، والعدّاد خط رفيع تحته؛
+   تحت: العنوان والرسالة، خط مقصوص، والتاريخ/الوقت/المستخدم في 3 مربعات.
+   على الموبايل بيطلع من تحت (قريب من صباعك)، وعلى الكمبيوتر في النص.
+════════════════════════════════════════════════════════════════════ */
+/* the overlay itself — its old rules sat inside an unclosed mobile @media in index.html,
+   so on the computer the message used to drop unstyled at the bottom of the page */
+.notify-overlay { position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(3, 6, 14, 0); opacity: 0; pointer-events: none; -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0);
+  transition: background .25s ease, backdrop-filter .25s ease, opacity .25s ease; }
+.notify-overlay.show { background: rgba(3, 6, 14, .62); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); opacity: 1; pointer-events: auto; }
+.notify-overlay.closing { opacity: 0; background: rgba(3, 6, 14, 0); }
+.nk { --nk1: #12A150; --nk2: #3BD982; --nkr: 18, 161, 80;
+  position: relative; width: 100%; max-width: 384px; border-radius: 28px; overflow: hidden;
+  background: var(--ax-surface, #121212); color: var(--ax-text, #fff); font-family: var(--ax-font, system-ui);
+  box-shadow: 0 34px 80px -20px rgba(0, 0, 0, .65), 0 0 0 1px rgba(255, 255, 255, .06);
+  transform: translateY(26px) scale(.95); opacity: 0;
+  transition: transform .46s cubic-bezier(.22, 1.3, .36, 1), opacity .22s ease; }
+html[data-theme="light"] .nk, html.aurum[data-theme="light"] .nk { box-shadow: 0 34px 80px -24px rgba(0, 32, 85, .45), 0 0 0 1px rgba(0, 32, 85, .06); }
+.nk-error   { --nk1: #DC2626; --nk2: #FB7185; --nkr: 220, 38, 38; }
+.nk-warning { --nk1: #D97706; --nk2: #FBBF24; --nkr: 217, 119, 6; }
+.nk-info    { --nk1: #2563EB; --nk2: #60A5FA; --nkr: 37, 99, 235; }
+.notify-overlay.show .nk { transform: none; opacity: 1; }
+.notify-overlay.closing .nk { transform: translateY(18px) scale(.97); opacity: 0; transition-duration: .22s; }
+
+.nk-band { position: relative; height: 138px; display: grid; place-items: center; overflow: hidden; color: #fff;
+  background: radial-gradient(120% 90% at 85% 0%, rgba(255, 255, 255, .28), transparent 55%), linear-gradient(140deg, var(--nk1), var(--nk2)); }
+.nk-orb { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, .14); pointer-events: none; }
+.nk-orb1 { width: 150px; height: 150px; left: -46px; bottom: -70px; }
+.nk-orb2 { width: 74px; height: 74px; right: 22%; top: -34px; background: rgba(255, 255, 255, .1); }
+.nk-kick { position: absolute; top: 14px; inset-inline-start: 16px; padding: 4px 11px; border-radius: 99px; background: rgba(255, 255, 255, .2);
+  font: 800 12px var(--ax-font, system-ui); letter-spacing: .2px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.nk-x { position: absolute; top: 11px; inset-inline-end: 11px; width: 32px; height: 32px; border: 0; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(255, 255, 255, .2); color: #fff; cursor: pointer; transition: background .15s; }
+.nk-x:hover { background: rgba(255, 255, 255, .32); }
+.nk-seal { position: relative; width: 88px; height: 88px; margin-top: 16px; }
+.nk-ring { position: absolute; inset: 0; width: 100%; height: 100%; animation: nkSpin 9s linear infinite; }
+.nk-ring circle { fill: none; stroke: rgba(255, 255, 255, .6); stroke-width: 2.5; stroke-dasharray: 5 7; stroke-linecap: round; }
+.nk-disc { position: absolute; inset: 11px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: var(--nk1);
+  box-shadow: 0 12px 26px -6px rgba(0, 0, 0, .35), inset 0 -3px 0 rgba(0, 0, 0, .06); animation: nkPop .5s cubic-bezier(.34, 1.56, .64, 1) .08s both; }
+.nk-path { stroke-dasharray: 90; stroke-dashoffset: 90; animation: nkDraw .45s ease .38s forwards; }
+.nk-time { position: absolute; inset-inline: 0; bottom: 0; height: 4px; background: rgba(0, 0, 0, .16); }
+.nk-time i { display: block; height: 100%; width: 100%; background: rgba(255, 255, 255, .9); border-radius: 0 4px 4px 0; }
+
+.nk-body { padding: 18px 20px 20px; text-align: center; }
+.nk-title { font: 800 22px/1.3 var(--ax-display, var(--ax-font, system-ui)); color: var(--ax-text, #fff); animation: nkUp .4s ease .12s both; }
+.nk-msg { margin-top: 6px; font-size: 14.5px; line-height: 1.75; font-weight: 600; color: var(--ax-muted, #9E9E9E); animation: nkUp .4s ease .18s both; }
+.nk-msg b { color: var(--ax-text, #fff); }
+.nk-perf { position: relative; height: 0; margin: 16px -20px 14px; border-top: 2px dashed var(--ax-line-2, #333); }
+.nk-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; animation: nkUp .4s ease .24s both; }
+.nk-meta > div { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; padding: 10px 6px 9px; border-radius: 16px;
+  background: var(--ax-surface-2, #1A1A1A); }
+.nk-meta svg { color: var(--nk1); margin-bottom: 1px; }
+html.aurum[data-theme="dark"] .nk-meta svg { color: var(--nk2); }
+.nk-meta span { font-size: 11px; font-weight: 700; color: var(--ax-faint, #6E6E6E); }
+.nk-meta b { max-width: 100%; font-size: 13px; font-weight: 800; color: var(--ax-text, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; direction: ltr; }
+.nk-meta > div:last-child b { direction: rtl; }
+.nk-ok { margin-top: 16px; width: 100%; height: 52px; border: 0; border-radius: 17px; cursor: pointer;
+  background: linear-gradient(135deg, var(--nk1), var(--nk2)); color: #fff; font: 800 16px var(--ax-font, system-ui);
+  box-shadow: 0 12px 26px -10px rgba(var(--nkr), .75), inset 0 1px 0 rgba(255, 255, 255, .25); transition: filter .15s, transform .12s; }
+.nk-ok:hover { filter: brightness(1.06); }
+.nk-ok:active { transform: scale(.98); }
+@keyframes nkSpin { to { transform: rotate(360deg); } }
+@keyframes nkPop { from { transform: scale(0) rotate(-30deg); } to { transform: none; } }
+@keyframes nkDraw { to { stroke-dashoffset: 0; } }
+@keyframes nkUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (max-width: 560px) {
+  .notify-overlay { align-items: flex-end; padding: 0 10px calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .nk { max-width: 100%; border-radius: 30px; transform: translateY(110%); }
+  .notify-overlay.closing .nk { transform: translateY(110%); opacity: 1; transition: transform .26s ease-in; }
+  .nk-band { height: 128px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nk, .nk-ring, .nk-disc, .nk-path, .nk-title, .nk-msg, .nk-meta { animation: none !important; transition: none !important; }
+  .nk-path { stroke-dashoffset: 0; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   61. 4.21 · الشريط السفلي الذكي (js/navsmart.js)
+   نازل ← بيختفي بهدوء · طالع ← بيرجع فوراً · أول الصفحة ← ظاهر
+════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  html.aurum #bottom-nav, #bottom-nav { transition: transform .28s cubic-bezier(.2, .9, .3, 1), opacity .2s ease, visibility 0s; will-change: transform; }
+  html.bn-hide #bottom-nav, html.aurum.bn-hide #bottom-nav { transform: translate3d(0, calc(100% + 28px), 0); opacity: 0; visibility: hidden; pointer-events: none;
+    transition: transform .42s cubic-bezier(.45, 0, .7, .3), opacity .38s ease, visibility 0s linear .42s; }
+  html.aurum .skc-actions { transition: bottom .32s cubic-bezier(.2, .9, .3, 1); }
+  html.aurum.bn-hide .skc-actions { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); transition: bottom .42s cubic-bezier(.45, 0, .7, .3); }
+}
+@media (prefers-reduced-motion: reduce) { #bottom-nav, html.aurum #bottom-nav { transition-duration: .01ms !important; } }
+
+/* ════════════════════════════════════════════════════════════════════
+   62. 4.21 · «كشف مركز» في التحصيل والمديونيات (js/centerstmt.js)
+════════════════════════════════════════════════════════════════════ */
+html.aurum .axst-open { background: var(--ax-ink) !important; color: var(--ax-on-ink) !important; border: 0 !important; gap: 7px; }
+html.aurum .axst-open svg { flex: none; }
+.axst-sheet .mh-panel.axst { max-height: 90dvh; display: flex; flex-direction: column; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+.axst-in { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.axst-s .axst-in { display: block; }
+.axst-sheet .mh-panel.axst.axst-s { display: block; }
+.axst-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 2px 12px; }
+.axst-tt { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.axst-tt > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.axst-tt b { font: 800 20px var(--ax-display, system-ui); }
+.axst-tt em { font-style: normal; font-size: 12.5px; color: var(--ax-muted, #9E9E9E); }
+.axst-badge { width: 42px; height: 42px; flex: none; display: grid; place-items: center; border-radius: 14px; background: var(--ax-ink, #fff); font-size: 19px; }
+.axst-fld { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 14px; flex: none; cursor: text;
+  background: var(--ax-surface-2, #1A1A1A); border: 1.5px solid var(--ax-ink, #fff); border-radius: 16px; box-shadow: 0 0 0 4px rgba(var(--ax-primary-rgb, 255, 255, 255), .08); }
+.axst-fld .axp-ic { font-size: 17px; opacity: .8; }
+.axst-fld .axp-n { flex: none; color: var(--ax-muted, #9E9E9E); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+#axst-q, html.aurum #axst-q { flex: 1; min-width: 0; height: 100% !important; min-height: 0 !important; border: 0 !important; outline: 0 !important; box-shadow: none !important; border-radius: 0 !important;
+  background: transparent !important; color: var(--ax-text, #fff) !important; font: 600 16px/1 var(--ax-font, system-ui) !important; padding: 0 !important; -webkit-appearance: none; appearance: none; }
+#axst-q::placeholder { color: var(--ax-muted, #9E9E9E); font-weight: 500; }
+#axst-q::-webkit-search-cancel-button { -webkit-appearance: none; }
+.axst-list { flex: 1; min-height: 120px; overflow-y: auto; overscroll-behavior: contain; margin-top: 10px; padding: 6px; border-radius: 22px;
+  background: var(--ax-surface-3, var(--ax-surface, #1E1E1E)); border: 1px solid var(--ax-line-2, #333); }
+.axst-list .axp-row { cursor: pointer; }
+.axst-chev { flex: none; font-size: 20px; color: var(--ax-faint, #6E6E6E); }
+.axst-foot { position: static; border-top: 0; padding: 8px 6px 0; }
+
+.axst-back { border: 0; background: var(--ax-surface-2, #1A1A1A); color: var(--ax-text, #fff); border-radius: 12px; height: 36px; padding: 0 14px; font: 700 13.5px var(--ax-font, system-ui); cursor: pointer; }
+.axst-hero { border-radius: 24px; padding: 16px 16px 14px; color: #fff; position: relative; overflow: hidden;
+  background: radial-gradient(110% 80% at 90% 0%, rgba(255, 255, 255, .18), transparent 60%), linear-gradient(140deg, #B91C1C, #F43F5E); }
+.axst-hero.clear { background: radial-gradient(110% 80% at 90% 0%, rgba(255, 255, 255, .2), transparent 60%), linear-gradient(140deg, #12A150, #3BD982); }
+.axst-who { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+.axst-who b { font: 800 18px var(--ax-display, system-ui); }
+.axst-who em { font-style: normal; font-size: 12.5px; opacity: .85; }
+.axst-lbl { font-size: 12.5px; font-weight: 700; opacity: .9; }
+.axst-big { font: 800 40px/1.1 var(--ax-display, system-ui); font-variant-numeric: tabular-nums; margin: 2px 0 12px; }
+.axst-big small { font: 700 16px var(--ax-font, system-ui); opacity: .85; }
+.axst-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.axst-kpis > div { background: rgba(0, 0, 0, .16); border-radius: 14px; padding: 8px 8px 7px; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.axst-kpis span { font-size: 11px; font-weight: 700; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.axst-kpis b { font: 800 16px var(--ax-display, system-ui); font-variant-numeric: tabular-nums; }
+.axst-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 12px 0 8px; position: sticky; top: -8px; z-index: 2; background: var(--ax-bg, #000); }
+.axst-chips::-webkit-scrollbar { display: none; }
+.axst-chip { flex: none; border: 1px solid var(--ax-line-2, #333); background: transparent; color: var(--ax-text, #fff); border-radius: 999px; height: 36px; padding: 0 14px; font: 700 13px var(--ax-font, system-ui); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.axst-chip i { font-style: normal; font-size: 11.5px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 99px; display: inline-grid; place-items: center; background: var(--ax-surface-2, #1A1A1A); }
+.axst-chip.red i { background: var(--ax-bad-soft, #46212E); color: var(--ax-bad, #FF6B6B); }
+.axst-chip.on { background: var(--ax-ink, #fff); color: var(--ax-on-ink, #000); border-color: transparent; }
+.axst-chip.on i { background: rgba(127, 127, 127, .25); color: inherit; }
+.axst-ops { display: flex; flex-direction: column; gap: 8px; padding-bottom: 6px; }
+.axst-op { background: var(--ax-surface, #121212); border-radius: 18px; padding: 12px 13px; border: 1px solid var(--ax-line, #232323); border-inline-start: 4px solid var(--ax-line-2, #333); }
+.axst-op.st-paid { border-inline-start-color: var(--ax-ok, #5CE89A); }
+.axst-op.st-part { border-inline-start-color: var(--ax-warn, #FFBD5C); }
+.axst-op.st-open { border-inline-start-color: var(--ax-bad, #FF6B6B); }
+.axst-op.axst-pay { border-inline-start-color: var(--ax-ok, #5CE89A); }
+.axst-op-h { display: flex; align-items: center; gap: 8px; }
+.axst-op-h b { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.axst-op-h strong { flex: none; font: 800 17px var(--ax-display, system-ui); font-variant-numeric: tabular-nums; }
+.axst-op-h strong small { font: 600 11.5px var(--ax-font, system-ui); color: var(--ax-muted, #9E9E9E); }
+.axst-pill { flex: none; font-size: 11.5px; font-weight: 800; padding: 3px 9px; border-radius: 99px; }
+.axst-pill.p-ok { background: var(--ax-ok-soft, #173E26); color: var(--ax-ok, #5CE89A); }
+.axst-pill.p-warn { background: var(--ax-warn-soft, #42301A); color: var(--ax-warn, #FFBD5C); }
+.axst-pill.p-bad { background: var(--ax-bad-soft, #46212E); color: var(--ax-bad, #FF6B6B); }
+.axst-op-s { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; font-size: 12.5px; color: var(--ax-muted, #9E9E9E); }
+.axst-it { color: var(--ax-text, #fff); opacity: .8; overflow-wrap: anywhere; }
+.axst-op-b { display: flex; flex-direction: column; gap: 5px; margin-top: 9px; font-size: 12.5px; color: var(--ax-muted, #9E9E9E); }
+.axst-op-b b { color: var(--ax-text, #fff); }
+.axst-bar { display: block; height: 6px; border-radius: 9px; background: var(--ax-bad-soft, #46212E); overflow: hidden; }
+.axst-bar u { display: block; height: 100%; border-radius: inherit; background: var(--ax-ok, #5CE89A); }
+.axst-op.late { box-shadow: 0 0 0 1px var(--ax-bad, #FF6B6B) inset; }
+.axst-acts { position: sticky; bottom: calc(-14px - env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; padding: 10px 0 2px; margin-top: 6px; background: var(--ax-bg, #000); }
+.axst-act { flex: 1; height: 48px; border: 1px solid var(--ax-line-2, #333); border-radius: 15px; background: var(--ax-surface, #121212); color: var(--ax-text, #fff); font: 800 14px var(--ax-font, system-ui); cursor: pointer; white-space: nowrap; }
+.axst-act.ok { background: linear-gradient(135deg, #12A150, #3BD982); color: #fff; border: 0; }
+.axst-act.wa { background: #25D366; color: #06331A; border: 0; }
+@media (min-width: 769px) {
+  .axst-sheet .mh-panel.axst { inset-inline: 0; margin-inline: auto; width: min(620px, calc(100vw - 48px)); bottom: 4vh; max-height: 88vh; border-radius: 28px; }
+}
+@media (min-width: 769px) { .axst-sheet .mh-panel.axst { transform: translateY(calc(100% + 8vh)); } .axst-sheet.show .mh-panel.axst { transform: none; } }
+
+/* ════════════════════════════════════════════════════════════════════
+   63. 4.22 · زرار «المزيد» العايم على الكمبيوتر (js/deskmore.js)
+   + المساعد الذكي العايم رجع على الموبايل في لوحة التحكم
+════════════════════════════════════════════════════════════════════ */
+#ax-more-fab { display: none; }
+@media (min-width: 769px) {
+  #ax-more-fab.show { position: fixed; z-index: 150; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); inset-inline-end: calc(78px + env(safe-area-inset-left, 0px));
+    display: inline-flex; align-items: center; gap: 7px; height: 46px; padding: 0 16px 0 14px; border: 0; border-radius: 99px; cursor: pointer;
+    background: var(--ax-hero-bg, #002055); color: var(--ax-hero-gold, #fff); font: 800 14.5px var(--ax-font, system-ui);
+    box-shadow: 0 0 0 1px rgba(233, 182, 80, .45), 0 12px 30px rgba(0, 0, 0, .35); transition: transform .2s cubic-bezier(.34, 1.56, .64, 1), box-shadow .2s;
+    animation: axMoreIn .35s cubic-bezier(.34, 1.56, .64, 1); }
+  #ax-more-fab.show:hover { transform: translateY(-3px); }
+  #ax-more-fab.show:active { transform: scale(.95); }
+  #ax-more-fab.on { box-shadow: 0 0 0 2px var(--ax-hero-gold, #fff), 0 12px 30px rgba(0, 0, 0, .35); }
+  #ax-more-fab.on svg { transform: rotate(45deg); }
+  #ax-more-fab svg { transition: transform .25s ease; flex: none; }
+  html[data-theme="light"] #ax-more-fab.show { box-shadow: 0 0 0 1px rgba(0, 32, 85, .25), 0 12px 30px rgba(0, 32, 85, .3); }
+
+  /* «المزيد» as a floating panel right above the button */
+  #mh-more.mh-desk .mh-scrim { background: rgba(4, 10, 24, .22); }
+  #mh-more.mh-desk .mh-panel { inset-inline: auto; inset-inline-end: calc(18px + env(safe-area-inset-left, 0px)); bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    width: 430px; max-height: min(76vh, 760px); border-radius: 26px; padding: 14px 16px 16px; border: 1px solid var(--ax-line);
+    transform: translateY(14px) scale(.97); opacity: 0; transform-origin: bottom left; transition: transform .26s cubic-bezier(.22, 1, .36, 1), opacity .18s ease; }
+  [dir="ltr"] #mh-more.mh-desk .mh-panel { transform-origin: bottom right; }
+  #mh-more.mh-desk.show .mh-panel { transform: none; opacity: 1; }
+  #mh-more.mh-desk .mh-grip { display: none; }
+  #mh-more.mh-desk .mh-quick button, #mh-more.mh-desk .mh-all button { transition: background .15s, border-color .15s, transform .12s; }
+  #mh-more.mh-desk .mh-quick button:hover, #mh-more.mh-desk .mh-all button:hover { border-color: var(--tc, var(--ax-line-2)); background: color-mix(in srgb, var(--tc, #888) 8%, var(--ax-surface)); }
+  html.aurum.mh-lock:has(#mh-more.mh-desk.show), html.aurum.mh-lock:has(#mh-more.mh-desk.show) body { overflow: auto !important; }
+}
+@keyframes axMoreIn { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+
+@media (max-width: 768px) {
+  html.aurum #ai-fab.visible { display: flex !important; }
+  html.aurum #ai-fab { inset-inline-end: calc(16px + env(safe-area-inset-left, 0px)) !important; bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important; z-index: 139 !important;
+    transition: bottom .32s cubic-bezier(.2, .9, .3, 1), transform .2s ease, opacity .25s ease !important; }
+  html.aurum.bn-hide #ai-fab { bottom: calc(18px + env(safe-area-inset-bottom, 0px)) !important; transition: bottom .42s cubic-bezier(.45, 0, .7, .3) !important; }
+  html.aurum.mh-lock #ai-fab { opacity: 0; pointer-events: none; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   64. 4.23 · المساعد الذكي العايم = روبوت لطيف في كورة ملونة بتتنطط
+   كل 4.6 ثانية: بيستعد (ينضغط) ← ينط ويلف سنة ← ينزل ويتنطط نطتين
+   صغيرين، وفوقه «مساعدك الذكي» بيتكتب حرف حرف مع النطة (js/aibot.js).
+════════════════════════════════════════════════════════════════════ */
+#ai-fab.axbot, html.aurum #ai-fab.axbot {
+  width: 48px !important; height: 48px !important; padding: 0 !important; border: 0 !important; border-radius: 50% !important;
+  background: transparent !important; box-shadow: none !important; overflow: visible !important; animation: none !important; color: inherit !important;
+  -webkit-tap-highlight-color: transparent; }
+html.aurum #ai-fab.axbot::before, #ai-fab.axbot::before { display: none !important; }
+#ai-fab.axbot:hover { transform: none; }
+#ai-fab.axbot:hover .axbot-orb { filter: brightness(1.06) saturate(1.1); }
+#ai-fab.axbot:active .axbot-orb { transform: scale(.9); animation-play-state: paused; }
+.axbot-jump { position: relative; display: block; width: 100%; height: 100%; animation: axHop 4.6s cubic-bezier(.3, .7, .4, 1) infinite; }
+.axbot-orb { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; overflow: hidden; transform-origin: 50% 100%;
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, .42), transparent 38%),
+    linear-gradient(138deg, #10E4EC 0%, #2FE39A 36%, #DDEB3B 62%, #FFB21F 84%, #FF9417 100%);
+  box-shadow: -5px -2px 16px rgba(16, 228, 236, .5), 6px 5px 18px rgba(255, 160, 30, .55),
+    inset 0 -7px 12px rgba(160, 70, 0, .18), inset 0 4px 8px rgba(255, 255, 255, .4);
+  animation: axSquash 4.6s ease-in-out infinite; transition: filter .2s; }
+.axbot-gl { position: absolute; border-radius: 50%; border: 2px solid transparent; pointer-events: none; }
+.axbot-gl1 { width: 24px; height: 24px; top: 4px; left: 4px; border-top-color: rgba(255, 255, 255, .55); transform: rotate(-38deg); }
+.axbot-gl2 { width: 24px; height: 24px; top: 4px; right: 4px; border-top-color: rgba(255, 255, 255, .45); transform: rotate(40deg); }
+.axbot-gl3 { width: 27px; height: 27px; bottom: 3px; right: 5px; border-bottom-color: rgba(255, 236, 160, .55); transform: rotate(-28deg); }
+.axbot-bot { position: relative; z-index: 1; width: 41px; height: 41px; margin-top: 1px; filter: drop-shadow(0 3px 4px rgba(90, 40, 0, .22)); overflow: visible; }
+.axbot-ant { animation: axAnt 2.3s ease-in-out infinite; transform-origin: 32px 11px; transform-box: view-box; }
+.axbot-face { animation: axFace 4.6s ease-in-out infinite; transform-origin: 32px 32px; transform-box: view-box; }
+.axbot-shd { position: absolute; left: 50%; bottom: -7px; width: 34px; height: 7px; margin-left: -17px; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, .42), transparent); animation: axShd 4.6s ease-in-out infinite; }
+
+/* «مساعدك الذكي» — small pill above, hops with the orb and types itself */
+.axbot-tag { position: absolute; left: -2px; bottom: calc(100% + 7px); transform-origin: 24px 100%; display: inline-flex; align-items: center; gap: 2px;
+  height: 21px; padding: 0 8px; border-radius: 99px; white-space: nowrap; pointer-events: none;
+  background: rgba(10, 14, 22, .9); color: #fff; font: 800 10.5px/1 var(--ax-font, system-ui);
+  box-shadow: 0 0 0 1px rgba(63, 229, 150, .45), 0 6px 16px rgba(0, 0, 0, .35), 0 0 14px rgba(16, 228, 236, .25);
+  transition: opacity .2s, transform .25s cubic-bezier(.34, 1.56, .64, 1); }
+.axbot-tag::after { content: ''; position: absolute; left: 19px; top: 100%; border: 5px solid transparent; border-top-color: rgba(10, 14, 22, .9); }
+.axbot-txt { background: linear-gradient(90deg, #5CF2C2, #E9F25A, #FFC04A); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.axbot-caret { width: 2px; height: 11px; border-radius: 2px; background: #5CF2C2; opacity: 0; }
+.axbot-tag.typing .axbot-caret { opacity: 1; animation: axCaret .5s steps(2) infinite; }
+.axbot-tag.empty { opacity: 0; transform: scale(.6) translateY(6px); transition-duration: .12s; }
+html[data-theme="light"] .axbot-tag { background: #fff; color: #0B1630; box-shadow: 0 0 0 1px rgba(18, 161, 80, .35), 0 6px 16px rgba(0, 32, 85, .2); }
+html[data-theme="light"] .axbot-tag::after { border-top-color: #fff; }
+html[data-theme="light"] .axbot-txt { background: linear-gradient(90deg, #0A9A8F, #12A150, #D07A00); -webkit-background-clip: text; background-clip: text; }
+
+@keyframes axHop {
+  0%, 6% { transform: translateY(0); }
+  15% { transform: translateY(-13px); }
+  21% { transform: translateY(-16px); }
+  29% { transform: translateY(0); }
+  34% { transform: translateY(-5px); }
+  39% { transform: translateY(0); }
+  43% { transform: translateY(-2.5px); }
+  47%, 100% { transform: translateY(0); }
+}
+@keyframes axSquash {
+  0%, 3% { transform: scale(1, 1); }
+  8% { transform: scale(1.12, .86); }
+  14% { transform: scale(.92, 1.1) rotate(-4deg); }
+  19% { transform: scale(.97, 1.04) rotate(-9deg); }
+  24% { transform: scale(1, 1) rotate(6deg); }
+  29% { transform: scale(1.13, .85) rotate(0); }
+  34% { transform: scale(.96, 1.05); }
+  39% { transform: scale(1.06, .94); }
+  44%, 100% { transform: scale(1, 1); }
+}
+@keyframes axShd {
+  0%, 6% { transform: scale(1); opacity: 1; }
+  8% { transform: scale(1.12); opacity: 1; }
+  21% { transform: scale(.5); opacity: .35; }
+  29% { transform: scale(1.15); opacity: 1; }
+  34% { transform: scale(.85); opacity: .75; }
+  39%, 100% { transform: scale(1); opacity: 1; }
+}
+@keyframes axFace { 0%, 12%, 30%, 100% { transform: translateY(0); } 18% { transform: translateY(-1.5px) scale(1.06); } 29% { transform: translateY(1px); } }
+@keyframes axAnt { 0%, 100% { filter: drop-shadow(0 0 2px rgba(255, 220, 60, .6)); } 50% { filter: drop-shadow(0 0 6px rgba(255, 220, 60, 1)); } }
+@keyframes axCaret { 50% { opacity: 0; } }
+
+@media (max-width: 768px) {
+  #ai-fab.axbot, html.aurum #ai-fab.axbot { width: 46px !important; height: 46px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .axbot-jump, .axbot-orb, .axbot-shd, .axbot-face, .axbot-ant { animation: none !important; }
+}
+[dir="ltr"] .axbot-tag { left: auto; right: -2px; transform-origin: calc(100% - 30px) 100%; }
+[dir="ltr"] .axbot-tag::after { left: auto; right: 19px; }
+
+/* ════════════════════════════════════════════════════════════════════
+   65. 4.24 · المساعد الذكي: مربعات الأرقام بتتداس + منطقة الإجابة على قدها
+   على الموبايل: مفيش صندوق طويل فاضي — الردود بتنزل في الصفحة نفسها، وخانة
+   السؤال ثابتة تحت فوق الشريط السفلي (وبتنزل معاه لما يستخبى).
+════════════════════════════════════════════════════════════════════ */
+html.aurum button.axa-kpi { border: 0; cursor: pointer; text-align: start; font: inherit; color: var(--ax-on-deep, #fff); transition: background .15s, transform .12s; -webkit-tap-highlight-color: transparent; }
+html.aurum button.axa-kpi:hover { background: rgba(255, 255, 255, .11); }
+html.aurum button.axa-kpi:active { transform: scale(.97); }
+html.aurum .axa-hero-c .axa-kpi small { display: none; }
+@media (max-width: 768px) {
+  html.aurum .axa-hero-c .axa-kpi small { display: block; font-size: 10.5px; opacity: .85; max-width: 100%; }
+  html.aurum .axa-hero-c .axa-kpi b { font-size: 15px; }
+
+  html.aurum .axa-chat { height: auto !important; min-height: 0 !important; overflow: visible !important; }
+  html.aurum .axa-chat .axa-msgs, html.aurum .axa-msgs { flex: none !important; height: auto !important; min-height: 0 !important; max-height: none !important; overflow: visible !important; padding: 12px 10px 4px !important; gap: 10px; }
+  html.aurum .axa-empty { font-size: 13px; line-height: 1.7; }
+  html.aurum .axa-empty p { padding: 9px 12px; }
+  html.aurum .axa-msg { gap: 0; scroll-margin-top: 140px; }
+  html.aurum .axa-msgs .axa-msg.bot:not(.axa-thinking) > .axa-mark, html.aurum .axa-empty .axa-mark { display: none; }
+  html.aurum .axa-msg.me .axa-bubble { font-size: 14px; padding: 8px 14px; border-radius: 16px 16px 4px 16px; }
+  html.aurum .axa-slip { padding: 12px 13px 12px; border-radius: 18px; max-width: 100%; }
+  html.aurum .axa-slip > header { gap: 10px; margin-bottom: 8px; }
+  html.aurum .axa-slip > header b { font-size: 16.5px; }
+  html.aurum .axa-slip.short > header b { font-size: 18px; }
+  html.aurum .axa-ledger > div { padding: 4px 0; }
+  html.aurum .axa-ledger dt { font-size: 13px; }
+  html.aurum .axa-ledger dd { font-size: 14.5px; }
+  html.aurum .axa-ledger .big dd { font-size: 19px; }
+  html.aurum .axa-follow { margin: 2px 0 6px; }
+  html.aurum .axa-chat .axa-composer { position: sticky !important; bottom: calc(78px + env(safe-area-inset-bottom, 0px)); z-index: 30; margin: 6px 8px 8px !important;
+    border-radius: 18px !important; border-top: 0 !important; background: var(--ax-surface) !important; box-shadow: 0 0 0 1px var(--ax-line-2), 0 10px 26px -8px rgba(0, 0, 0, .45) !important;
+    transition: bottom .32s cubic-bezier(.2, .9, .3, 1); }
+  html.aurum.bn-hide .axa-chat .axa-composer { bottom: calc(10px + env(safe-area-inset-bottom, 0px)); transition: bottom .42s cubic-bezier(.45, 0, .7, .3); }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   66. 4.25 · الرد بيتكتب بسرعة زي الآلة الكاتبة — بنفس ألوان «مساعدك الذكي»
+   العنوان فاضل بالألوان دي على طول، والباقي ملوّن وهو بيتكتب وبعدين يرجع عادي.
+════════════════════════════════════════════════════════════════════ */
+html.aurum { --axg: linear-gradient(90deg, #5CF2C2, #E9F25A 55%, #FFC04A); }
+html.aurum[data-theme="light"] { --axg: linear-gradient(90deg, #0A9A8F, #12A150 55%, #D07A00); }
+html.aurum .axa-slip > header b { background: var(--axg); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+/* 4.25.1: the whole answer keeps these colors (not just while it types) */
+html.aurum .axa-slip :is(header div > span, dt, dd, .l, .v, small, h4, .axa-note, .m b, .m small, li em, p) {
+  background: var(--axg); -webkit-background-clip: text; background-clip: text; color: transparent !important; -webkit-text-fill-color: transparent; }
+html.aurum .axa-slip dd em { -webkit-text-fill-color: currentColor; background-clip: border-box; -webkit-background-clip: border-box; }
+html.aurum .axa-slip .axa-ledger dd em.up, html.aurum .axa-slip .axa-ledger dd em.down.inv { background: var(--ax-ok-soft); color: var(--ax-ok) !important; }
+html.aurum .axa-slip .axa-ledger dd em.down, html.aurum .axa-slip .axa-ledger dd em.up.inv { background: var(--ax-bad-soft); color: var(--ax-bad) !important; }
+html.aurum .axa-caret { display: inline-block; width: 2px; height: 1em; margin: 0 1px; vertical-align: -.12em; border-radius: 2px; background: #5CF2C2; animation: axCaret .45s steps(2) infinite; -webkit-text-fill-color: initial; }
+html.aurum[data-theme="light"] .axa-caret { background: #12A150; }
+/* bars, spark, buttons and footer show up once the words are in */
+html.aurum .axa-slip.axa-typing .axa-bars .b u { width: 0 !important; }
+html.aurum .axa-slip .axa-bars .b u { transition: width .6s cubic-bezier(.22, 1, .36, 1); }
+html.aurum .axa-slip.axa-typing .axa-spark span { transform: scaleY(0); }
+html.aurum .axa-slip .axa-spark span { transform-origin: bottom; transition: transform .5s cubic-bezier(.22, 1, .36, 1); }
+html.aurum .axa-slip.axa-typing :is(.axa-acts, .axa-rowa, footer, .axa-ledger i, .dot, .axa-ic) { opacity: 0; }
+html.aurum .axa-slip :is(.axa-acts, .axa-rowa, footer, .axa-ledger i, .dot, .axa-ic) { transition: opacity .35s ease; }
+html.aurum .axa-follow.axa-wait { opacity: 0; transform: translateY(6px); pointer-events: none; }
+html.aurum .axa-follow { transition: opacity .35s ease, transform .35s ease; }
+
+/* ════════════════════════════════════════════════════════════════════
+   67. 4.26 · أرقام ردود المساعد = Green Highlighter Marker Effect
+   الإجمالي وكل رقم في الرد (الأرقام اللي على الشمال) عليه ضربة ماركر
+   فسفوري أخضر بتترسم بعد ما الرد يخلص كتابة؛ الكلام فاضل بألوان «مساعدك الذكي».
+════════════════════════════════════════════════════════════════════ */
+html.aurum .axa-slip :is(mark.axa-num, .axa-bars .v, .axa-rows .axa-rowb > em) {
+  --hl: 92, 236, 104; --hlt: #063B1A;
+  display: inline-block; position: relative; line-height: 1.3; margin: 1px -0.06em 0; padding: 0 .32em; white-space: nowrap; max-width: 100%;
+  border-radius: .85em .25em .9em .3em / .4em .9em .35em .8em; transform: rotate(-.6deg);
+  background-color: transparent !important;
+  background-image:
+    linear-gradient(100deg, rgba(var(--hl), .0) 0%, rgba(var(--hl), .82) 3%, rgba(var(--hl), .58) 55%, rgba(var(--hl), .76) 92%, rgba(var(--hl), .14) 100%),
+    linear-gradient(176deg, transparent 0 18%, rgba(var(--hl), .24) 19% 84%, transparent 85%) !important;
+  background-repeat: no-repeat !important; background-position: right center !important; background-size: 100% 100% !important;
+  -webkit-background-clip: border-box !important; background-clip: border-box !important;
+  color: var(--hlt) !important; -webkit-text-fill-color: var(--hlt) !important; font-weight: 800; font-style: normal;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+  transition: background-size .55s cubic-bezier(.3, .7, .2, 1); }
+html.aurum[data-theme="dark"] .axa-slip :is(mark.axa-num, .axa-bars .v, .axa-rows .axa-rowb > em) { --hl: 74, 222, 128; --hlt: #04210E; }
+[dir="ltr"] html.aurum .axa-slip :is(mark.axa-num, .axa-bars .v, .axa-rows .axa-rowb > em) { background-position: left center !important; }
+html.aurum .axa-slip.axa-typing :is(mark.axa-num, .axa-bars .v, .axa-rows .axa-rowb > em) { background-size: 0% 100%, 0% 100% !important; }
+html.aurum .axa-slip .axa-ledger .big mark.axa-num { padding: 0 .36em; }
+html.aurum .axa-slip .axa-rows .axa-rowb > em:empty { display: none; }
+html.aurum .axa-heard { margin: -2px 0 8px; font-size: 12px; opacity: .85; }
+html.aurum .axa-slip mark.axa-num { white-space: normal !important; display: inline !important; line-height: 1.7 !important; }
