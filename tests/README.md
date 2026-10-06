@@ -51,7 +51,7 @@ throw-away `DATA_DIR`, so tests never touch your real data and can run in parall
 | `browser/phase4.spec.mjs` | Phase 4 · sync race: the pull's answer is held inside the page (`installGate`) while the device edits — saved / save-waiting / not-saved edits, several edits, another device during a save, several refresh notices, balance delta applied once, renumbered invoice, offline queue + live refresh (records never vanish). Stress: `npx playwright test browser/phase4.spec.mjs --repeat-each=25` |
 | `browser/phase5.spec.mjs` | Phase 5: long lists in steps (every row arrives in order while scrolling, none missing/twice; refresh keeps the place; filters restart; short lists whole); the incremental highlighter leaves exactly what a full pass would, on all 25 pages |
 | `browser/phase6.spec.mjs` | Phase 6: 1920 / 1600 / 1440 / 1366 / 1280 px — all 25 pages fit (no sideways page scroll), top-bar icons on screen, title not cut, sidebar full + collapsed + menu button, wide tables scroll inside their own box; light theme |
-| `browser/v11.spec.mjs` | Version 1.1 (features of 4.21–4.26): assistant understands everyday questions, «كشف مركز» from payments, floating «المزيد» on the computer (gone after logout), new success card |
+| `browser/v11.spec.mjs` | Version 4.26: assistant understands everyday questions, «كشف مركز» from payments, floating «المزيد» on the computer (gone after logout), new success card |
 | `browser/phase1.spec.mjs` | Phase 1 from a real browser: UUID ids, backup date, renumbered invoice reaches the device, refused record removed, offline queue not blocked |
 
 Fixed in Phase 1 (markers removed, tests now guard the fix): C2, C5, I10, I14, the «NaN/10/6» backup date.
