@@ -1,5 +1,5 @@
 /* Phase 1 regression tests seen from a real browser (old/new client compatibility). */
-import { test, expect, watchErrors } from './fixtures.mjs';
+import { test, expect, watchErrors, unlockSection } from './fixtures.mjs';
 import { login, send, ops, col, adminLogin, req } from '../helpers/api.mjs';
 
 test('I10: new record ids are random UUIDs, also without crypto.randomUUID (plain http)', async ({ app: page }) => {
@@ -18,6 +18,7 @@ test('I10: new record ids are random UUIDs, also without crypto.randomUUID (plai
 test('security page: the backup list shows the real date (no «NaN»)', async ({ app: page }) => {
   await page.waitForTimeout(500);
   await page.evaluate(() => navigate('security'));
+  await unlockSection(page);                                         // 4.27: the section is behind the settings password
   const d = new Date(), want = d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear();
   await expect(page.locator('.sec-files li span').first()).toHaveText(want, { timeout: 10_000 });
   await expect(page.locator('#page-content')).not.toContainText('NaN');

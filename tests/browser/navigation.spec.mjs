@@ -20,7 +20,7 @@ test('sidebar: every item opens its page; back button returns', async ({ app: pa
   const errors = watchErrors(page);
   const mobile = info.project.name === 'iphone';
   const labels = await page.$$eval('#sidebar-nav .nav-item', els => els.map(e => ({ text: e.innerText.trim().split('\n')[0], click: e.getAttribute('onclick') })));
-  expect(labels.length).toBe(25);
+  expect(labels.length).toBe(26);                                  // 4.27: + «المبيعات»
   for (const it of labels) {
     const key = /navigate\('([^']+)'\)/.exec(it.click)[1];
     if (mobile) { await page.click('.topbar .menu-toggle'); await expect(page.locator('#sidebar')).toHaveClass(/open/); }

@@ -70,12 +70,14 @@
   function isOpen() { return Date.now() < openUntil; }
   var KINDS = {
     audit: { title: 'سجل التعديلات مقفول', sub: 'القسم ده ليك انت بس — اكتب كلمة السر عشان تفتحه.', go: 'افتح السجل' },
-    settings: { title: 'الإعدادات مقفولة', sub: 'الإعدادات ليك انت بس — اكتب نفس كلمة سر سجل التعديلات عشان تفتحها.', go: 'افتح الإعدادات' }
+    settings: { title: 'الإعدادات مقفولة', sub: 'الإعدادات ليك انت بس — اكتب نفس كلمة سر سجل التعديلات عشان تفتحها.', go: 'افتح الإعدادات' },
+    security: { title: 'الأمان والنسخ مقفول', sub: 'النسخ الاحتياطي والأمان ليك انت بس — اكتب نفس كلمة سر الإعدادات عشان تفتحه.', go: 'افتح الأمان والنسخ' },
+    users: { title: 'المستخدمين مقفولين', sub: 'إدارة المستخدمين ليك انت بس — اكتب نفس كلمة سر الإعدادات عشان تفتحها.', go: 'افتح المستخدمين' }
   };
   function setupHtml(err) {
     return '<div class="axl"><div class="axl-card' + (err ? ' shake' : '') + '">' +
       '<div class="axl-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.4"/></svg></div>' +
-      '<h2>اعمل كلمة سر للإعدادات والسجل</h2><p>أول مرة بس — الكلمة دي هتقفل «الإعدادات» و«سجل التعديلات» (للمدير بس). اختار كلمة غير كلمة سر الدخول.</p>' +
+      '<h2>اعمل كلمة سر للإعدادات والسجل</h2><p>أول مرة بس — الكلمة دي هتقفل «الإعدادات» و«سجل التعديلات» و«الأمان والنسخ» و«المستخدمين» (للمدير بس). اختار كلمة غير كلمة سر الدخول.</p>' +
       '<form onsubmit="AXAudit.setup(event)" autocomplete="off">' +
         '<input id="axl-pw" class="form-control" type="password" autocomplete="new-password" minlength="6" placeholder="كلمة السر الجديدة (6 حروف على الأقل)" aria-label="كلمة السر الجديدة">' +
         '<input id="axl-pw2" class="form-control" type="password" autocomplete="new-password" minlength="6" placeholder="اكتبها تاني" aria-label="تأكيد كلمة السر" style="margin-top:10px">' +
@@ -126,7 +128,10 @@
       else { if (++bad >= 5) { bad = 0; badUntil = Date.now() + 60e3; } if (root) { root.innerHTML = lockHtml(true, kind); focusPw(); } }
     });
   }
-  function rerender(kind) { if (kind === 'settings') { if (typeof window.renderSettings === 'function') window.renderSettings(); } else render(); }
+  function rerender(kind) {
+    var fn = { settings: 'renderSettings', security: 'renderSecurity', users: 'renderUsers' }[kind];
+    if (fn) { if (typeof window[fn] === 'function') window[fn](); } else render();
+  }
   function lock(kind) { openUntil = 0; rerender(kind); }
   function focusPw() { setTimeout(function () { var i = document.getElementById('axl-pw'); if (i) try { i.focus(); } catch (e) {} }, 60); }
   function changePw() {

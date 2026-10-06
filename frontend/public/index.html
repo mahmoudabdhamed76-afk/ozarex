@@ -9633,7 +9633,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">نظام الحسابات</span></div>
-      <div class="version">الإصدار 4.26</div>
+      <div class="version">الإصدار 4.27</div>
     </footer>
   </div>
 </div>
@@ -10401,6 +10401,7 @@ const SyncEngine = (() => {
       profit:    typeof renderProfit    === 'function' ? renderProfit    : null,
       suppliers: typeof renderSuppliers === 'function' ? renderSuppliers : null,
       issuances: typeof renderIssuances === 'function' ? renderIssuances : null,
+      sales:     typeof renderSales     === 'function' ? renderSales     : null,
       expenses:  typeof renderExpenses  === 'function' ? renderExpenses  : null,
     };
     const fn = R[page];
@@ -10733,6 +10734,7 @@ function userPages(u) {
 }
 function can(page) {
   if (!currentUser) return false;
+  if (page === 'sales') page = 'issuances';      // «المبيعات» shows the issuance records — same right as «صرف الورق»
   const fresh = (DB.data.users || []).find(x => x.id === currentUser.id) || currentUser;   // picks up a change the admin just made
   return userPages(fresh).includes(page);
 }
@@ -11251,6 +11253,7 @@ const NAV_ITEMS = [
   { key: 'customers', label: 'العملاء والمراكز', color: '#8b5cf6', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>', section: 'main' },
   { key: 'invoices', label: 'الفواتير', color: '#06b6d4', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>', section: 'main' },
   { key: 'payments', label: 'التحصيل والمديونيات', color: '#f59e0b', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>', section: 'main' },
+  { key: 'sales', label: 'المبيعات', color: '#2563EB', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="20" x2="6" y2="13"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="18" y1="20" x2="18" y2="9"/></svg>', section: 'main' },
   { key: 'aging', label: 'أعمار الديون', color: '#F43F5E', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>', section: 'main' },
   { key: 'transfers', label: 'التحويلات البنكية', color: '#ec4899', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10h18"/><path d="M3 14h18"/><path d="M5 21V3"/><path d="M19 21V3"/><circle cx="12" cy="12" r="3"/></svg>', section: 'main' },
   { key: 'cheques', label: 'الشيكات', color: '#0891B2', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 10h6M6 14h4M15 14h3"/></svg>', section: 'main' },
@@ -11373,7 +11376,7 @@ function navigate(page, isBack) {
   currentPage = page;
   renderSidebar();
   toggleSidebar(false);
-  const titles = { dashboard:'لوحة التحكم', customers:'العملاء والمراكز', issuances:'صرف الورق للمراكز', forecast:'مواعيد السحب المتوقعة', purchases:'فواتير المشتريات', monthly:'تقرير الشهر والتقفيل', invoices:'الفواتير', payments:'التحصيل والمديونيات', transfers:'التحويلات البنكية', debts:'سداد المديونية', suppliers:'الموردين', inventory:'إدارة المخازن', stock:'مخزوني وجرد', expenses:'المصروفات', reports:'التقارير', aiassistant:'المساعد الذكي', approvals:'طلبات الموافقة', requests:'الطلبات والمقترحات', aging:'أعمار الديون', cheques:'الشيكات', profit:'الأرباح', users:'إدارة المستخدمين', security:'الأمان والنسخ الاحتياطي', audit:'سجل التعديلات الذكي', settings:'الإعدادات' };
+  const titles = { sales:'المبيعات', dashboard:'لوحة التحكم', customers:'العملاء والمراكز', issuances:'صرف الورق للمراكز', forecast:'مواعيد السحب المتوقعة', purchases:'فواتير المشتريات', monthly:'تقرير الشهر والتقفيل', invoices:'الفواتير', payments:'التحصيل والمديونيات', transfers:'التحويلات البنكية', debts:'سداد المديونية', suppliers:'الموردين', inventory:'إدارة المخازن', stock:'مخزوني وجرد', expenses:'المصروفات', reports:'التقارير', aiassistant:'المساعد الذكي', approvals:'طلبات الموافقة', requests:'الطلبات والمقترحات', aging:'أعمار الديون', cheques:'الشيكات', profit:'الأرباح', users:'إدارة المستخدمين', security:'الأمان والنسخ الاحتياطي', audit:'سجل التعديلات الذكي', settings:'الإعدادات' };
   document.getElementById('topbar-title').innerText = titles[page] || '';
 
   const pc = document.getElementById('page-content');
@@ -11386,7 +11389,7 @@ function navigate(page, isBack) {
   }
 
   const doRender = () => {
-    const renderers = { dashboard: renderDashboard, customers: renderCustomers, issuances: renderIssuances, invoices: renderInvoices, payments: renderPayments, transfers: renderTransfersPage, debts: (typeof renderDebts === 'function' ? renderDebts : renderDashboard), suppliers: renderSuppliers, inventory: renderInventory, stock: (typeof renderStockHub === 'function' ? renderStockHub : renderDashboard), expenses: renderExpenses, reports: renderReports, aiassistant: renderAIAssistant, approvals: (typeof renderApprovals === 'function' ? renderApprovals : renderDashboard), requests: (typeof renderRequests === 'function' ? renderRequests : renderDashboard), forecast: (typeof renderForecast === 'function' ? renderForecast : renderDashboard), monthly: (typeof renderMonthly === 'function' ? renderMonthly : renderDashboard), purchases: (typeof renderPurchaseInvoices === 'function' ? renderPurchaseInvoices : renderDashboard), aging: (typeof renderAging === 'function' ? renderAging : renderDashboard), cheques: (typeof renderCheques === 'function' ? renderCheques : renderDashboard), profit: (typeof renderProfit === 'function' ? renderProfit : renderDashboard), users: renderUsers, security: (typeof renderSecurity === 'function' ? renderSecurity : renderDashboard), audit: renderAuditLog, settings: renderSettings };
+    const renderers = { sales: (typeof renderSales === 'function' ? renderSales : renderDashboard), dashboard: renderDashboard, customers: renderCustomers, issuances: renderIssuances, invoices: renderInvoices, payments: renderPayments, transfers: renderTransfersPage, debts: (typeof renderDebts === 'function' ? renderDebts : renderDashboard), suppliers: renderSuppliers, inventory: renderInventory, stock: (typeof renderStockHub === 'function' ? renderStockHub : renderDashboard), expenses: renderExpenses, reports: renderReports, aiassistant: renderAIAssistant, approvals: (typeof renderApprovals === 'function' ? renderApprovals : renderDashboard), requests: (typeof renderRequests === 'function' ? renderRequests : renderDashboard), forecast: (typeof renderForecast === 'function' ? renderForecast : renderDashboard), monthly: (typeof renderMonthly === 'function' ? renderMonthly : renderDashboard), purchases: (typeof renderPurchaseInvoices === 'function' ? renderPurchaseInvoices : renderDashboard), aging: (typeof renderAging === 'function' ? renderAging : renderDashboard), cheques: (typeof renderCheques === 'function' ? renderCheques : renderDashboard), profit: (typeof renderProfit === 'function' ? renderProfit : renderDashboard), users: renderUsers, security: (typeof renderSecurity === 'function' ? renderSecurity : renderDashboard), audit: renderAuditLog, settings: renderSettings };
     (renderers[page] || renderDashboard)();
     updateBackButton();
     updateHomeFab();
@@ -22558,7 +22561,7 @@ function _stepWatch(st, list, rowFn, after) {
   if (st.obs) { st.obs.disconnect(); st.obs = null; }
   const mark = document.getElementById(st.mark);
   if (!mark) return;
-  const tbody = document.querySelector('#page-content .data-table tbody');
+  const tbody = document.querySelector(st.tbody || '#page-content .data-table tbody');
   const more = () => {
     if (!tbody || !tbody.isConnected || !mark.isConnected) return false;
     const from = tbody.querySelectorAll(':scope > tr').length, to = Math.min(list.length, from + LIST_STEP);
@@ -26477,5 +26480,6 @@ function exportSuppliersCSV() {
 <script src="js/deskmore.js"></script>
 <script src="js/aibot.js"></script>
 <script src="js/settingsx.js"></script>
+<script src="js/sales.js"></script>
 </body>
 </html>

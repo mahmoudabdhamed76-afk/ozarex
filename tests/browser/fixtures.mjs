@@ -5,10 +5,10 @@ import { XSS } from '../fixtures/gen-large-dataset.mjs';
 
 export { expect, ADMIN_PASSWORD, SALES, CLERK };
 
-/* the 25 pages and the title each one must show in the top bar */
+/* the 26 pages and the title each one must show in the top bar (4.27: + «المبيعات») */
 export const PAGES = {
   dashboard: 'لوحة التحكم', customers: 'العملاء والمراكز', issuances: 'صرف الورق للمراكز', forecast: 'مواعيد السحب المتوقعة',
-  invoices: 'الفواتير', payments: 'التحصيل والمديونيات', aging: 'أعمار الديون', transfers: 'التحويلات البنكية', cheques: 'الشيكات',
+  invoices: 'الفواتير', payments: 'التحصيل والمديونيات', sales: 'المبيعات', aging: 'أعمار الديون', transfers: 'التحويلات البنكية', cheques: 'الشيكات',
   debts: 'سداد المديونية', suppliers: 'الموردين', purchases: 'فواتير المشتريات', inventory: 'إدارة المخازن', stock: 'مخزوني وجرد',
   expenses: 'المصروفات', reports: 'التقارير', monthly: 'تقرير الشهر والتقفيل', profit: 'الأرباح', aiassistant: 'المساعد الذكي',
   approvals: 'طلبات الموافقة', requests: 'الطلبات والمقترحات', users: 'إدارة المستخدمين', audit: 'سجل التعديلات الذكي',
@@ -172,3 +172,15 @@ export const heldCount = (page, kind) => page.evaluate(k => window.__gate.waitin
 export const gateStats = page => page.evaluate(() => JSON.parse(JSON.stringify({ held: window.__gate.held, started: window.__gate.started, done: window.__gate.done })));
 /* lets every held response through (and keeps letting through whatever arrives while `kind` is still held, if on=false) */
 export const releaseAll = (page, kind) => page.evaluate(k => { const w = window.__gate.waiting[k].splice(0); w.forEach(f => f()); return w.length; }, kind);
+
+/* 4.27 · «الإعدادات» «سجل التعديلات» «الأمان والنسخ» «المستخدمين» share one password. On a locked page: the first time
+   it is created, later it is typed (same worker server → same password). */
+export const LOCK_PW = 'Lock-Test-Pass-1';
+export async function unlockSection(page) {
+  await page.waitForSelector('#axl-pw', { timeout: 10_000 });
+  if (await page.locator('#axl-pw2').count()) {
+    await page.fill('#axl-pw', LOCK_PW); await page.fill('#axl-pw2', LOCK_PW);
+  } else await page.fill('#axl-pw', LOCK_PW);
+  await page.click('.axl-go');
+  await page.waitForFunction(() => !document.getElementById('axl-pw'), null, { timeout: 10_000 });
+}

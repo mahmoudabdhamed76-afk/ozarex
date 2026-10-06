@@ -57,8 +57,12 @@ test('matrix: role pages and admin-only pages are the same as the browser (index
 test('matrix: every page in the menu has a policy, every policy names real collections', () => {
   const html = readFileSync(path.join(ROOT, 'frontend', 'public', 'index.html'), 'utf8');
   const nav = [...html.slice(html.indexOf('const NAV_ITEMS'), html.indexOf('const SECTIONS')).matchAll(/key: '([a-z]+)'/g)].map(m => m[1]);
-  assert.equal(nav.length, 25);
-  for (const k of nav) assert.ok(P.POLICY[k] || P.ADMIN_ONLY_PAGES.includes(k), 'no policy for page ' + k);
+  /* 4.27: «المبيعات» is a view of the issuance records — the browser maps it to «صرف الورق» (same right, same data),
+     so the server policy that covers it is the issuances one */
+  const VIEWS = { sales: 'issuances' };
+  assert.equal(nav.length, 26);
+  assert.match(html, /if \(page === 'sales'\) page = 'issuances';/, 'the browser maps «المبيعات» to «صرف الورق»');
+  for (const k of nav) { const real = VIEWS[k] || k; assert.ok(P.POLICY[real] || P.ADMIN_ONLY_PAGES.includes(real), 'no policy for page ' + k); }
   for (const [k, pol] of Object.entries(P.POLICY)) {
     for (const c of (pol.read || []).concat(Object.keys(pol.write || {}))) assert.ok(P.COLLECTIONS.includes(c), k + ' → ' + c);
   }

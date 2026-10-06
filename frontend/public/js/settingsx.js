@@ -89,4 +89,23 @@
     window.renderSettings = w;
   }
   window.AXSettings = { tab: function (k) { setTab(k); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {} } };
+
+  /* «الأمان والنسخ» و«المستخدمين» — same lock as the settings and the audit log
+     (one password, one unlock opens all four for 10 minutes; admin only) */
+  [['renderSecurity', 'security'], ['renderUsers', 'users']].forEach(function (x) {
+    var fn = x[0], kind = x[1], o = window[fn];
+    if (typeof o !== 'function' || o._axlk) return;
+    var w = function () {
+      var r = o.apply(this, arguments);
+      (window.queueMicrotask || function (f) { Promise.resolve().then(f); })(function () {
+        if (typeof currentPage !== 'undefined' && currentPage !== kind) return;
+        var root = document.getElementById('page-content'); if (!root || !window.AXLock) return;
+        if (!AXLock.isOpen()) { root.innerHTML = AXLock.html(false, kind); AXLock.focus(); return; }
+        AXLock.touch();
+      });
+      return r;
+    };
+    w._axlk = true;
+    window[fn] = w;
+  });
 })();

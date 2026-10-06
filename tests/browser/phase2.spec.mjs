@@ -18,8 +18,10 @@ for (const [who, cred] of Object.entries(USERS)) {
     const pages = await page.evaluate(() => (typeof userPages === 'function' ? userPages((DB.data.users || []).find(u => u.id === currentUser.id) || currentUser) : []));
     expect(pages.length).toBeGreaterThan(2);
     const sidebar = await page.$$eval('#sidebar-nav .nav-item', els => els.map(e => /navigate\('([^']+)'\)/.exec(e.getAttribute('onclick'))[1]));
-    expect(sidebar.sort()).toEqual(pages.slice().sort());
-    for (const k of pages) {
+    /* 4.27: «المبيعات» shows the issuance records → it is in the menu of whoever has «صرف الورق» */
+    const expected = pages.concat(pages.includes('issuances') ? ['sales'] : []);
+    expect(sidebar.sort()).toEqual(expected.sort());
+    for (const k of expected) {
       await page.evaluate(k => navigate(k), k);
       await page.waitForFunction(k => currentPage === k, k);
       await page.waitForTimeout(500);
