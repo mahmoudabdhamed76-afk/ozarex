@@ -85,14 +85,36 @@
     var on = F.sort === k, arrow = '<i class="sl-sort' + (on ? (F.dir > 0 ? ' up' : ' down') : '') + '" aria-hidden="true"></i>';
     return '<th class="sl-th-s' + (on ? ' on' : '') + (cls ? ' ' + cls : '') + '" onclick="AXSales.sort(\'' + k + '\')" aria-sort="' + (on ? (F.dir > 0 ? 'ascending' : 'descending') : 'none') + '"><span>' + label + arrow + '</span></th>';
   }
+  function sortBtn(k, label) {
+    var on = F.sort === k;
+    return '<button type="button" class="sl-sb' + (on ? ' on' : '') + '" onclick="AXSales.sort(\'' + k + '\')" aria-pressed="' + on + '">' + label + '<i class="sl-sort' + (on ? (F.dir > 0 ? ' up' : ' down') : '') + '" aria-hidden="true"></i></button>';
+  }
   function periodOptions() {
     return PERIODS.map(function (p) { return '<option value="' + p[0] + '"' + (F.period === p[0] ? ' selected' : '') + '>' + p[1] + '</option>'; }).join('');
   }
 
-  /* ── one row ── */
-  function rowM(i) {
-    return '<tr onclick="AXSales.open(\'' + esc(i.id) + '\')"><td class="sl-no">#' + esc(i.number) + '</td><td class="sl-dt">' + esc(i.date) + '</td>' +
-      '<td class="sl-cu">' + esc(i.customerName) + '</td><td class="sl-pr">' + esc(i.productName) + '</td><td class="sl-q">' + num(i.quantity) + '</td></tr>';
+  /* ── phone: one card per sale — a sale with several paper types (same number, center and day) is one card ── */
+  function qty(n) { n = N(n); var w = Math.abs(n - Math.round(n)) < 0.005; return n.toLocaleString('en-US', { minimumFractionDigits: w ? 0 : 2, maximumFractionDigits: w ? 0 : 2 }); }
+  function groups(l) {
+    var by = {}, out = [];
+    l.forEach(function (i) {
+      var k = String(i.number) + '|' + (i.customerId || i.customerName) + '|' + i.date, g = by[k];
+      if (!g) { g = by[k] = { id: i.id, number: i.number, date: i.date, customerName: i.customerName, total: 0, paid: 0, items: [] }; out.push(g); }
+      g.total += N(i.total); g.paid += N(i.paid);
+      g.items.push({ name: i.productName, q: N(i.quantity), unit: i.unit || i.productUnit || '' });
+    });
+    if (F.sort === 'qty') out.sort(function (a, b) { var x = a.items.reduce(function (s, t) { return s + t.q; }, 0), y = b.items.reduce(function (s, t) { return s + t.q; }, 0); return (x - y) * F.dir; });
+    return out;
+  }
+  function rowM(g) {
+    var rem = g.total - g.paid, st = g.paid <= 0.005 ? 'un' : rem > 0.005 ? 'part' : 'ok';
+    return '<div class="sl-row" role="button" tabindex="0" onclick="AXSales.open(\'' + esc(g.id) + '\')">' +
+      '<div class="sl-r-top ax-hl-off"><span class="sl-dot sl-' + st + '" title="' + (st === 'ok' ? 'مدفوعة' : st === 'part' ? 'مدفوعة جزئياً' : 'مش مدفوعة') + '"></span>' +
+        '<b class="sl-no">#' + esc(g.number) + '</b><span class="sl-dt">' + esc(g.date) + '</span><span class="sl-amt">' + money(g.total) + '</span></div>' +
+      '<div class="sl-r-cu ax-hl-off">' + esc(g.customerName) + '</div>' +
+      '<div class="sl-r-items">' + g.items.map(function (t) {
+        return '<div class="sl-it"><span class="sl-pr ax-hl-off">' + esc(t.name) + '</span><span class="sl-qw"><b class="sl-q">' + qty(t.q) + '</b><small class="ax-hl-off">' + esc(t.unit) + '</small></span></div>';
+      }).join('') + '</div></div>';
   }
   function rowD(i, ctx) {
     var rem = N(i.total) - N(i.paid);
@@ -118,20 +140,23 @@
     var l = list(), total = 0, paid = 0;
     l.forEach(function (i) { total += N(i.total); paid += N(i.paid); });
     var key = JSON.stringify([F.period, F.from, F.to, F.q, F.customerId, F.productId, F.sort, F.dir, mobile()]);
-    var shown = (typeof _stepCount === 'function') ? _stepCount(steps, l, key) : l.length;
+    var items = mobile() ? groups(l) : l;                                       // phone: one card per sale
+    var shown = (typeof _stepCount === 'function') ? _stepCount(steps, items, key) : items.length;
     var ctx = { canEdit: role() === 'admin' || role() === 'accountant' };
-    var head = mobile() ? mHead(l, total) : dHead(l, total, paid);
-    var rows = l.slice(0, shown).map(mobile() ? rowM : function (i) { return rowD(i, ctx); }).join('');
-    var empty = '<tr class="sl-empty"><td colspan="' + (mobile() ? 5 : 9) + '"><div class="empty-state"><div class="icon">📊</div><p>مفيش مبيعات في ' + esc(F.period === 'all' ? 'البرنامج لسه' : 'الفترة دي') + '</p>' +
-      '<button class="btn btn-primary" style="margin-top:12px" onclick="AXSales.add()">مبيعات جديدة</button></div></td></tr>';
-    root.innerHTML = head.replace('%ROWS%', function () { return l.length ? rows : empty; }) + ((typeof _stepMark === 'function') ? _stepMark(steps, l) : '');
-    if (typeof _stepWatch === 'function') _stepWatch(steps, l, mobile() ? rowM : function (i) { return rowD(i, ctx); });
+    var head = mobile() ? mHead(items, total) : dHead(l, total, paid);
+    var rowFn = mobile() ? rowM : function (i) { return rowD(i, ctx); };
+    var rows = items.slice(0, shown).map(rowFn).join('');
+    var msg = '<div class="empty-state"><div class="icon">📊</div><p>مفيش مبيعات في ' + esc(F.period === 'all' ? 'البرنامج لسه' : 'الفترة دي') + '</p>' +
+      '<button class="btn btn-primary" style="margin-top:12px" onclick="AXSales.add()">مبيعات جديدة</button></div>';
+    var empty = mobile() ? '<div class="sl-empty">' + msg + '</div>' : '<tr class="sl-empty"><td colspan="9">' + msg + '</td></tr>';
+    root.innerHTML = head.replace('%ROWS%', function () { return items.length ? rows : empty; }) + ((typeof _stepMark === 'function') ? _stepMark(steps, items) : '');
+    if (typeof _stepWatch === 'function') _stepWatch(steps, items, rowFn);
     wire();
   }
 
   function mHead(l, total) {
-    return '<div class="sl sl-m ax-hl-off">' +
-      '<header class="sl-head">' +
+    return '<div class="sl sl-m">' +
+      '<header class="sl-head ax-hl-off">' +
         '<button type="button" class="sl-new" onclick="AXSales.add()" aria-label="مبيعات جديدة">' + I.plus + '<span class="sl-new-l">مبيعات جديدة</span><span class="sl-new-s">جديدة</span></button>' +
         '<div class="sl-title"><b><i class="sl-bars">' + I.bars + '</i><span>المبيعات</span></b><span>قائمة المبيعات</span></div>' +
         '<div class="sl-tools">' +
@@ -140,19 +165,18 @@
           '<button type="button" class="sl-tool' + (F.search || F.q ? ' on' : '') + '" aria-label="بحث" onclick="AXSales.toggleSearch()">' + I.search + '</button>' +
         '</div>' +
       '</header>' +
-      (F.search || F.q ? '<div class="sl-sbar">' + I.search + '<input id="sl-q" type="search" placeholder="ابحث باسم المركز أو نوع الورق أو الرقم…" value="' + esc(F.q) + '" autocomplete="off"></div>' : '') +
+      (F.search || F.q ? '<div class="sl-sbar ax-hl-off">' + I.search + '<input id="sl-q" type="search" placeholder="ابحث باسم المركز أو نوع الورق أو الرقم…" value="' + esc(F.q) + '" autocomplete="off"></div>' : '') +
       '<section class="sl-sum">' +
-        '<label class="sl-period">' + I.cal + '<select id="sl-period" aria-label="الفترة">' + periodOptions() + '</select>' + (F.period === 'custom' ? '<em>' + esc(periodLabel()) + '</em>' : '') + I.chev + '</label>' +
-        '<div class="sl-total"><span>إجمالي المبيعات <i>' + I.trend + '</i></span><b class="ax-hl-off">' + money(total) + '</b></div>' +
+        '<label class="sl-period ax-hl-off">' + I.cal + '<select id="sl-period" aria-label="الفترة">' + periodOptions() + '</select>' + (F.period === 'custom' ? '<em>' + esc(periodLabel()) + '</em>' : '') + I.chev + '</label>' +
+        '<div class="sl-total"><span class="ax-hl-off">إجمالي المبيعات <i>' + I.trend + '</i></span><b class="sl-total-v">' + money(total) + '</b></div>' +
       '</section>' +
       '<section class="sl-card">' +
-        '<div class="sl-card-h">' +
+        '<div class="sl-card-h ax-hl-off">' +
           '<div class="sl-card-t"><b><i>' + I.doc + '</i><span>قائمة المبيعات</span></b><span>جميع عمليات البيع المسجلة في النظام</span></div>' +
           '<span class="sl-chip">' + I.list + '<span>' + ops(l.length) + '</span></span>' +
         '</div>' +
-        '<div class="sl-tbl-wrap"><table class="sl-tbl"><thead><tr>' +
-          '<th class="sl-th-no">رقم</th>' + sortTh('date', 'التاريخ') + '<th>المركز / العميل</th>' + sortTh('product', 'نوع الورق') + sortTh('qty', 'الكمية') +
-        '</tr></thead><tbody class="sl-rows">%ROWS%</tbody></table></div>' +
+        '<div class="sl-sortbar ax-hl-off" role="group" aria-label="ترتيب"><span>ترتيب:</span>' + sortBtn('date', 'التاريخ') + sortBtn('product', 'نوع الورق') + sortBtn('qty', 'الكمية') + '</div>' +
+        '<div class="sl-rows">%ROWS%</div>' +
       '</section></div>';
   }
 

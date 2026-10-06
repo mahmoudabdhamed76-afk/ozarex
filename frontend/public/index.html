@@ -22564,7 +22564,7 @@ function _stepWatch(st, list, rowFn, after) {
   const tbody = document.querySelector(st.tbody || '#page-content .data-table tbody');
   const more = () => {
     if (!tbody || !tbody.isConnected || !mark.isConnected) return false;
-    const from = tbody.querySelectorAll(':scope > tr').length, to = Math.min(list.length, from + LIST_STEP);
+    const from = tbody.querySelectorAll(':scope > tr, :scope > .sl-row').length, to = Math.min(list.length, from + LIST_STEP);
     tbody.insertAdjacentHTML('beforeend', list.slice(from, to).map(rowFn).join(''));
     st.shown = to;
     if (after) { try { after(); } catch (_) {} }

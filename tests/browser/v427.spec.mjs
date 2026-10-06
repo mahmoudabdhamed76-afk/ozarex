@@ -4,7 +4,10 @@ import { test, expect, openSignedIn, watchErrors, unlockSection, LOCK_PW } from 
 import { login, adminLogin, send, ops, col } from '../helpers/api.mjs';
 
 const isDesktop = () => test.info().project.name === 'desktop';
-const rows = page => page.evaluate(() => Array.from(document.querySelectorAll('#page-content .sl-rows > tr:not(.sl-empty)')).map(tr => tr.children[0].textContent.trim()));
+/* the sale numbers on screen: computer = table rows, phone = one card per sale */
+const rows = page => page.evaluate(() => document.querySelector('#page-content .sl-m')
+  ? Array.from(document.querySelectorAll('#page-content .sl-rows > .sl-row .sl-no')).map(e => e.textContent.trim())
+  : Array.from(document.querySelectorAll('#page-content .sl-rows > tr:not(.sl-empty)')).map(tr => tr.children[0].textContent.trim()));
 
 /* ── locks ── */
 test('«الأمان والنسخ» and «المستخدمين» are locked like the settings; one unlock opens all four', async ({ app: page }) => {
@@ -88,7 +91,9 @@ test.describe('«المبيعات»', () => {
     expect(await rows(page)).not.toContain('#7003');                          // last month
     /* sort by quantity, small → big */
     await page.evaluate(() => { AXSales.sort('qty'); AXSales.sort('qty'); });
-    const q = await page.evaluate(() => Array.from(document.querySelectorAll('#page-content .sl-rows > tr')).map(tr => Number((tr.children[4].textContent.match(/[\d,.]+/) || ['0'])[0].replace(/,/g, ''))));
+    const q = await page.evaluate(() => document.querySelector('#page-content .sl-m')
+      ? Array.from(document.querySelectorAll('#page-content .sl-row')).map(c => Array.from(c.querySelectorAll('.sl-q')).reduce((s, e) => s + Number(e.textContent.replace(/,/g, '')), 0))
+      : Array.from(document.querySelectorAll('#page-content .sl-rows > tr')).map(tr => Number((tr.children[4].textContent.match(/[\d,.]+/) || ['0'])[0].replace(/,/g, ''))));
     expect(q).toEqual(q.slice().sort((a, b) => a - b));
     /* other periods */
     await page.evaluate(() => AXSales.period('last'));
@@ -110,9 +115,14 @@ test.describe('«المبيعات»', () => {
     await expect(page.locator('.sl-m .sl-sum .sl-total')).toContainText('إجمالي المبيعات');
     await expect(page.locator('#sl-period')).toHaveValue('month');
     await expect(page.locator('.sl-m .sl-chip')).toContainText(/عمليات? بيع/);
-    expect(await page.$$eval('.sl-m .sl-tbl thead th', ths => ths.map(t => t.textContent.trim()))).toEqual(['رقم', 'التاريخ', 'المركز / العميل', 'نوع الورق', 'الكمية']);
-    /* the five columns fit the phone (no sideways scroll in the list) */
-    expect(await page.evaluate(() => { const w = document.querySelector('.sl-m .sl-tbl-wrap'); return w.scrollWidth - w.clientWidth; })).toBeLessThanOrEqual(1);
+    expect(await page.$$eval('.sl-m .sl-sortbar .sl-sb', b => b.map(x => x.textContent.trim()))).toEqual(['التاريخ', 'نوع الورق', 'الكمية']);
+    /* one card per sale: number, date, amount, center, and each paper type with its quantity — nothing wider than the phone */
+    const card = page.locator('.sl-m .sl-row').first();
+    for (const sel of ['.sl-no', '.sl-dt', '.sl-amt', '.sl-r-cu', '.sl-it .sl-pr', '.sl-it .sl-q']) await expect(card.locator(sel).first()).toBeVisible();
+    expect(await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - innerWidth)).toBeLessThanOrEqual(1);
+    /* Green Highlighter Marker: the total and the quantities get the green stroke */
+    await expect(page.locator('.sl-m .sl-total-v.ax-hl.hlk-g, .sl-m .sl-total-v .ax-hl.hlk-g').first()).toBeAttached({ timeout: 5000 });
+    await expect(page.locator('.sl-m .sl-q.ax-hl.hlk-g, .sl-m .sl-q .ax-hl.hlk-g').first()).toBeAttached({ timeout: 5000 });
     /* search, filter, calendar */
     await page.click('.sl-m .sl-tool[aria-label="بحث"]');
     await page.fill('#sl-q', '7002');
@@ -128,10 +138,27 @@ test.describe('«المبيعات»', () => {
     await expect(page.locator('#sl-m-from')).toBeVisible();
     await page.evaluate(() => closeModal());
     /* tapping a row opens the sale */
-    await page.locator('.sl-m .sl-rows > tr').first().click();
+    await page.locator('.sl-m .sl-row').first().click();
     await expect(page.locator('#modal-overlay')).toHaveClass(/show|active|open/, { timeout: 5000 });
     await page.evaluate(() => closeModal());
     expect(errors).toEqual([]);
+  });
+
+  test('phone: a sale with two paper types (same number, center and day) is one card with both lines', async ({ app: page }) => {
+    test.skip(isDesktop(), 'phone layout');
+    await page.evaluate(() => {
+      const t = todayStr();
+      DB.data.issuances.push(
+        { id: 'sl_two_a', number: 7300, customerId: 'c1', customerName: 'مركز النور', productId: 'p1', productName: 'Green Tec - Black', quantity: 1, unit: 'علبة', unitPrice: 2500, total: 2500, paid: 0, status: 'unpaid', date: t, createdAt: Date.now(), items: [] },
+        { id: 'sl_two_b', number: 7300, customerId: 'c1', customerName: 'مركز النور', productId: 'p1', productName: 'A3 - Photo ( 200 g ) - AGFA', quantity: 600, unit: 'ورقة', unitPrice: 8.5, total: 5100, paid: 0, status: 'unpaid', date: t, createdAt: Date.now() + 1, items: [] });
+      AXSales.reset(); navigate('sales');
+    });
+    await page.waitForFunction(() => document.querySelector('#page-content .sl-m .sl-row'));
+    expect((await rows(page)).filter(n => n === '#7300').length).toBe(1);
+    const card = page.locator('.sl-m .sl-row', { hasText: '#7300' });
+    expect(await card.locator('.sl-it').count()).toBe(2);
+    await expect(card.locator('.sl-amt')).toContainText('7,600.00');
+    await page.evaluate(() => { DB.data.issuances = DB.data.issuances.filter(i => i.number !== 7300); AXSales.render(); });
   });
 
   test('computer: like «الفواتير» — header, buttons, number boxes, filters, table with actions', async ({ app: page }) => {

@@ -4932,3 +4932,31 @@ html.aurum .sl-m .sl-period select { width: auto !important; min-width: 0 !impor
   .sl-m .sl-tbl td { font-size: 13px; }
   .sl-m .sl-tbl .sl-dt { font-size: 12px; }
 }
+
+/* 4.27.1 · المبيعات على الموبايل: كارت لكل عملية بيع (بدل جدول بيتكسر مع الأسماء الطويلة) + Green Highlighter Marker */
+.sl-m .sl-sortbar { display: flex; align-items: center; gap: 6px; margin: 0 2px 10px; overflow-x: auto; scrollbar-width: none; }
+.sl-m .sl-sortbar::-webkit-scrollbar { display: none; }
+.sl-m .sl-sortbar > span { font: 700 12.5px var(--ax-font); color: var(--ax-muted); flex: none; }
+.sl-m .sl-sb { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--ax-line); background: var(--ax-surface-2); color: var(--ax-text); font: 700 12.5px var(--ax-font); }
+.sl-m .sl-sb.on { border-color: var(--sl-blue-2); color: var(--sl-blue-2); background: color-mix(in srgb, var(--sl-blue-2) 12%, var(--ax-surface)); }
+.sl-m .sl-rows { display: flex; flex-direction: column; gap: 10px; }
+.sl-m .sl-row { padding: 12px 14px; border-radius: 18px; border: 1px solid var(--ax-line); background: var(--ax-surface-2); cursor: pointer;
+  transition: transform .12s ease, border-color .15s; -webkit-tap-highlight-color: transparent; }
+.sl-m .sl-row:active { transform: scale(.985); border-color: var(--ax-line-2); }
+.sl-m .sl-r-top { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.sl-m .sl-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.sl-m .sl-dot.sl-ok { background: var(--ax-ok); } .sl-m .sl-dot.sl-part { background: var(--ax-warn); } .sl-m .sl-dot.sl-un { background: var(--ax-bad); }
+.sl-m .sl-r-top .sl-no { font: 800 15px var(--ax-font); color: var(--ax-text); }
+.sl-m .sl-r-top .sl-dt { font-size: 12.5px; color: var(--ax-muted); }
+.sl-m .sl-r-top .sl-amt { margin-inline-start: auto; font: 700 13.5px var(--ax-font); color: var(--ax-text); white-space: nowrap; }
+.sl-m .sl-r-cu { margin: 6px 0 8px; font: 800 15.5px/1.4 var(--ax-font); color: var(--ax-text); overflow-wrap: anywhere; }
+.sl-m .sl-r-items { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--ax-line); }
+.sl-m .sl-it { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sl-m .sl-it .sl-pr { min-width: 0; font-size: 13.5px; line-height: 1.4; color: var(--ax-muted); overflow-wrap: anywhere; }
+.sl-m .sl-qw { flex: none; display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.sl-m .sl-qw small { font-size: 12px; color: var(--ax-muted); }
+/* green numbers → the app's highlighter (marker.js) draws a green marker stroke behind them */
+.sl-m .sl-q { font: 800 16px var(--ax-font); color: var(--ax-ok); font-variant-numeric: tabular-nums; }
+.sl-m .sl-total-v { color: var(--ax-ok); }
+.sl-m .sl-empty { padding: 8px 0; }
