@@ -140,31 +140,77 @@
   }
 
   /* ════════ scan ════════ */
-  function scanRoot(root, list, btns) {
+  /* list / btns: arrays in document order + Sets for «seen already» (Phase 5: was indexOf → O(n²)) */
+  function addText(n, list, seen) {
+    if (!WORDISH.test(n.nodeValue)) return;
+    var el = n.parentElement; if (!el) return;
+    if (el.classList.contains('ax-hl-in')) el = el.parentElement;
+    if (!el || seen.has(el) || el.matches(BTN) || el.closest(SKIP)) return;
+    seen.add(el); list.push(el);
+  }
+  function addBtn(b, btns, seenB) {
+    if (!seenB.has(b) && !b.closest(BTN_SKIP) && !b.matches('.btn-icon, .voice-mic-btn')) { seenB.add(b); btns.push(b); }
+  }
+  function scanRoot(root, c) {
     var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: function (n) { return WORDISH.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; }
     });
     var n;
-    while ((n = w.nextNode())) {
-      var el = n.parentElement; if (!el) continue;
-      if (el.classList.contains('ax-hl-in')) el = el.parentElement;
-      if (!el || list.indexOf(el) >= 0 || el.matches(BTN) || el.closest(SKIP)) continue;
-      list.push(el);
-    }
-    Array.prototype.forEach.call(root.querySelectorAll(BTN), function (b) {
-      if (btns.indexOf(b) < 0 && !b.closest(BTN_SKIP) && !b.matches('.btn-icon, .voice-mic-btn')) btns.push(b);
+    while ((n = w.nextNode())) addText(n, c.list, c.seen);
+    Array.prototype.forEach.call(root.querySelectorAll(BTN), function (b) { addBtn(b, c.btns, c.seenB); });
+  }
+  function judgeAll(c) {
+    c.btns.forEach(judgeBtn);                                          // buttons first: text inside a stroked button is left alone
+    c.list.forEach(function (el) {
+      if (el.getAttribute('data-hlt') === el.textContent) return;      // unchanged since last time (judge() would stop here too)
+      if (!el.closest('.ax-mkb')) judge(el);
     });
   }
+  function fresh() { return { list: [], btns: [], seen: new Set(), seenB: new Set() }; }
+  /* the whole screen: at start, on a theme switch, or when called from outside (AXMarker.scan) */
   function scan() {
-    timer = 0;
+    timer = 0; pend = []; full = false;
     try {
-      var list = [], btns = [];
-      Array.prototype.forEach.call(document.querySelectorAll(ROOTS), function (r) { scanRoot(r, list, btns); });
-      btns.forEach(judgeBtn);                                          // buttons first: text inside a stroked button is left alone
-      list.forEach(function (el) { if (!el.closest('.ax-mkb')) judge(el); });
+      var c = fresh();
+      Array.prototype.forEach.call(document.querySelectorAll(ROOTS), function (r) { scanRoot(r, c); });
+      judgeAll(c);
     } catch (e) { console.warn('[marker]', e); }
   }
-  function later() { if (!timer) timer = setTimeout(scan, 140); }
+  /* Phase 5 · only what changed since the last pass (the observer's records), not the whole screen again:
+     a list that grows by 150 rows costs 150 rows, not the whole page */
+  var pend = [], full = true;
+  function inRoots(el) { return !!(el && el.closest && el.closest(ROOTS)); }
+  function scanChanged() {
+    if (full) return scan();
+    timer = 0;
+    var work = pend; pend = [];
+    try {
+      var c = fresh();
+      work.forEach(function (x) {
+        var n = x.n;
+        if (!n || !n.isConnected) return;
+        if (x.k === 'btn') {                                           // a button's own state changed → it, then the words inside it
+          if (!inRoots(n)) return;
+          addBtn(n, c.btns, c.seenB); scanRoot(n, c); return;
+        }
+        if (n.nodeType === 3) {                                         // a text node added / edited
+          var p = n.parentElement; if (!p || !inRoots(p)) return;
+          addText(n, c.list, c.seen);
+          var b = p.closest(BTN); if (b) addBtn(b, c.btns, c.seenB);   // words of a button changed
+          return;
+        }
+        if (n.nodeType !== 1) return;
+        if (inRoots(n)) {
+          scanRoot(n, c);
+          var ob = n.parentElement && n.parentElement.closest(BTN); if (ob) addBtn(ob, c.btns, c.seenB);
+          if (n.matches(BTN)) addBtn(n, c.btns, c.seenB);
+        } else Array.prototype.forEach.call(n.querySelectorAll(ROOTS), function (r) { scanRoot(r, c); });   // e.g. a new modal holding a root
+      });
+      judgeAll(c);
+    } catch (e) { console.warn('[marker]', e); }
+  }
+  function later() { if (!timer) timer = setTimeout(scanChanged, 140); }
+  function want(n, k) { pend.push({ n: n, k: k }); if (pend.length > 4000) full = true; later(); }   // a flood of changes → one full pass
   function redraw() {
     if (document.hidden) return;
     Array.prototype.forEach.call(document.querySelectorAll(FORCE_G + ' .ax-hl, ' + FORCE_G + '.ax-hl'), function (h) {
@@ -176,11 +222,16 @@
   function boot() {
     new MutationObserver(function (ms) {
       for (var i = 0; i < ms.length; i++) {
-        var m = ms[i];
-        if (m.type !== 'attributes') { later(); return; }
-        var t = m.target;                                              // a class flip on a tab / toggle (not one of ours)
-        if (m.attributeName === 'aria-selected' && t.matches && t.matches(BTN)) { later(); return; }
-        if (t.matches && t.matches(BTN) && String(t.className).replace(OURS, '').replace(/\s+/g, ' ').trim() !== String(m.oldValue || '').replace(OURS, '').replace(/\s+/g, ' ').trim()) { later(); return; }
+        var m = ms[i], t = m.target;
+        if (m.type === 'characterData') { want(t, 'node'); continue; }
+        if (m.type === 'childList') {
+          for (var a = 0; a < m.addedNodes.length; a++) want(m.addedNodes[a], 'node');
+          if (m.removedNodes.length && !m.addedNodes.length) want(t, 'node');   // words removed: look at what is left
+          continue;
+        }
+        /* a class flip on a tab / toggle (not one of ours) */
+        if (m.attributeName === 'aria-selected' && t.matches && t.matches(BTN)) { want(t, 'btn'); continue; }
+        if (t.matches && t.matches(BTN) && String(t.className).replace(OURS, '').replace(/\s+/g, ' ').trim() !== String(m.oldValue || '').replace(OURS, '').replace(/\s+/g, ' ').trim()) { want(t, 'btn'); continue; }
       }
     }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'disabled', 'aria-selected'], attributeOldValue: true });
     later();
@@ -191,7 +242,7 @@
       var k = tk(); if (k === themeKey) return; themeKey = k;               // only a real theme switch (html also flips other classes)
       inkRGB = null;
       Array.prototype.forEach.call(document.querySelectorAll('[data-hlt],[data-mkt]'), function (e) { e.removeAttribute('data-hlt'); e.removeAttribute('data-mkt'); });
-      later();
+      full = true; later();
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

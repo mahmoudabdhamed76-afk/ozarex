@@ -14899,6 +14899,36 @@ function statusBadge(status) {
    CUSTOMERS PAGE
 ========================================================= */
 let customerSearch = '';
+/* Phase 5 · one customer row (unchanged markup) — the list is shown in steps, see LIST_STEP */
+const _custSteps = { mark: 'cust-more', shown: 0, key: '', obs: null };
+function _custRow(c, ctx) {
+                const overLimit = c.balance > c.creditLimit;
+                return `<tr>
+                  <td><b>${escapeHtml(c.name)}</b><br><small style="color:var(--text-muted)">${escapeHtml(c.address||'')}</small></td>
+                  <td>${escapeHtml(c.company||'-')}</td>
+                  <td>${escapeHtml(c.phone||'-')}</td>
+                  <td>${fmtCurrency(c.creditLimit)}</td>
+                  <td><b style="color:${c.balance>0?'var(--danger)':'var(--success)'}">${fmtCurrency(c.balance)}</b></td>
+                  <td>${overLimit ? '<span class="badge-status badge-unpaid">تجاوز الحد</span>' : c.balance>0 ? '<span class="badge-status badge-partial">له مستحقات</span>' : '<span class="badge-status badge-paid">مسدد</span>'}</td>
+                  <td>
+                    <div class="row-actions">
+                      <button class="btn-icon" title="كشف الحساب" onclick="viewCustomerStatement('${c.id}')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                      </button>
+                      <button class="btn-icon" title="تعديل" onclick="openCustomerForm('${c.id}')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>
+                      ${ctx.canPay ? `<button class="btn-icon" title="تحصيل" onclick="openPaymentForm('${c.id}')" style="color:var(--success)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                      </button>` : ''}
+                      ${ctx.isAdmin ? `<button class="btn-icon" title="حذف" onclick="deleteCustomer('${c.id}')" style="color:var(--danger)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      </button>` : ''}
+                    </div>
+                  </td>
+                </tr>`;
+}
+
 function renderCustomers() {
   const root = document.getElementById('page-content');
   let list = DB.data.customers.slice();
@@ -14910,6 +14940,8 @@ function renderCustomers() {
 
   const totalDebts = DB.data.customers.reduce((s,c)=>s+c.balance, 0);
   const overdue = DB.data.customers.filter(c=>c.balance>0).length;
+  const shown = _stepCount(_custSteps, list, customerSearch || '');
+  const ctx = { canPay: can('payments'), isAdmin: currentUser.role==='admin' };
 
   root.innerHTML = `
     <div class="page-header">
@@ -14956,39 +14988,15 @@ function renderCustomers() {
           </thead>
           <tbody>
             ${list.length === 0 ? '<tr><td colspan="7"><div class="empty-state"><div class="icon">👥</div><p>لا يوجد عملاء</p></div></td></tr>' :
-              list.map(c => {
-                const overLimit = c.balance > c.creditLimit;
-                return `<tr>
-                  <td><b>${escapeHtml(c.name)}</b><br><small style="color:var(--text-muted)">${escapeHtml(c.address||'')}</small></td>
-                  <td>${escapeHtml(c.company||'-')}</td>
-                  <td>${escapeHtml(c.phone||'-')}</td>
-                  <td>${fmtCurrency(c.creditLimit)}</td>
-                  <td><b style="color:${c.balance>0?'var(--danger)':'var(--success)'}">${fmtCurrency(c.balance)}</b></td>
-                  <td>${overLimit ? '<span class="badge-status badge-unpaid">تجاوز الحد</span>' : c.balance>0 ? '<span class="badge-status badge-partial">له مستحقات</span>' : '<span class="badge-status badge-paid">مسدد</span>'}</td>
-                  <td>
-                    <div class="row-actions">
-                      <button class="btn-icon" title="كشف الحساب" onclick="viewCustomerStatement('${c.id}')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                      </button>
-                      <button class="btn-icon" title="تعديل" onclick="openCustomerForm('${c.id}')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                      </button>
-                      ${can('payments') ? `<button class="btn-icon" title="تحصيل" onclick="openPaymentForm('${c.id}')" style="color:var(--success)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                      </button>` : ''}
-                      ${currentUser.role==='admin' ? `<button class="btn-icon" title="حذف" onclick="deleteCustomer('${c.id}')" style="color:var(--danger)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                      </button>` : ''}
-                    </div>
-                  </td>
-                </tr>`;
-              }).join('')
+              list.slice(0, shown).map(c => _custRow(c, ctx)).join('')
             }
           </tbody>
         </table>
       </div>
     </div>
+    ${_stepMark(_custSteps, list)}
   `;
+  _stepWatch(_custSteps, list, c => _custRow(c, ctx));
   document.getElementById('cust-search').addEventListener('input', e => { customerSearch = e.target.value; renderCustomers(); document.getElementById('cust-search').focus(); });
 }
 
@@ -15236,9 +15244,58 @@ function viewCustomerStatement(id) {
    INVOICES PAGE
 ========================================================= */
 let invoiceFilters = { search: '', status: '', from: '', to: '', showArchived: false, customerId: '' };
+/* Phase 5 · one invoice row (unchanged markup) — the list is shown in steps, see LIST_STEP */
+const _invSteps = { mark: 'inv-more', shown: 0, key: '', obs: null };
+function _invRow(inv, custById, ctx) {
+                const c = custById.get(inv.customerId);
+                let badges = '';
+                if (inv.isConsolidated) badges += `<span class="inv-cons-badge" title="${inv.sourceInvoicesCount} فاتورة مجمعة">🧾 مجمعة ×${inv.sourceInvoicesCount}</span>`;
+                if (inv.archived) badges += `<span class="inv-arch-badge" title="مؤرشفة - تم تجميعها في فاتورة #${inv.consolidatedIntoNumber||''}">📦 مؤرشفة</span>`;
+                return `<tr class="${inv.isConsolidated?'inv-row-consolidated':''} ${inv.archived?'inv-row-archived':''}">
+                  <td><b>#${inv.number}</b> ${badges}</td>
+                  <td>${inv.date}</td>
+                  <td>${escapeHtml(c?c.name:'محذوف')}</td>
+                  <td>${inv.items.length}</td>
+                  <td><b>${fmtCurrency(inv.total)}</b></td>
+                  <td style="color:var(--success)">${fmtCurrency(inv.paid)}</td>
+                  <td style="color:${(inv.total-inv.paid)>0?'var(--danger)':'inherit'}">${fmtCurrency(inv.total-inv.paid)}</td>
+                  <td>${statusBadge(inv.status)}</td>
+                  <td>
+                    <div class="row-actions">
+                      <button class="btn-icon" title="عرض" onclick="viewInvoice('${inv.id}')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      </button>
+                      <button class="btn-icon btn-whatsapp" title="إرسال على واتساب" onclick="sendInvoiceWhatsApp('${inv.id}')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
+                        </svg>
+                      </button>
+                      <button class="btn-icon" title="طباعة" onclick="printInvoice('${inv.id}')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                      </button>
+                      ${ctx.canEdit ? `<button class="btn-icon" title="تعديل" onclick="editInvoice('${inv.id}')" style="color:var(--info)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>` : ''}
+                      ${inv.status !== 'paid' && ctx.canPay ? `<button class="btn-icon" title="تحصيل" onclick="openPaymentForm('${inv.customerId}','${inv.id}')" style="color:var(--success)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                      </button>` : ''}
+                      ${inv.isConsolidated && ctx.isAdmin ? `<button class="btn-icon" title="فك التجميع" onclick="unconsolidateInvoice('${inv.id}')" style="color:#7c3aed">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 8l-8 8M8 8l8 8"/><circle cx="12" cy="12" r="10"/></svg>
+                      </button>` : ''}
+                      ${ctx.isAdmin ? `<button class="btn-icon" title="حذف" onclick="deleteInvoice('${inv.id}')" style="color:var(--danger)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      </button>` : ''}
+                    </div>
+                  </td>
+                </tr>`;
+}
+
 function renderInvoices() {
   const root = document.getElementById('page-content');
   let list = DB.data.invoices.slice();
+  /* Phase 5: customers by id, built once (was a .find() per invoice) — the first record wins, like .find() */
+  const custById = new Map();
+  for (const c of DB.data.customers) if (!custById.has(c.id)) custById.set(c.id, c);
 
   // Hide archived (consolidated-source) invoices by default unless toggled
   if (!invoiceFilters.showArchived) {
@@ -15254,7 +15311,7 @@ function renderInvoices() {
     const qRaw = invoiceFilters.search.trim();
     const q = normalizeArabic(qRaw);
     list = list.filter(inv => {
-      const c = DB.data.customers.find(x=>x.id===inv.customerId);
+      const c = custById.get(inv.customerId);
       const numberMatch = String(inv.number).includes(qRaw);
       const nameMatch = c && normalizeArabic(c.name).includes(q);
       const phoneMatch = c && c.phone && c.phone.replace(/\s+/g,'').includes(qRaw.replace(/\s+/g,''));
@@ -15268,6 +15325,8 @@ function renderInvoices() {
 
   const total = list.reduce((s,i)=>s+i.total, 0);
   const paid = list.reduce((s,i)=>s+i.paid, 0);
+  const shown = _stepCount(_invSteps, list, JSON.stringify(invoiceFilters));
+  const ctx = { canEdit: currentUser.role==='admin' || currentUser.role==='accountant', isAdmin: currentUser.role==='admin', canPay: can('payments') };
 
   root.innerHTML = `
     <div class="page-header">
@@ -15345,55 +15404,15 @@ function renderInvoices() {
           </thead>
           <tbody>
             ${list.length === 0 ? '<tr><td colspan="9"><div class="empty-state"><div class="icon">📄</div><p>لا توجد فواتير</p></div></td></tr>' :
-              list.map(inv => {
-                const c = DB.data.customers.find(x=>x.id===inv.customerId);
-                let badges = '';
-                if (inv.isConsolidated) badges += `<span class="inv-cons-badge" title="${inv.sourceInvoicesCount} فاتورة مجمعة">🧾 مجمعة ×${inv.sourceInvoicesCount}</span>`;
-                if (inv.archived) badges += `<span class="inv-arch-badge" title="مؤرشفة - تم تجميعها في فاتورة #${inv.consolidatedIntoNumber||''}">📦 مؤرشفة</span>`;
-                return `<tr class="${inv.isConsolidated?'inv-row-consolidated':''} ${inv.archived?'inv-row-archived':''}">
-                  <td><b>#${inv.number}</b> ${badges}</td>
-                  <td>${inv.date}</td>
-                  <td>${escapeHtml(c?c.name:'محذوف')}</td>
-                  <td>${inv.items.length}</td>
-                  <td><b>${fmtCurrency(inv.total)}</b></td>
-                  <td style="color:var(--success)">${fmtCurrency(inv.paid)}</td>
-                  <td style="color:${(inv.total-inv.paid)>0?'var(--danger)':'inherit'}">${fmtCurrency(inv.total-inv.paid)}</td>
-                  <td>${statusBadge(inv.status)}</td>
-                  <td>
-                    <div class="row-actions">
-                      <button class="btn-icon" title="عرض" onclick="viewInvoice('${inv.id}')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                      </button>
-                      <button class="btn-icon btn-whatsapp" title="إرسال على واتساب" onclick="sendInvoiceWhatsApp('${inv.id}')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893A11.821 11.821 0 0020.885 3.488"/>
-                        </svg>
-                      </button>
-                      <button class="btn-icon" title="طباعة" onclick="printInvoice('${inv.id}')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                      </button>
-                      ${(currentUser.role==='admin' || currentUser.role==='accountant') ? `<button class="btn-icon" title="تعديل" onclick="editInvoice('${inv.id}')" style="color:var(--info)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                      </button>` : ''}
-                      ${inv.status !== 'paid' && can('payments') ? `<button class="btn-icon" title="تحصيل" onclick="openPaymentForm('${inv.customerId}','${inv.id}')" style="color:var(--success)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                      </button>` : ''}
-                      ${inv.isConsolidated && currentUser.role==='admin' ? `<button class="btn-icon" title="فك التجميع" onclick="unconsolidateInvoice('${inv.id}')" style="color:#7c3aed">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M16 8l-8 8M8 8l8 8"/><circle cx="12" cy="12" r="10"/></svg>
-                      </button>` : ''}
-                      ${currentUser.role==='admin' ? `<button class="btn-icon" title="حذف" onclick="deleteInvoice('${inv.id}')" style="color:var(--danger)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                      </button>` : ''}
-                    </div>
-                  </td>
-                </tr>`;
-              }).join('')
+              list.slice(0, shown).map(inv => _invRow(inv, custById, ctx)).join('')
             }
           </tbody>
         </table>
       </div>
     </div>
+    ${_stepMark(_invSteps, list)}
   `;
+  _stepWatch(_invSteps, list, inv => _invRow(inv, custById, ctx));
   // Search input: preserve focus + cursor position after re-render
   const searchInput = document.getElementById('inv-search');
   if (searchInput) {
@@ -22536,6 +22555,89 @@ function exportCSV(type) {
 ========================================================= */
 let issuanceFilters = { search: '', from: '', to: '', customerId: '', productId: '' };
 
+/* Phase 5 · a long list is shown in steps: the first LIST_STEP rows at once, the next ones as the user scrolls
+   near the end (same rows, same markup, same order). 6,000 rows at once = ~230,000 elements = ~20 s of layout.
+   Short lists (≤ 2 steps) are rendered whole, exactly as before. A refresh with the same filters keeps the
+   rows already shown (the user keeps his place); new filters start again from the first step. */
+const LIST_STEP = 150;
+function _stepCount(st, list, key) {
+  const n = list.length <= LIST_STEP * 2 ? list.length : Math.min(list.length, key === st.key && st.shown ? Math.max(st.shown, LIST_STEP) : LIST_STEP);
+  st.key = key; st.shown = n;
+  return n;
+}
+function _stepMark(st, list) { return st.shown < list.length ? '<div id="' + st.mark + '" aria-hidden="true" style="height:1px"></div>' : ''; }
+function _stepWatch(st, list, rowFn, after) {
+  if (st.obs) { st.obs.disconnect(); st.obs = null; }
+  const mark = document.getElementById(st.mark);
+  if (!mark) return;
+  const tbody = document.querySelector('#page-content .data-table tbody');
+  const more = () => {
+    if (!tbody || !tbody.isConnected || !mark.isConnected) return false;
+    const from = tbody.querySelectorAll(':scope > tr').length, to = Math.min(list.length, from + LIST_STEP);
+    tbody.insertAdjacentHTML('beforeend', list.slice(from, to).map(rowFn).join(''));
+    st.shown = to;
+    if (after) { try { after(); } catch (_) {} }
+    if (to >= list.length) { mark.remove(); return false; }
+    return true;
+  };
+  if (typeof IntersectionObserver !== 'function') { while (more()) {} return; }     // old browser: everything, as before
+  /* the element that scrolls (the window, or a scrolling box around the page) — load ~2 screens ahead */
+  let root = null;
+  for (let el = mark.parentElement; el && el !== document.body; el = el.parentElement) {
+    const oy = getComputedStyle(el).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight + 1) { root = el; break; }
+  }
+  st.obs = new IntersectionObserver(es => {
+    if (!es.some(e => e.isIntersecting)) return;
+    if (!more()) { if (st.obs) { st.obs.disconnect(); st.obs = null; } return; }
+    /* observe again: the observer reports only changes — if the user is already at the new end (fast scroll,
+       End key) there is no change to report, so ask for a fresh check of where the mark is now */
+    if (st.obs) { st.obs.unobserve(mark); st.obs.observe(mark); }
+  }, { root, rootMargin: '0px 0px 1600px 0px' });
+  st.obs.observe(mark);
+}
+const _issSteps = { mark: 'iss-more', shown: 0, key: '', obs: null };
+function _issRow(i, ctx) {
+                const today = ctx.today;
+                const remaining = i.total - (i.paid||0);
+                let dueLabel = '';
+                if (i.dueDate && remaining > 0) {
+                  const daysDiff = Math.floor((new Date(i.dueDate) - new Date(today)) / 86400000);
+                  if (daysDiff < 0) dueLabel = `<div style="font-size:10px;color:var(--danger);background:rgba(239,68,68,.12);padding:2px 6px;border-radius:999px;margin-top:3px;display:inline-block">⏰ متأخر ${Math.abs(daysDiff)} يوم</div>`;
+                  else if (daysDiff <= 7) dueLabel = `<div style="font-size:10px;color:#92400e;background:rgba(245,158,11,.15);padding:2px 6px;border-radius:999px;margin-top:3px;display:inline-block">📅 ${daysDiff===0?'النهارده':daysDiff===1?'بكرة':`خلال ${daysDiff}ي`}</div>`;
+                  else dueLabel = `<div style="font-size:10px;color:var(--text-muted);margin-top:3px">📅 ${i.dueDate}</div>`;
+                }
+                return `<tr>
+                  <td><b style="color:var(--primary)">#${i.number}</b></td>
+                  <td>${i.date}${dueLabel}</td>
+                  <td><b>${escapeHtml(i.customerName)}</b></td>
+                  <td>${escapeHtml(i.productName)}</td>
+                  <td><b>${fmt(i.quantity)}</b></td>
+                  <td>${fmtCurrency(i.unitPrice)}</td>
+                  <td><b style="color:var(--success)">${fmtCurrency(i.total)}</b></td>
+                  <td style="color:var(--success)">${fmtCurrency(i.paid||0)}</td>
+                  <td style="color:${remaining>0?'var(--danger)':'var(--success)'}">${fmtCurrency(remaining)}</td>
+                  <td>${statusBadge(i.status)}</td>
+                  <td><div class="row-actions">
+                    <button class="btn-icon" onclick="viewIssuance('${i.id}')" title="عرض">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                    ${ctx.canEdit ? `<button class="btn-icon" onclick="editIssuance('${i.id}')" style="color:var(--info)" title="تعديل">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>` : ''}
+                    <button class="btn-icon" onclick="printIssuance('${i.id}')" title="طباعة إيصال">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    </button>
+                    ${(i.paid||0) < i.total ? `<button class="btn-icon" onclick="openPaymentForm('${i.customerId}')" style="color:var(--success)" title="تحصيل">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    </button>` : ''}
+                    ${ctx.isAdmin ? `<button class="btn-icon" onclick="deleteIssuance('${i.id}')" style="color:var(--danger)" title="حذف">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                    </button>` : ''}
+                  </div></td>
+                </tr>`;
+}
+
 function renderIssuances() {
   const root = document.getElementById('page-content');
   const issuances = (DB.data.issuances||[]).slice().sort((a,b)=>b.createdAt-a.createdAt);
@@ -22561,6 +22663,10 @@ function renderIssuances() {
   const listQty = list.reduce((s,i)=>s+i.quantity, 0);
   const listTotal = list.reduce((s,i)=>s+i.total, 0);
   const listPaid = list.reduce((s,i)=>s+(i.paid||0), 0);
+  /* how many rows: everything for a short list; otherwise as many as were shown before (a refresh keeps the
+     user's place), or the first step after the filters changed */
+  const shown = _stepCount(_issSteps, list, JSON.stringify(issuanceFilters));
+  const ctx = { today: todayStr(), canEdit: currentUser.role==='admin' || currentUser.role==='accountant', isAdmin: currentUser.role==='admin' };
 
   root.innerHTML = `
     <div class="page-header">
@@ -22621,52 +22727,15 @@ function renderIssuances() {
           </thead>
           <tbody>
             ${list.length === 0 ? `<tr><td colspan="11"><div class="empty-state"><div class="icon">📄</div><p>لا توجد عمليات صرف</p><button class="btn btn-primary" onclick="openIssuanceForm()" style="margin-top:12px">صرف ورق جديد</button></div></td></tr>` :
-              list.map(i => {
-                const remaining = i.total - (i.paid||0);
-                const today = todayStr();
-                let dueLabel = '';
-                if (i.dueDate && remaining > 0) {
-                  const daysDiff = Math.floor((new Date(i.dueDate) - new Date(today)) / 86400000);
-                  if (daysDiff < 0) dueLabel = `<div style="font-size:10px;color:var(--danger);background:rgba(239,68,68,.12);padding:2px 6px;border-radius:999px;margin-top:3px;display:inline-block">⏰ متأخر ${Math.abs(daysDiff)} يوم</div>`;
-                  else if (daysDiff <= 7) dueLabel = `<div style="font-size:10px;color:#92400e;background:rgba(245,158,11,.15);padding:2px 6px;border-radius:999px;margin-top:3px;display:inline-block">📅 ${daysDiff===0?'النهارده':daysDiff===1?'بكرة':`خلال ${daysDiff}ي`}</div>`;
-                  else dueLabel = `<div style="font-size:10px;color:var(--text-muted);margin-top:3px">📅 ${i.dueDate}</div>`;
-                }
-                return `<tr>
-                  <td><b style="color:var(--primary)">#${i.number}</b></td>
-                  <td>${i.date}${dueLabel}</td>
-                  <td><b>${escapeHtml(i.customerName)}</b></td>
-                  <td>${escapeHtml(i.productName)}</td>
-                  <td><b>${fmt(i.quantity)}</b></td>
-                  <td>${fmtCurrency(i.unitPrice)}</td>
-                  <td><b style="color:var(--success)">${fmtCurrency(i.total)}</b></td>
-                  <td style="color:var(--success)">${fmtCurrency(i.paid||0)}</td>
-                  <td style="color:${remaining>0?'var(--danger)':'var(--success)'}">${fmtCurrency(remaining)}</td>
-                  <td>${statusBadge(i.status)}</td>
-                  <td><div class="row-actions">
-                    <button class="btn-icon" onclick="viewIssuance('${i.id}')" title="عرض">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                    </button>
-                    ${(currentUser.role==='admin' || currentUser.role==='accountant') ? `<button class="btn-icon" onclick="editIssuance('${i.id}')" style="color:var(--info)" title="تعديل">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    </button>` : ''}
-                    <button class="btn-icon" onclick="printIssuance('${i.id}')" title="طباعة إيصال">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                    </button>
-                    ${(i.paid||0) < i.total ? `<button class="btn-icon" onclick="openPaymentForm('${i.customerId}')" style="color:var(--success)" title="تحصيل">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                    </button>` : ''}
-                    ${currentUser.role==='admin' ? `<button class="btn-icon" onclick="deleteIssuance('${i.id}')" style="color:var(--danger)" title="حذف">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
-                    </button>` : ''}
-                  </div></td>
-                </tr>`;
-              }).join('')
+              list.slice(0, shown).map(i => _issRow(i, ctx)).join('')
             }
           </tbody>
         </table>
       </div>
     </div>
+    ${_stepMark(_issSteps, list)}
   `;
+  _stepWatch(_issSteps, list, i => _issRow(i, ctx), () => { if (window.AXIssCards) AXIssCards.apply(); });
 
   // Wire up filters
   document.getElementById('iss-search').addEventListener('input', e => { issuanceFilters.search = e.target.value; renderIssuances(); const s = document.getElementById('iss-search'); if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); } });
@@ -22675,6 +22744,7 @@ function renderIssuances() {
   document.getElementById('iss-from').addEventListener('change', e => { issuanceFilters.from = e.target.value; renderIssuances(); });
   document.getElementById('iss-to').addEventListener('change', e => { issuanceFilters.to = e.target.value; renderIssuances(); });
 }
+
 
 /* ============== VOICE INPUT (Web Speech API) ============== */
 /* Picks the best-matching customer from the select by Arabic voice. */

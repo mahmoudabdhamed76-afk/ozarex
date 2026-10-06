@@ -116,6 +116,21 @@ test.describe('large dataset', () => {
     expect(errors).toEqual([]);
   });
 
+  /* Phase 5 — long lists open with their first step only (counts, not timings: never flaky) */
+  test('Phase 5: issuances / invoices / customers open with the first 150 rows, not thousands of elements', async ({ page, context }) => {
+    test.setTimeout(180_000);
+    const errors = watchErrors(page);
+    await openSignedIn(page, context, big.base, (await login(big.base, 'admin', ADMIN_PASSWORD)).token);
+    for (const k of ['issuances', 'invoices', 'customers']) {
+      await page.evaluate(k => navigate(k), k);
+      await page.waitForFunction(k => currentPage === k && document.querySelector('#page-content [id$="-more"]'), k, { timeout: 60_000 });
+      const m = await page.evaluate(() => ({ rows: document.querySelectorAll('#page-content .data-table tbody > tr').length, nodes: document.getElementById('page-content').getElementsByTagName('*').length }));
+      expect(m.rows, k).toBe(150);
+      expect(m.nodes, k + ' elements on the page').toBeLessThan(15_000);       // was ~230,000 for issuances / invoices
+    }
+    expect(errors).toEqual([]);
+  });
+
   /* Phase 4 — the real thing, no held answers: with this much data a pull takes seconds; edits land in it */
   test('Phase 4: edits made while a multi-second pull downloads are never lost and are sent once (8 rounds)', async ({ page, context }) => {
     test.setTimeout(600_000);

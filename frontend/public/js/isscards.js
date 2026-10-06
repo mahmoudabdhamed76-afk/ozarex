@@ -13,14 +13,16 @@
     if (heads.length < 10) return;
     t.classList.add('iss-tbl');
     var wrap = t.closest('.table-wrap'); if (wrap) wrap.classList.add('iss-wrap');
-    Array.prototype.forEach.call(t.querySelectorAll('tbody tr'), function (tr) {
+    var mobile = !!(window.matchMedia && matchMedia('(max-width: 768px)').matches);
+    /* Phase 5: only rows not done yet (a long list is appended in steps) */
+    Array.prototype.forEach.call(t.querySelectorAll('tbody tr:not(.iss-row)'), function (tr) {
       var tds = tr.children; if (tds.length !== heads.length) return;
       tr.classList.add('iss-row');
       Array.prototype.forEach.call(tds, function (td, i) {
         td.setAttribute('data-label', heads[i]); td.classList.add('ic-' + i);
         if (i >= 4 && i <= 8) {
           td.setAttribute('title', td.textContent.trim());
-          if (window.matchMedia && matchMedia('(max-width: 768px)').matches) td.innerHTML = td.innerHTML.replace(/(\d)\.00(?!\d)/g, '$1');   // «16,500 ج» بدل «16,500.00 ج» على الموبايل
+          if (mobile) td.innerHTML = td.innerHTML.replace(/(\d)\.00(?!\d)/g, '$1');   // «16,500 ج» بدل «16,500.00 ج» على الموبايل
         }
       });
     });
