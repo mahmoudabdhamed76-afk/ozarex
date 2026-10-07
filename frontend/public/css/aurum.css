@@ -4960,3 +4960,74 @@ html.aurum .sl-m .sl-period select { width: auto !important; min-width: 0 !impor
 .sl-m .sl-q { font: 800 16px var(--ax-font); color: var(--ax-ok); font-variant-numeric: tabular-nums; }
 .sl-m .sl-total-v { color: var(--ax-ok); }
 .sl-m .sl-empty { padding: 8px 0; }
+
+/* ════════════════════════════════════════════════════════════════════
+   4.28 · الشريط السفلي الزجاجي (js/glassnav.js) — موبايل
+   شريط عايم: بلور قوي + حواف 30px + ظل خفيف + حافة نور فوق. التاب المفتوح جوه
+   كبسولة زجاجية مضيئة (دهبي) بتتزحلق بين التابات. ليلي ونهاري.
+════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  html.aurum #bottom-nav {
+    --gn-bg: rgba(18, 20, 28, .58); --gn-rim: rgba(255, 255, 255, .14); --gn-hi: rgba(255, 255, 255, .16);
+    --gn-shadow: 0 18px 40px -12px rgba(0, 0, 0, .65), 0 2px 10px rgba(0, 0, 0, .3);
+    --gn-ink: rgba(235, 238, 247, .62); --gn-on: #FFCF6E;
+    --gn-cap: linear-gradient(180deg, rgba(255, 214, 128, .26), rgba(255, 176, 64, .10));
+    --gn-cap-rim: rgba(255, 210, 130, .42); --gn-cap-glow: 0 0 24px rgba(255, 178, 60, .32), 0 6px 16px -6px rgba(255, 160, 40, .45);
+    --gn-cap-hi: rgba(255, 255, 255, .28);
+    position: fixed !important; inset-inline: 12px !important; left: 12px !important; right: 12px !important;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 7px !important; gap: 0 !important; align-items: stretch !important; justify-content: space-between !important;
+    border-radius: 30px !important; border: 1px solid var(--gn-rim) !important; border-top: 1px solid var(--gn-rim) !important;
+    background: var(--gn-bg) !important;
+    backdrop-filter: blur(28px) saturate(190%) !important; -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+    box-shadow: var(--gn-shadow), inset 0 1px 0 var(--gn-hi), inset 0 -1px 0 rgba(255, 255, 255, .03) !important;
+    isolation: isolate; overflow: visible;
+  }
+  html.aurum[data-theme="light"] #bottom-nav {
+    --gn-bg: rgba(255, 255, 255, .62); --gn-rim: rgba(255, 255, 255, .85); --gn-hi: rgba(255, 255, 255, .95);
+    --gn-shadow: 0 16px 36px -14px rgba(0, 32, 85, .38), 0 2px 8px rgba(0, 32, 85, .08);
+    --gn-ink: #5B6478; --gn-on: #A86B00;
+    --gn-cap: linear-gradient(180deg, rgba(255, 255, 255, .98), rgba(255, 238, 200, .82));
+    --gn-cap-rim: rgba(240, 190, 90, .65); --gn-cap-glow: 0 0 22px rgba(255, 186, 72, .45), 0 8px 18px -8px rgba(214, 140, 20, .55);
+    --gn-cap-hi: #fff;
+  }
+  html.aurum #bottom-nav::after, html.aurum #bottom-nav::before { display: none !important; }        /* the old full-width strip */
+  /* the glass capsule behind the open tab */
+  html.aurum #bottom-nav .bn-glass {
+    position: absolute; top: 7px; bottom: 7px; left: 0; width: 0; z-index: 0; pointer-events: none;
+    border-radius: 23px; background: var(--gn-cap); border: 1px solid var(--gn-cap-rim);
+    box-shadow: var(--gn-cap-glow), inset 0 1px 0 var(--gn-cap-hi), inset 0 -8px 14px -10px rgba(255, 170, 50, .35);
+    backdrop-filter: blur(10px) saturate(160%); -webkit-backdrop-filter: blur(10px) saturate(160%);
+    opacity: 0; transition: transform .52s cubic-bezier(.34, 1.32, .5, 1), width .52s cubic-bezier(.34, 1.32, .5, 1), opacity .25s ease;
+  }
+  html.aurum #bottom-nav .bn-glass::after { content: ''; position: absolute; inset: 1px 10% auto; height: 40%; border-radius: 20px 20px 50% 50%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .35), transparent); opacity: .7; }
+  html.aurum #bottom-nav .bn-glass.on { opacity: 1; }
+  html.aurum #bottom-nav .bn-glass.no-anim { transition: none !important; }
+  /* the tabs */
+  html.aurum #bottom-nav .bn-item { position: relative; z-index: 1; flex: 1 1 0 !important; max-width: none !important; min-height: 54px; border-radius: 23px !important;
+    padding: 7px 0 5px !important; gap: 4px !important; justify-content: center; color: var(--gn-ink) !important;
+    background: transparent !important; box-shadow: none !important; font: 700 11px var(--ax-font) !important; transition: color .25s ease, transform .15s ease; }
+  html.aurum #bottom-nav .bn-item svg { width: 23px !important; height: 23px !important; color: inherit !important; filter: none !important; transform: none; stroke-width: 1.9; }
+  html.aurum #bottom-nav .bn-item:active { transform: scale(.92); }
+  html.aurum #bottom-nav .bn-item.active, html.aurum[data-theme="light"] #bottom-nav .bn-item.active { color: var(--gn-on) !important; background: transparent !important; box-shadow: none !important; font-weight: 800 !important; }
+  html.aurum #bottom-nav .bn-item.active svg, html.aurum[data-theme="light"] #bottom-nav .bn-item.active svg { color: var(--gn-on) !important; stroke-width: 2.3;
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--gn-on) 55%, transparent)) !important; }
+  html.aurum #bottom-nav .bn-item.active::after { display: none !important; }
+  html.aurum #bottom-nav .bn-sell:not(.active) svg { color: var(--gn-on) !important; opacity: .85; }   /* «بيع» keeps its gold hint */
+  html.aurum #bottom-nav .bn-item.bn-pop svg { animation: gnPop .5s cubic-bezier(.34, 1.5, .5, 1); }
+  /* the page ends above the floating bar */
+  #page-content { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+@keyframes gnPop { 0% { transform: scale(.82) translateY(2px); } 60% { transform: scale(1.12) translateY(-2px); } 100% { transform: none; } }
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+  html.aurum #bottom-nav .bn-glass { transition: opacity .15s ease !important; }
+  html.aurum #bottom-nav .bn-item.bn-pop svg { animation: none; }
+}
+/* browsers without backdrop blur: a solid glass color instead of see-through */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  @media (max-width: 768px) {
+    html.aurum #bottom-nav { background: rgba(22, 24, 32, .96) !important; }
+    html.aurum[data-theme="light"] #bottom-nav { background: rgba(255, 255, 255, .97) !important; }
+  }
+}

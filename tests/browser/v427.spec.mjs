@@ -194,3 +194,24 @@ test.describe('«المبيعات»', () => {
     expect(await page.locator('#sidebar-nav .nav-item[onclick*="\'sales\'"]').count()).toBe(0);
   });
 });
+
+/* ── 4.28 · glass bottom bar (phone) ── */
+test('4.28 phone: the bottom bar is floating glass; the glowing capsule sits under the open tab and follows it', async ({ app: page }) => {
+  test.skip(isDesktop(), 'phone only');
+  const errors = watchErrors(page);
+  const bar = await page.evaluate(() => { const n = document.getElementById('bottom-nav'), cs = getComputedStyle(n), r = n.getBoundingClientRect();
+    return { radius: parseFloat(cs.borderTopLeftRadius), blur: (cs.backdropFilter || cs.webkitBackdropFilter || '').includes('blur'), left: r.left, right: innerWidth - r.right, bottomGap: innerHeight - r.bottom }; });
+  expect(bar.radius).toBeGreaterThanOrEqual(24);
+  expect(bar.blur).toBe(true);
+  expect(bar.left).toBeGreaterThan(4); expect(bar.right).toBeGreaterThan(4); expect(bar.bottomGap).toBeGreaterThan(4);   // floating
+  const under = () => page.evaluate(() => { const g = document.querySelector('#bottom-nav .bn-glass'), a = document.querySelector('#bottom-nav .bn-item.active');
+    if (!g || !a) return null; const r1 = g.getBoundingClientRect(), r2 = a.getBoundingClientRect(); return { page: a.dataset.page, dx: Math.abs(r1.left - r2.left), dw: Math.abs(r1.width - r2.width), on: g.classList.contains('on') }; });
+  for (const [k, tab] of [['customers', 'customers'], ['invoices', 'invoices'], ['sales', 'issuances'], ['dashboard', 'dashboard']]) {
+    await page.evaluate(k => navigate(k), k);
+    await expect.poll(async () => { const u = await under(); return u && u.on && u.page === tab && u.dx < 1.5 && u.dw < 1.5; }, { timeout: 5000 }).toBe(true);
+  }
+  /* a page that has no tab: no capsule */
+  await page.evaluate(() => navigate('expenses'));
+  await expect.poll(() => page.evaluate(() => document.querySelector('#bottom-nav .bn-glass').classList.contains('on')), { timeout: 5000 }).toBe(false);
+  expect(errors).toEqual([]);
+});
