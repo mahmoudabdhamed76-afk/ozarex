@@ -4962,72 +4962,99 @@ html.aurum .sl-m .sl-period select { width: auto !important; min-width: 0 !impor
 .sl-m .sl-empty { padding: 8px 0; }
 
 /* ════════════════════════════════════════════════════════════════════
-   4.28 · الشريط السفلي الزجاجي (js/glassnav.js) — موبايل
-   شريط عايم: بلور قوي + حواف 30px + ظل خفيف + حافة نور فوق. التاب المفتوح جوه
-   كبسولة زجاجية مضيئة (دهبي) بتتزحلق بين التابات. ليلي ونهاري.
+   4.29 · الشريط السفلي — عدسة زجاجية زي متجر آبل (js/glassnav.js) — موبايل
+   شريط زجاج عايم على شكل كبسولة · التاب المفتوح: عدسة هادية · بتلمس وتسحب: العدسة
+   بتكبر وتطلع برا الشريط وبتكبّر اللي تحتها، بحافة ألوان خفيفة · تفلت: تستقر وتفتح.
 ════════════════════════════════════════════════════════════════════ */
 @media (max-width: 768px) {
   html.aurum #bottom-nav {
-    --gn-bg: rgba(18, 20, 28, .58); --gn-rim: rgba(255, 255, 255, .14); --gn-hi: rgba(255, 255, 255, .16);
-    --gn-shadow: 0 18px 40px -12px rgba(0, 0, 0, .65), 0 2px 10px rgba(0, 0, 0, .3);
-    --gn-ink: rgba(235, 238, 247, .62); --gn-on: #FFCF6E;
-    --gn-cap: linear-gradient(180deg, rgba(255, 214, 128, .26), rgba(255, 176, 64, .10));
-    --gn-cap-rim: rgba(255, 210, 130, .42); --gn-cap-glow: 0 0 24px rgba(255, 178, 60, .32), 0 6px 16px -6px rgba(255, 160, 40, .45);
-    --gn-cap-hi: rgba(255, 255, 255, .28);
+    --gn-bg: rgba(30, 30, 33, .74); --gn-rim: rgba(255, 255, 255, .09); --gn-hi: rgba(255, 255, 255, .10);
+    --gn-shadow: 0 16px 38px -10px rgba(0, 0, 0, .7), 0 2px 10px rgba(0, 0, 0, .35);
+    --gn-ink: rgba(255, 255, 255, .92); --gn-on: #3E93FF;
+    --gn-lens: rgba(255, 255, 255, .085); --gn-lens-drag: rgba(36, 36, 40, .96);
     position: fixed !important; inset-inline: 12px !important; left: 12px !important; right: 12px !important;
     bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
-    padding: 7px !important; gap: 0 !important; align-items: stretch !important; justify-content: space-between !important;
-    border-radius: 30px !important; border: 1px solid var(--gn-rim) !important; border-top: 1px solid var(--gn-rim) !important;
+    padding: 6px !important; gap: 0 !important; align-items: stretch !important; justify-content: space-between !important;
+    border-radius: 36px !important; border: 1px solid var(--gn-rim) !important; border-top: 1px solid var(--gn-rim) !important;
     background: var(--gn-bg) !important;
-    backdrop-filter: blur(28px) saturate(190%) !important; -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
-    box-shadow: var(--gn-shadow), inset 0 1px 0 var(--gn-hi), inset 0 -1px 0 rgba(255, 255, 255, .03) !important;
-    isolation: isolate; overflow: visible;
+    backdrop-filter: blur(26px) saturate(185%) !important; -webkit-backdrop-filter: blur(26px) saturate(185%) !important;
+    box-shadow: var(--gn-shadow), inset 0 1px 0 var(--gn-hi) !important;
+    isolation: isolate; overflow: visible; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
   html.aurum[data-theme="light"] #bottom-nav {
-    --gn-bg: rgba(255, 255, 255, .62); --gn-rim: rgba(255, 255, 255, .85); --gn-hi: rgba(255, 255, 255, .95);
-    --gn-shadow: 0 16px 36px -14px rgba(0, 32, 85, .38), 0 2px 8px rgba(0, 32, 85, .08);
-    --gn-ink: #5B6478; --gn-on: #A86B00;
-    --gn-cap: linear-gradient(180deg, rgba(255, 255, 255, .98), rgba(255, 238, 200, .82));
-    --gn-cap-rim: rgba(240, 190, 90, .65); --gn-cap-glow: 0 0 22px rgba(255, 186, 72, .45), 0 8px 18px -8px rgba(214, 140, 20, .55);
-    --gn-cap-hi: #fff;
+    --gn-bg: rgba(250, 250, 252, .74); --gn-rim: rgba(255, 255, 255, .9); --gn-hi: #fff;
+    --gn-shadow: 0 14px 34px -12px rgba(0, 20, 60, .35), 0 2px 8px rgba(0, 20, 60, .08);
+    --gn-ink: #1D1D1F; --gn-on: #0A72F0;
+    --gn-lens: rgba(0, 0, 0, .055); --gn-lens-drag: rgba(255, 255, 255, .985);
   }
   html.aurum #bottom-nav::after, html.aurum #bottom-nav::before { display: none !important; }        /* the old full-width strip */
-  /* the glass capsule behind the open tab */
+
+  /* the lens */
   html.aurum #bottom-nav .bn-glass {
-    position: absolute; top: 7px; bottom: 7px; left: 0; width: 0; z-index: 0; pointer-events: none;
-    border-radius: 23px; background: var(--gn-cap); border: 1px solid var(--gn-cap-rim);
-    box-shadow: var(--gn-cap-glow), inset 0 1px 0 var(--gn-cap-hi), inset 0 -8px 14px -10px rgba(255, 170, 50, .35);
-    backdrop-filter: blur(10px) saturate(160%); -webkit-backdrop-filter: blur(10px) saturate(160%);
-    opacity: 0; transition: transform .52s cubic-bezier(.34, 1.32, .5, 1), width .52s cubic-bezier(.34, 1.32, .5, 1), opacity .25s ease;
+    --x: 0px; --s: 1;
+    position: absolute; top: 6px; bottom: 6px; left: 0; width: 0; z-index: 0; pointer-events: none; overflow: hidden;
+    border-radius: 30px; background: var(--gn-lens);
+    transform: translate3d(var(--x), 0, 0) scale(var(--s)); transform-origin: 50% 50%;
+    opacity: 0;
+    transition: transform .5s cubic-bezier(.3, 1.35, .45, 1), width .5s cubic-bezier(.3, 1.35, .45, 1), top .3s ease, bottom .3s ease,
+      background .25s ease, box-shadow .25s ease, opacity .2s ease;
   }
-  html.aurum #bottom-nav .bn-glass::after { content: ''; position: absolute; inset: 1px 10% auto; height: 40%; border-radius: 20px 20px 50% 50%;
-    background: linear-gradient(180deg, rgba(255, 255, 255, .35), transparent); opacity: .7; }
   html.aurum #bottom-nav .bn-glass.on { opacity: 1; }
+  html.aurum #bottom-nav .bn-glass.no-anim, html.aurum #bottom-nav .bn-glass.follow { transition: top .3s ease, bottom .3s ease, background .25s, box-shadow .25s, opacity .2s, transform .07s linear !important; }
   html.aurum #bottom-nav .bn-glass.no-anim { transition: none !important; }
+  html.aurum #bottom-nav .bn-lens-in { position: absolute; top: 0; left: 0; display: flex; box-sizing: border-box; align-items: stretch; justify-content: space-between;
+    opacity: 0; transition: opacity .15s ease; }
+  /* pressed / dragging: a bigger clear lens above the bar that magnifies what is under it */
+  html.aurum #bottom-nav .bn-glass.drag {
+    --s: 1.14; top: -9px; bottom: -9px; z-index: 3; border-radius: 34px; background: var(--gn-lens-drag);
+    box-shadow: 0 14px 30px -8px rgba(0, 0, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .28), inset 0 -1px 0 rgba(255, 255, 255, .08),
+      inset 0 8px 12px -10px rgba(120, 190, 255, .9), inset 0 -8px 12px -10px rgba(255, 120, 210, .7);
+  }
+  html.aurum[data-theme="light"] #bottom-nav .bn-glass.drag { box-shadow: 0 14px 30px -10px rgba(0, 30, 80, .4), inset 0 1px 0 #fff,
+      inset 0 8px 12px -10px rgba(80, 160, 255, .8), inset 0 -8px 12px -10px rgba(255, 110, 200, .55); }
+  html.aurum #bottom-nav .bn-glass.drag .bn-lens-in { opacity: 1; }
+  /* the rainbow rim of the glass */
+  html.aurum #bottom-nav .bn-glass::before { content: ''; position: absolute; inset: 0; z-index: 2; border-radius: inherit; padding: 1.5px; pointer-events: none;
+    background: conic-gradient(from 200deg, rgba(120, 200, 255, .9), rgba(255, 120, 220, .8), rgba(255, 220, 120, .7), rgba(120, 255, 190, .7), rgba(120, 200, 255, .9));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+    opacity: 0; transition: opacity .2s ease; }
+  html.aurum #bottom-nav .bn-glass.drag::before { opacity: .75; }
+  /* a soft reflection on top of the glass */
+  html.aurum #bottom-nav .bn-glass::after { content: ''; position: absolute; z-index: 2; inset: 2px 14% auto; height: 34%; border-radius: 30px 30px 60% 60%; pointer-events: none;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .22), transparent); opacity: 0; transition: opacity .2s ease; }
+  html.aurum #bottom-nav .bn-glass.drag::after { opacity: 1; }
+
   /* the tabs */
-  html.aurum #bottom-nav .bn-item { position: relative; z-index: 1; flex: 1 1 0 !important; max-width: none !important; min-height: 54px; border-radius: 23px !important;
-    padding: 7px 0 5px !important; gap: 4px !important; justify-content: center; color: var(--gn-ink) !important;
-    background: transparent !important; box-shadow: none !important; font: 700 11px var(--ax-font) !important; transition: color .25s ease, transform .15s ease; }
-  html.aurum #bottom-nav .bn-item svg { width: 23px !important; height: 23px !important; color: inherit !important; filter: none !important; transform: none; stroke-width: 1.9; }
-  html.aurum #bottom-nav .bn-item:active { transform: scale(.92); }
-  html.aurum #bottom-nav .bn-item.active, html.aurum[data-theme="light"] #bottom-nav .bn-item.active { color: var(--gn-on) !important; background: transparent !important; box-shadow: none !important; font-weight: 800 !important; }
-  html.aurum #bottom-nav .bn-item.active svg, html.aurum[data-theme="light"] #bottom-nav .bn-item.active svg { color: var(--gn-on) !important; stroke-width: 2.3;
-    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--gn-on) 55%, transparent)) !important; }
+  html.aurum #bottom-nav .bn-item { position: relative; z-index: 1; flex: 1 1 0 !important; max-width: none !important; min-height: 56px; border-radius: 30px !important;
+    padding: 7px 0 5px !important; gap: 3px !important; justify-content: center; color: var(--gn-ink) !important;
+    background: transparent !important; box-shadow: none !important; font: 600 11px var(--ax-font) !important; transition: color .2s ease; }
+  html.aurum #bottom-nav .bn-item svg { width: 24px !important; height: 24px !important; color: inherit !important; filter: none !important; transform: none !important; stroke-width: 1.9; }
+  html.aurum #bottom-nav .bn-item:active { transform: none !important; }
+  html.aurum #bottom-nav .bn-item.active, html.aurum[data-theme="light"] #bottom-nav .bn-item.active,
+  html.aurum #bottom-nav .bn-item.bn-hot { color: var(--gn-on) !important; background: transparent !important; box-shadow: none !important; font-weight: 700 !important; }
+  html.aurum #bottom-nav .bn-item.active svg, html.aurum[data-theme="light"] #bottom-nav .bn-item.active svg, html.aurum #bottom-nav .bn-item.bn-hot svg { color: var(--gn-on) !important; stroke-width: 2.2; }
+  /* the magnified copies inside the lens look exactly like the tabs */
+  html.aurum #bottom-nav .bn-ghost { flex: 1 1 0; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 7px 0 5px; gap: 3px; color: var(--gn-ink); font: 600 11px var(--ax-font); }
+  html.aurum #bottom-nav .bn-ghost svg { width: 24px; height: 24px; stroke-width: 1.9; }
+  html.aurum #bottom-nav .bn-ghost.bn-hot { color: var(--gn-on); font-weight: 700; }
+  html.aurum #bottom-nav .bn-ghost.bn-hot svg { stroke-width: 2.2; }
+  html.aurum #bottom-nav .bn-ghost .bn-gl::after { content: attr(data-t); white-space: nowrap; }
+  html.aurum #bottom-nav.bn-dragging .bn-item.active:not(.bn-hot) { color: var(--gn-ink) !important; }
+  html.aurum #bottom-nav.bn-dragging .bn-item.active:not(.bn-hot) svg { color: var(--gn-ink) !important; }
   html.aurum #bottom-nav .bn-item.active::after { display: none !important; }
-  html.aurum #bottom-nav .bn-sell:not(.active) svg { color: var(--gn-on) !important; opacity: .85; }   /* «بيع» keeps its gold hint */
-  html.aurum #bottom-nav .bn-item.bn-pop svg { animation: gnPop .5s cubic-bezier(.34, 1.5, .5, 1); }
+  html.aurum #bottom-nav .bn-sell svg { color: inherit !important; opacity: 1; }
   /* the page ends above the floating bar */
-  #page-content { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important; }
+  #page-content { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)) !important; }
 }
-@keyframes gnPop { 0% { transform: scale(.82) translateY(2px); } 60% { transform: scale(1.12) translateY(-2px); } 100% { transform: none; } }
 @media (max-width: 768px) and (prefers-reduced-motion: reduce) {
   html.aurum #bottom-nav .bn-glass { transition: opacity .15s ease !important; }
-  html.aurum #bottom-nav .bn-item.bn-pop svg { animation: none; }
+  html.aurum #bottom-nav .bn-glass.drag { --s: 1; }
 }
 /* browsers without backdrop blur: a solid glass color instead of see-through */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   @media (max-width: 768px) {
-    html.aurum #bottom-nav { background: rgba(22, 24, 32, .96) !important; }
-    html.aurum[data-theme="light"] #bottom-nav { background: rgba(255, 255, 255, .97) !important; }
+    html.aurum #bottom-nav { background: rgba(30, 30, 33, .97) !important; }
+    html.aurum[data-theme="light"] #bottom-nav { background: rgba(250, 250, 252, .98) !important; }
   }
 }

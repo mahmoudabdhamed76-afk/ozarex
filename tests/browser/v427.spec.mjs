@@ -215,3 +215,36 @@ test('4.28 phone: the bottom bar is floating glass; the glowing capsule sits und
   await expect.poll(() => page.evaluate(() => document.querySelector('#bottom-nav .bn-glass').classList.contains('on')), { timeout: 5000 }).toBe(false);
   expect(errors).toEqual([]);
 });
+
+/* ── 4.29 · App Store style lens: drag across the bar, release opens the tab under the finger ── */
+test('4.29 phone: pressing a tab grows the glass lens; dragging moves it; releasing opens the tab under the finger', async ({ app: page }) => {
+  test.skip(isDesktop(), 'phone only');
+  const errors = watchErrors(page);
+  await page.evaluate(() => navigate('dashboard'));
+  const box = async k => page.locator('#bottom-nav .bn-item[data-page="' + k + '"]').boundingBox();
+  const from = await box('issuances'), to = await box('customers');
+  const y = from.y + from.height / 2;
+  await page.mouse.move(from.x + from.width / 2, y);
+  await page.mouse.down();
+  await expect.poll(() => page.evaluate(() => document.querySelector('#bottom-nav .bn-glass').classList.contains('drag'))).toBe(true);
+  expect(await page.evaluate(() => document.getElementById('bottom-nav').classList.contains('bn-dragging'))).toBe(true);
+  const steps = 8;
+  for (let i = 1; i <= steps; i++) await page.mouse.move(from.x + from.width / 2 + (to.x - from.x) * i / steps, y);
+  /* the tab under the finger lights up, nothing opens before release */
+  await expect.poll(() => page.evaluate(() => (document.querySelector('#bottom-nav .bn-item.bn-hot') || {}).dataset?.page)).toBe('customers');
+  expect(await page.evaluate(() => currentPage)).toBe('dashboard');
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => currentPage), { timeout: 5000 }).toBe('customers');
+  await expect.poll(() => page.evaluate(() => { const g = document.querySelector('#bottom-nav .bn-glass'); return !g.classList.contains('drag') && !document.querySelector('#bottom-nav .bn-hot') && !document.getElementById('bottom-nav').classList.contains('bn-dragging'); })).toBe(true);
+  /* the copies inside the lens are gone, and the tabs are not duplicated */
+  await expect.poll(() => page.evaluate(() => document.querySelectorAll('#bottom-nav .bn-ghost').length)).toBe(0);
+  expect(await page.locator('#bottom-nav .bn-item[data-page="customers"]').count()).toBe(1);
+  /* the page opened once, not twice (no double navigation from the browser's own click) */
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => currentPage)).toBe('customers');
+  /* a plain tap still works */
+  const home = await box('dashboard');
+  await page.mouse.click(home.x + home.width / 2, home.y + home.height / 2);
+  await expect.poll(() => page.evaluate(() => currentPage), { timeout: 5000 }).toBe('dashboard');
+  expect(errors).toEqual([]);
+});
