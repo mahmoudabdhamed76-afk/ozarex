@@ -7,7 +7,7 @@
     "startCommand": "node backend/server.js",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 30,
-    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyType": "ALWAYS",
     "restartPolicyMaxRetries": 10
   }
 }
