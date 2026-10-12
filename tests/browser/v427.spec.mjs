@@ -208,7 +208,7 @@ test('4.28 phone: the bottom bar is floating glass; the glowing capsule sits und
   expect(bar.left).toBeGreaterThan(4); expect(bar.right).toBeGreaterThan(4); expect(bar.bottomGap).toBeGreaterThan(4);   // floating
   const under = () => page.evaluate(() => { const g = document.querySelector('#bottom-nav .bn-glass'), a = document.querySelector('#bottom-nav .bn-item.active');
     if (!g || !a) return null; const r1 = g.getBoundingClientRect(), r2 = a.getBoundingClientRect(); return { page: a.dataset.page, dx: Math.abs(r1.left - r2.left), dw: Math.abs(r1.width - r2.width), on: g.classList.contains('on') }; });
-  for (const [k, tab] of [['customers', 'customers'], ['invoices', 'invoices'], ['sales', 'issuances'], ['dashboard', 'dashboard']]) {
+  for (const [k, tab] of [['customers', 'customers'], ['invoices', 'invoices'], ['inventory', 'inventory'], ['stock', 'inventory'], ['dashboard', 'dashboard']]) {
     await page.evaluate(k => navigate(k), k);
     await expect.poll(async () => { const u = await under(); return u && u.on && u.page === tab && u.dx < 1.5 && u.dw < 1.5; }, { timeout: 5000 }).toBe(true);
   }
@@ -224,7 +224,7 @@ test('4.29 phone: pressing a tab grows the glass lens; dragging moves it; releas
   const errors = watchErrors(page);
   await page.evaluate(() => navigate('dashboard'));
   const box = async k => page.locator('#bottom-nav .bn-item[data-page="' + k + '"]').boundingBox();
-  const from = await box('issuances'), to = await box('customers');
+  const from = await box('inventory'), to = await box('customers');
   const y = from.y + from.height / 2;
   await page.mouse.move(from.x + from.width / 2, y);
   await page.mouse.down();
@@ -280,4 +280,33 @@ test('4.30 welcome screen: brand on red shows once per launch, covers the app, t
 
 test('4.30 the welcome screen never shows under automation unless asked, so tests are not blocked', async ({ app: page }) => {
   expect(await page.locator('#ax-splash').count()).toBe(0);
+});
+
+/* ── 4.31 · Ozarex red ── */
+test('4.31 the name is Ozarex and the look is red (night + day); «المخزن» sits where «بيع» was', async ({ app: page }) => {
+  const errors = watchErrors(page);
+  await expect(page.locator('.js-brand-name').first()).toHaveText('Ozarex');
+  expect(await page.title()).toContain('Ozarex');
+  const look = () => page.evaluate(() => { const cs = getComputedStyle(document.documentElement); return { primary: cs.getPropertyValue('--ax-primary').trim().toUpperCase(), bg: getComputedStyle(document.body).backgroundColor, theme: document.querySelector('meta[name="theme-color"]').content }; });
+  for (const t of ['dark', 'light']) {
+    await page.evaluate(t => window.AX.setTheme(t), t);
+    const l = await look();
+    expect(l.primary).toBe(t === 'dark' ? '#E5232F' : '#D71F2B');
+    expect(l.theme).toBe(t === 'dark' ? '#070304' : '#B3121B');
+  }
+  await page.evaluate(() => window.AX.setTheme('dark'));
+  if (!isDesktop()) {
+    const tabs = await page.$$eval('#bottom-nav > .bn-item span', s => s.map(x => x.textContent));
+    expect(tabs).toEqual(['الرئيسية', 'المخزن', 'الفواتير', 'عملاء', 'المزيد']);
+    await page.locator('#bottom-nav .bn-item[data-page="inventory"]').click();
+    await expect.poll(() => page.evaluate(() => currentPage)).toBe('inventory');
+    /* selling is still one tap away: «المزيد» → إنشاء سريع */
+    await page.evaluate(() => window.AXM.more());
+    await expect(page.locator('#mh-more').getByText('صرف ورق', { exact: true }).first()).toBeVisible();
+    await page.evaluate(() => window.AXM.more(false));
+  } else {
+    const bg = await page.evaluate(() => getComputedStyle(document.querySelector('#sidebar-nav .nav-item.active')).backgroundImage);
+    expect(bg).toContain('linear-gradient');
+  }
+  expect(errors).toEqual([]);
 });

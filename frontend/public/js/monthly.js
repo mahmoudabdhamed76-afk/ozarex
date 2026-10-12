@@ -145,7 +145,7 @@
       '.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #D79613;padding-bottom:10px}.hd span{color:#47536b}' +
       'table{width:100%;border-collapse:collapse}th,td{padding:7px 8px;border-bottom:1px solid #d5dde8;text-align:right}th{background:#f1f4f9;color:#47536b;font-weight:700}' +
       'td.n{font-variant-numeric:tabular-nums;font-weight:700}.pb{page-break-before:always}.ft{margin-top:16px;color:#737e95;font-size:11px}</style></head><body>' +
-      '<div class="hd"><div><h1>' + esc(s.companyName || 'نظام الحسابات') + '</h1><span>تقرير شهر ' + mName(ui.m) + '</span></div><span>اتطبع ' + today() + (closedTo() >= mEnd(ui.m) ? ' · الشهر مقفول' : '') + '</span></div>' +
+      '<div class="hd"><div><h1>' + esc(s.companyName || 'Ozarex') + '</h1><span>تقرير شهر ' + mName(ui.m) + '</span></div><span>اتطبع ' + today() + (closedTo() >= mEnd(ui.m) ? ' · الشهر مقفول' : '') + '</span></div>' +
       '<h2>الأرقام مقارنة بـ ' + mName(b.m) + '</h2><table><tr><th>البند</th><th>' + mName(ui.m) + '</th><th>' + mName(b.m) + '</th><th>التغيير</th></tr>' +
       rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td class="n">' + money(r[1]) + '</td><td class="n">' + money(r[2]) + '</td><td class="n">' + pct(r[1], r[2]) + '</td></tr>'; }).join('') +
       '<tr><td>الورق المصروف</td><td class="n">' + num(a.qty) + '</td><td class="n">' + num(b.qty) + '</td><td class="n">' + pct(a.qty, b.qty) + '</td></tr>' +

@@ -122,7 +122,7 @@
     }).join('');
     var showXl = u.role === 'admin' || canGo('reports');
     return '<div class="mh" id="mh-root">' +
-      '<section class="mh-hello"><div><h1>' + esc(s.companyName || 'نظام الحسابات') + '</h1><p>' + esc(roleLabel(u)) + (u.name ? ' · ' + esc(u.name) : '') + '</p></div><span class="mh-date">' + esc(m.day) + '</span></section>' +
+      '<section class="mh-hello"><div><h1>' + esc(s.companyName || 'Ozarex') + '</h1><p>' + esc(roleLabel(u)) + (u.name ? ' · ' + esc(u.name) : '') + '</p></div><span class="mh-date">' + esc(m.day) + '</span></section>' +
       '<section class="mh-kpis" aria-label="أرقام اليوم والشهر">' +
         kpi('hi', "AXM.go('" + (canGo('issuances') ? 'issuances' : 'invoices') + "')", 'مبيعات اليوم', money(m.sT.v), m.sT.n + ' فاتورة') +
         kpi('', "AXM.go('payments')", 'تحصيل اليوم', money(m.cT.v), m.cT.n + ' عملية', 1) +
@@ -174,7 +174,7 @@
   function fillHeader() {
     var u = me(); if (!u) return;
     var co = document.getElementById('mh-co'), ro = document.getElementById('mh-role');
-    if (co) co.textContent = S().companyName || 'نظام الحسابات';
+    if (co) co.textContent = S().companyName || 'Ozarex';
     if (ro) ro.textContent = roleLabel(u);
     var dot = document.getElementById('mh-shield-dot');
     if (dot) {
@@ -197,14 +197,17 @@
   }
   function buildNav() {
     var bn = document.getElementById('bottom-nav'), u = me(); if (!bn || !u) return;
-    var sig = [u.id, canGo('invoices'), canGo('customers'), canGo('issuances'), 'v2'].join('|');
+    var sig = [u.id, canGo('invoices'), canGo('customers'), canGo('issuances'), canGo('inventory'), canGo('stock'), 'v3'].join('|');
     if (bn.getAttribute('data-mh') === sig && !bn.querySelector('.bn-create')) return;
     var item = function (page, label, icon, click, extra) {
       return '<button type="button" class="bn-item' + (extra || '') + '"' + (page ? ' data-page="' + page + '"' : '') + ' onclick="' + click + '" aria-label="' + label + '">' + icon + '<span>' + label + '</span></button>';
     };
     bn.innerHTML =
       item('dashboard', 'الرئيسية', IC.home, "navigate('dashboard')") +
-      item(canGo('issuances') ? 'issuances' : '', 'بيع', IC.sell, 'AXM.sell()', ' bn-sell') +
+      /* 4.31 · «المخزن» instead of «بيع» (selling stays one tap away in «المزيد» → إنشاء سريع) */
+      (canGo('inventory') ? item('inventory', 'المخزن', IC.box, "navigate('inventory')", ' bn-stock')
+        : canGo('stock') ? item('stock', 'المخزن', IC.box, "navigate('stock')", ' bn-stock')
+        : item(canGo('issuances') ? 'issuances' : '', 'بيع', IC.sell, 'AXM.sell()', ' bn-sell')) +
       (canGo('invoices') ? item('invoices', 'الفواتير', IC.doc, "navigate('invoices')") : '') +
       (canGo('customers') ? item('customers', 'عملاء', IC.users, "navigate('customers')") : '') +
       item('', 'المزيد', IC.more, 'AXM.more()', ' bn-more');
@@ -239,7 +242,7 @@
     var theme = document.documentElement.getAttribute('data-theme') === 'dark';
     var html = '<div class="mh-scrim" onclick="AXM.more(false)"></div>' +
       '<div class="mh-panel" role="dialog" aria-modal="true" aria-label="المزيد"><div class="mh-grip"></div>' +
-        '<div class="mh-me"><span class="mh-av">' + esc(initial(u.name)) + '</span><div><b>' + esc(u.name || '') + '</b><span>' + esc(roleLabel(u)) + ' · ' + esc(S().companyName || 'نظام الحسابات') + '</span></div>' +
+        '<div class="mh-me"><span class="mh-av">' + esc(initial(u.name)) + '</span><div><b>' + esc(u.name || '') + '</b><span>' + esc(roleLabel(u)) + ' · ' + esc(S().companyName || 'Ozarex') + '</span></div>' +
           '<button type="button" class="mh-theme" onclick="toggleTheme();AXM.more(false)" aria-label="تبديل الوضع">' + IC.moon + '<span>' + (theme ? 'نهاري' : 'ليلي') + '</span></button></div>' +
         '<button type="button" class="mh-sbox" onclick="AXM.more(false);AXM.search()">' + IC.search + '<span>ابحث عن عميل، فاتورة، صنف…</span></button>' +
         (quick.length ? '<div class="mh-qh"><h6>إنشاء سريع</h6><button type="button" class="mh-qsort" onclick="AXM.qedit()">' + 'رتّب' + '</button></div>' +

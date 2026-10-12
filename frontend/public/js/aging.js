@@ -25,7 +25,7 @@
   function dmy(ds) { if (!ds) return ''; var p = String(ds).slice(0, 10).split('-'); return (+p[2]) + '/' + (+p[1]) + '/' + p[0]; }
   function month() { return today().slice(0, 7); }
   function phoneOf(c) { try { return typeof normalizeEgyptianPhone === 'function' ? normalizeEgyptianPhone(c.phone) : String(c.phone || '').replace(/\D/g, ''); } catch (e) { return ''; } }
-  function company() { var s = S(); return s.companyName || 'نظام الحسابات'; }
+  function company() { var s = S(); return s.companyName || 'Ozarex'; }
   function base() { return typeof API_BASE !== 'undefined' ? API_BASE : location.origin; }
   function daysTxt(n) { return n === 0 ? 'النهارده' : n === 1 ? 'يوم' : n === 2 ? 'يومين' : n + (n <= 10 ? ' أيام' : ' يوم'); }
 

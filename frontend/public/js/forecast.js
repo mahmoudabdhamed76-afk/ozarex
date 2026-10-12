@@ -141,7 +141,7 @@
 
   /* ── actions ── */
   function waText(x) {
-    var s = S(), lines = ['السلام عليكم ' + x.name + ' 🌿', 'معاكم ' + (s.companyName || 'نظام الحسابات') + '.', 'حبينا نطمن عليكم ونسأل لو محتاجين:'];
+    var s = S(), lines = ['السلام عليكم ' + x.name + ' 🌿', 'معاكم ' + (s.companyName || 'Ozarex') + '.', 'حبينا نطمن عليكم ونسأل لو محتاجين:'];
     x.basket.forEach(function (b) { lines.push('• ' + num(b.qty) + ' ' + (b.unit || '') + ' ' + b.name); });
     lines.push('نجهّزها ونوصّلها في أقرب وقت.', 'شكراً لثقتكم 🙏');
     if (s.companyPhone) lines.push('📞 ' + s.companyPhone);

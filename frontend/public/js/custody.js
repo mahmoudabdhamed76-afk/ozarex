@@ -233,7 +233,7 @@
   }
   function print(cid, kind) {
     var c = list().find(function (x) { return x.id === cid; }); if (!c) return;
-    var co = S().companyName || 'نظام الحسابات', isCash = c.type === 'cash', fv = function (v) { return isCash ? money(v) : num(v) + ' ' + (c.unit || ''); };
+    var co = S().companyName || 'Ozarex', isCash = c.type === 'cash', fv = function (v) { return isCash ? money(v) : num(v) + ' ' + (c.unit || ''); };
     var w = window.open('', '_blank'); if (!w) { toast('المتصفح منع نافذة الطباعة', 'error'); return; }
     var body = kind === 'receipt'
       ? '<h2>إقرار استلام عهدة ' + (isCash ? 'نقدية' : 'عينية') + ' رقم ' + c.no + '</h2>' +

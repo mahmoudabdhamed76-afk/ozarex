@@ -927,7 +927,7 @@
   function slip(r, at) {
     var id = 'm' + (++st.fid);
     st.fns['c' + id] = function () { copy(plain(r)); };
-    st.fns['w' + id] = function () { window.open('https://wa.me/?text=' + encodeURIComponent(plain(r) + '\n\n— ' + (S().companyName || 'نظام الحسابات')), '_blank'); };
+    st.fns['w' + id] = function () { window.open('https://wa.me/?text=' + encodeURIComponent(plain(r) + '\n\n— ' + (S().companyName || 'Ozarex')), '_blank'); };
     if (r.plainOnly) {
       return '<div class="axa-slip ax-hl-off short' + (r.tone ? ' t-' + r.tone : '') + '"><header><span class="axa-ic">' + ic(r.icon) + '</span><div><b>' + esc(r.title) + '</b>' + (r.sub ? '<span>' + esc(r.sub) + '</span>' : '') + '</div></header>' + (r.note ? '<p class="axa-note">' + r.note + '</p>' : '') + '</div>';
     }

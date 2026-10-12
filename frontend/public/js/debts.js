@@ -452,7 +452,7 @@
   }
   function print() {
     var b = budgetNow(), st = plan().strategy || 'smart', sim = simulate(b, st, firstBudget(b));
-    var total = active().reduce(function (s, x) { return s + x.bal; }, 0), co = S().companyName || 'نظام الحسابات';
+    var total = active().reduce(function (s, x) { return s + x.bal; }, 0), co = S().companyName || 'Ozarex';
     var w = window.open('', '_blank'); if (!w) { toast('المتصفح منع نافذة الطباعة', 'error'); return; }
     w.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>خطة سداد المديونية</title><style>@page{size:A4;margin:14mm}body{font-family:"Zain","IBM Plex Sans Arabic","Cairo",Tahoma,sans-serif;color:#000}' +
       'h1{margin:0;font-size:22px}h2{margin:4px 0 12px;font-size:14px;font-weight:600;color:#444}.s{display:flex;gap:22px;margin:0 0 12px;font-size:14px}table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}th,td{border:1px solid #000;padding:6px;text-align:right}th{background:#eee}</style></head><body>' +

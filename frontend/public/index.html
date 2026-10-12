@@ -8,11 +8,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <script>/* 4.12.1 · iPhone/iPad: stop Safari from zooming the page when a field is tapped (pinch-zoom still works on iOS) — same fix as the attendance app */
 (function(){try{var ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);if(!ios)return;document.documentElement.classList.add('ax-ios');var vp=document.querySelector('meta[name=viewport]');if(vp)vp.setAttribute('content','width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover');}catch(e){}})();</script>
-<title>نظام الحسابات — إدارة التوريدات</title>
+<title>Ozarex — إدارة التوريدات</title>
 
 <!-- PWA: install to home screen with company logo -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#121212">
+<meta name="theme-color" content="#070304">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -32,7 +32,7 @@
   var t = 'dark', rail = false;
   try { t = localStorage.getItem('theme') || 'dark'; rail = localStorage.getItem('ax_rail') === '1'; } catch (e) {}
   d.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
-  try { var tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.setAttribute('content', t === 'light' ? '#002055' : '#121212'); } catch (e) {}
+  try { var tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.setAttribute('content', t === 'light' ? '#B3121B' : '#070304'); } catch (e) {}
   d.classList.add('aurum');
   if (rail) d.classList.add('ax-rail');
   /* 4.9 · no splash: the login form shows at once. Only when this device was
@@ -9533,7 +9533,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
     </div>
 
     <div class="lgn-card">
-      <h1 class="lgn-title js-brand-name">نظام الحسابات</h1>
+      <h1 class="lgn-title js-brand-name">Ozarex</h1>
       <p class="lgn-sub">سجّل دخولك إلى لوحة التحكم</p>
 
       <form id="login-form" autocomplete="on">
@@ -9579,7 +9579,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div>
-        <div class="brand-name js-brand-name">نظام الحسابات</div>
+        <div class="brand-name js-brand-name">Ozarex</div>
         <div class="brand-sub">نظام الإدارة</div>
       </div>
       <div class="brand-logo brand-logo-svg" aria-label="الشعار">
@@ -9598,7 +9598,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
     <div class="company-banner">
       <div class="banner-inner">
         <img class="banner-icon js-brand-logo" src="icons/logo-square.png" onerror="this.onerror=null;this.src='/icons/logo-square.png'" alt="" style="width:28px;height:28px;border-radius:6px;object-fit:cover;flex-shrink:0">
-        <span class="banner-name js-brand-name">نظام الحسابات</span>
+        <span class="banner-name js-brand-name">Ozarex</span>
         <span class="banner-tag">إدارة التوريدات والمحاسبة</span>
       </div>
     </div>
@@ -9669,8 +9669,8 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
     <div class="page-content" id="page-content"></div>
 
     <footer class="app-footer">
-      <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">نظام الحسابات</span></div>
-      <div class="version">الإصدار 4.30</div>
+      <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
+      <div class="version">الإصدار 4.31</div>
     </footer>
   </div>
 </div>
@@ -10693,7 +10693,7 @@ function seedData() {
     employees: [],
     salaryRuns: [],
     settings: {
-      companyName: 'نظام الحسابات',
+      companyName: 'Ozarex',
       companyAddress: '',
       companyPhone: '',
       taxNumber: '',
@@ -11525,7 +11525,7 @@ window.addEventListener('resize', function () {
    STARTUP
 ========================================================= */
 /* ═══ the buyer's own brand: company name + logo from الإعدادات → الشركة, everywhere (login too) ═══ */
-const BRAND_DEFAULT = 'نظام الحسابات';
+const BRAND_DEFAULT = 'Ozarex';
 function applyBrand(src) {
   try {
     let b = src;
@@ -11535,7 +11535,8 @@ function applyBrand(src) {
     }
     if (!b) { try { b = JSON.parse(localStorage.getItem('erp_brand') || 'null'); } catch (e) {} }
     if (!b) return;
-    const name = String(b.name || '').trim() || BRAND_DEFAULT;
+    let name = String(b.name || '').trim() || BRAND_DEFAULT;
+    if (name === 'نظام' + ' الحسابات') name = BRAND_DEFAULT;          /* 4.31 · the old default name → Ozarex */
     const logo = (typeof b.logo === 'string' && b.logo.startsWith('data:image/')) ? b.logo : '';
     const key = name + '|' + logo.length;
     if (applyBrand._k === key) return;
@@ -11834,7 +11835,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!DB.load()) seedData();
     OfflineManager.setBase(DB.data);      // what the server has → every save sends only the difference
     // Ensure latest schema bits exist
-    if (!DB.data.settings) DB.data.settings = { companyName:'نظام الحسابات', taxRate:0, currency:'جنيه', soundEnabled: true };
+    if (!DB.data.settings) DB.data.settings = { companyName:'Ozarex', taxRate:0, currency:'جنيه', soundEnabled: true };
     if (DB.data.settings.soundEnabled === undefined) DB.data.settings.soundEnabled = true;
     if (!DB.data.counters) DB.data.counters = { invoice: 1000, issuance: 1000, purchase: 1000 };
     if (!DB.data.counters.issuance) DB.data.counters.issuance = 1000;
@@ -16318,7 +16319,7 @@ async function sendInvoiceWhatsApp(id) {
   const s = DB.data.settings;
   const due = inv.total - inv.paid;
   const msgLines = [
-    `*${s.companyName || 'نظام الحسابات'}*`,
+    `*${s.companyName || 'Ozarex'}*`,
     `━━━━━━━━━━━━━━`,
     `📋 *فاتورة رقم #${inv.number}*`,
     `📅 التاريخ: ${inv.date}`,
@@ -16959,7 +16960,7 @@ function sendInvoiceReminderWhatsApp(customerId, kind, itemId) {
   }
 
   const msgLines = [
-    `🌟 *${s.companyName || 'نظام الحسابات'}* 🌟`,
+    `🌟 *${s.companyName || 'Ozarex'}* 🌟`,
     `━━━━━━━━━━━━━━`,
     `🌺 السلام عليكم ورحمة الله ${c.name}`,
     `أتمنى أن تكونوا بأفضل حال 🤲`,
@@ -17002,7 +17003,7 @@ function sendAllDebtsReminderWhatsApp(customerId) {
     .filter(inv => inv.customerId === customerId && (inv.total - (inv.paid || 0)) > 0 && !inv.sourceIssuanceId);
 
   const msgLines = [
-    `🌟 *${s.companyName || 'نظام الحسابات'}* 🌟`,
+    `🌟 *${s.companyName || 'Ozarex'}* 🌟`,
     `━━━━━━━━━━━━━━`,
     `🌺 السلام عليكم ورحمة الله ${c.name}`,
     `أتمنى أن تكونوا بأفضل حال 🤲`,
@@ -17059,7 +17060,7 @@ async function sendCustomerStatementWhatsApp(customerId) {
   const totalPaid = payments.reduce((s2,p)=>s2+(p.amount||0), 0);
 
   const msgLines = [
-    `*${s.companyName || 'نظام الحسابات'}*`,
+    `*${s.companyName || 'Ozarex'}*`,
     `━━━━━━━━━━━━━━`,
     `📋 *كشف حساب - ${c.name}*`,
     `📅 حتى ${todayStr()}`,
@@ -21292,7 +21293,7 @@ function buildOffer(id) {
   const items = v('of-items-'+id), price = v('of-price-'+id), disc = v('of-disc-'+id), valid = v('of-valid-'+id);
   if (!items || !price) { toast('اكتب المنتجات والسعر على الأقل', 'warning'); return; }
   const s = DB.data.settings || {};
-  const companyName = s.companyName || 'نظام الحسابات';
+  const companyName = s.companyName || 'Ozarex';
   let text = 'السلام عليكم أ/ ' + (p.person || p.company) + ' 👋\n\n';
   text += 'يسعدنا في *' + companyName + '* نقدم لحضراتكم عرضنا الخاص:\n\n';
   text += '📦 *المنتجات:* ' + items + '\n';
@@ -21345,7 +21346,7 @@ function renderProspects() {
     const d = prospectDays(p);
     const phone = (p.phone||'').replace(/[^0-9+]/g, '');
     const waPhone = phone.startsWith('0') ? '2' + phone : phone;
-    const waText = p.offer && p.offer.text ? encodeURIComponent(p.offer.text) : encodeURIComponent('أهلاً ' + (p.person||p.company) + ' 👋 معاك ' + ((DB.data.settings||{}).companyName||'نظام الحسابات') + ' — حابين نتواصل معاكم بخصوص التوريدات');
+    const waText = p.offer && p.offer.text ? encodeURIComponent(p.offer.text) : encodeURIComponent('أهلاً ' + (p.person||p.company) + ' 👋 معاك ' + ((DB.data.settings||{}).companyName||'Ozarex') + ' — حابين نتواصل معاكم بخصوص التوريدات');
     const atRisk = d >= 7;
     return `
     <div class="churn-card prospect-card ${atRisk ? 'churn-medium' : ''}" style="--st:${st.color}">

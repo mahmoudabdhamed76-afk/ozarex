@@ -33,16 +33,17 @@ test('sidebar: every item opens its page; back button returns', async ({ app: pa
   expect(errors).toEqual([]);
 });
 
-test('iPhone bottom bar: home, invoices, customers open; «بيع» and «المزيد» open their sheets', async ({ app: page }, info) => {
+test('iPhone bottom bar: home, store, invoices, customers open; «المزيد» opens its sheet', async ({ app: page }, info) => {
   test.skip(info.project.name !== 'iphone', 'bottom bar is the phone layout');
   const errors = watchErrors(page);
   const bar = page.locator('#bottom-nav');
   await expect(bar).toBeVisible();
-  for (const [label, key] of [['الفواتير', 'invoices'], ['عملاء', 'customers'], ['الرئيسية', 'dashboard']]) {
+  for (const [label, key] of [['المخزن', 'inventory'], ['الفواتير', 'invoices'], ['عملاء', 'customers'], ['الرئيسية', 'dashboard']]) {
     await bar.getByText(label, { exact: true }).click();
     await expect(page.locator('#topbar-title')).toHaveText(PAGES[key]);
   }
-  for (const label of ['بيع', 'المزيد']) {
+  expect(await bar.getByText('بيع', { exact: true }).count()).toBe(0);         // 4.31: «المخزن» took its place
+  for (const label of ['المزيد']) {
     const before = await page.evaluate(() => document.body.innerHTML.length);
     await bar.getByText(label, { exact: true }).click();
     await page.waitForTimeout(500);

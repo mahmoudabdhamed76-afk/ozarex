@@ -183,7 +183,7 @@
   }
   function find(oid) { return list().find(function (x) { return x.id === oid; }); }
   function text(o) {
-    var s = S(), L = ['السلام عليكم ' + (o.supplierName || ''), 'طلب شراء #' + o.no + ' من *' + (s.companyName || 'نظام الحسابات') + '* — ' + dmy(o.date) + ':', ''];
+    var s = S(), L = ['السلام عليكم ' + (o.supplierName || ''), 'طلب شراء #' + o.no + ' من *' + (s.companyName || 'Ozarex') + '* — ' + dmy(o.date) + ':', ''];
     (o.items || []).forEach(function (x, i) { L.push((i + 1) + '. ' + x.name + ' — ' + num(x.qty) + ' ' + (x.unit || '')); });
     L.push('', 'ياريت تأكدوا الأسعار وميعاد التسليم 🙏');
     if (s.companyPhone) L.push('📞 ' + s.companyPhone);
@@ -199,7 +199,7 @@
     var o = find(oid); if (!o) return;
     var s = S(), w = window.open('', '_blank'); if (!w) { T('المتصفح منع نافذة الطباعة', 'error'); return; }
     w.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>طلب شراء #' + o.no + '</title><style>@page{size:A4;margin:14mm}body{font-family:"Zain","IBM Plex Sans Arabic","Cairo",Tahoma,sans-serif;color:#000}h1{margin:0;font-size:22px}h2{margin:4px 0 14px;font-size:14px;font-weight:600;color:#444}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border:1px solid #000;padding:7px;text-align:right}th{background:#eee}.sig{display:flex;justify-content:space-between;margin-top:40px;font-size:13px}</style></head><body>' +
-      '<h1>' + esc(s.companyName || 'نظام الحسابات') + '</h1><h2>طلب شراء #' + o.no + ' — ' + dmy(o.date) + ' — المورد: ' + esc(o.supplierName || '—') + '</h2>' +
+      '<h1>' + esc(s.companyName || 'Ozarex') + '</h1><h2>طلب شراء #' + o.no + ' — ' + dmy(o.date) + ' — المورد: ' + esc(o.supplierName || '—') + '</h2>' +
       '<table><thead><tr><th>#</th><th>الصنف</th><th>الكمية</th><th>الوحدة</th><th>السعر المتوقع</th><th>الإجمالي</th></tr></thead><tbody>' +
       (o.items || []).map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.name) + '</td><td>' + num(x.qty) + '</td><td>' + esc(x.unit || '') + '</td><td>' + num(x.price) + '</td><td>' + num(x.qty * x.price) + '</td></tr>'; }).join('') +
       '<tr><th colspan="5">الإجمالي التقريبي</th><th>' + num(total(o)) + '</th></tr></tbody></table>' +

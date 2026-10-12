@@ -33,7 +33,7 @@ function page(d, c) {
   const logo = typeof s.companyLogo === 'string' && s.companyLogo.startsWith('data:image') ? s.companyLogo : '';
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<title>${esc(c.name)} — كشف حساب ${esc(s.companyName || 'نظام الحسابات')}</title>
+<title>${esc(c.name)} — كشف حساب ${esc(s.companyName || 'Ozarex')}</title>
 <link rel="stylesheet" href="/fonts/fonts.css">
 <style>
 :root{--bg:#F2F2F2;--card:#fff;--soft:#F6F6F6;--line:#E6E6E6;--ink:#000;--mut:#6B6B6B;--faint:#9A9A9A}
@@ -59,7 +59,7 @@ td{padding:9px 6px;border-bottom:1px solid var(--line);vertical-align:top}td.n{w
 .acts{display:flex;justify-content:flex-end;margin-top:12px}
 @media print{body{background:#fff;color:#000}.acts,.foot a{display:none}.hero{background:#fff;color:#000;border:1px solid #000}.hero small{color:#444}.card,.facts div{border:1px solid #ccc}}
 </style></head><body><div class="w">
-<div class="top">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<div><b>${esc(s.companyName || 'نظام الحسابات')}</b><span>كشف حساب — ${dmy(t)}</span></div></div>
+<div class="top">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<div><b>${esc(s.companyName || 'Ozarex')}</b><span>كشف حساب — ${dmy(t)}</span></div></div>
 <section class="hero"><small>المستحق على ${esc(c.name)}</small><div class="v">${num(due)} <span style="font-size:20px">${esc(C)}</span></div>
 <small>${due > 0.5 ? (a.oldestDays > 0 ? 'أقدم مبلغ مستحق من ' + a.oldestDays + ' يوم' : 'مستحق حديثاً') : 'الحساب مسدد بالكامل — شكراً لكم 🙏'}</small>
 ${due > 0.5 ? `<div class="bar">${a.buckets.map((v, i) => v > 0 ? `<i style="width:${(v / total * 100).toFixed(2)}%;background:${colors[i]}"></i>` : '').join('')}</div>

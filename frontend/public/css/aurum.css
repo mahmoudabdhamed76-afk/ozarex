@@ -5058,3 +5058,113 @@ html.aurum .sl-m .sl-period select { width: auto !important; min-width: 0 !impor
     html.aurum[data-theme="light"] #bottom-nav { background: rgba(250, 250, 252, .98) !important; }
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   4.31 · OZAREX الأحمر — الواجهة كلها بتعتمد على الأحمر (زي التصميم اللي اتوافق عليه)
+   ليلي: أسود بإضاءة حمرا وكروت داكنة بحافة حمرا · نهاري: أبيض مايل للوردي وهيدر أحمر.
+   ألوان الحالة (مدفوع أخضر / غير مدفوع أحمر) والماركر فضلت زي ما هي.
+════════════════════════════════════════════════════════════════════ */
+html.aurum[data-theme="dark"] {
+  --ax-bg: #070304; --ax-side: #0B0405; --ax-surface: #130809; --ax-surface-2: #1A0B0D; --ax-surface-3: #221012;
+  --ax-line: #2C1114; --ax-line-2: #47191E;
+  --ax-text: #FFFFFF; --ax-muted: #B79B9E; --ax-faint: #7F6366;
+  --ax-ink: #E5232F; --ax-on-ink: #FFFFFF;
+  --ax-deep: #1A0709; --ax-deep-muted: #C9A3A7;
+  --ax-gold: #FF3B47; --ax-gold-2: #FF6B74; --ax-gold-soft: rgba(229, 35, 47, .16);
+  --ax-primary: #E5232F; --ax-primary-hover: #C81B26; --ax-primary-ink: #FFFFFF; --ax-primary-rgb: 229, 35, 47;
+  --ax-hover: rgba(229, 35, 47, .07); --ax-active: rgba(229, 35, 47, .12); --ax-input: #0D0506; --ax-ripple: rgba(229, 35, 47, .2);
+  --ax-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 28px -16px rgba(229, 35, 47, .28);
+  --ax-shadow-lift: 0 2px 8px rgba(0, 0, 0, .45), 0 22px 46px -18px rgba(229, 35, 47, .35);
+  --rd-card: linear-gradient(160deg, #1C0B0D 0%, #110607 100%);
+  --rd-edge: rgba(229, 35, 47, .26);
+  --rd-glow: 0 0 0 1px rgba(229, 35, 47, .22), 0 14px 34px -20px rgba(229, 35, 47, .55);
+  --gn-on: #FF3B47;
+  --mkc: 229, 35, 47; --mkt: #FFFFFF;
+}
+html.aurum[data-theme="light"] {
+  --ax-bg: #FFF6F6; --ax-side: #FFFFFF; --ax-surface: #FFFFFF; --ax-surface-2: #FFF0F1; --ax-surface-3: #FFE6E8;
+  --ax-line: #F5D9DC; --ax-line-2: #EDBEC3;
+  --ax-text: #1C0A0C; --ax-muted: #6E4B50; --ax-faint: #9A7A7E;
+  --ax-ink: #C8161F; --ax-on-ink: #FFFFFF;
+  --ax-deep: #B3121B; --ax-deep-muted: #FFD0D3;
+  --ax-gold: #D71F2B; --ax-gold-2: #B3121B; --ax-gold-soft: rgba(215, 31, 43, .1);
+  --ax-primary: #D71F2B; --ax-primary-hover: #B3121B; --ax-primary-ink: #FFFFFF; --ax-primary-rgb: 215, 31, 43;
+  --ax-hover: rgba(215, 31, 43, .05); --ax-active: rgba(215, 31, 43, .09); --ax-ripple: rgba(215, 31, 43, .14);
+  --ax-shadow: 0 1px 2px rgba(120, 10, 20, .06), 0 10px 26px -14px rgba(180, 20, 30, .22);
+  --ax-shadow-lift: 0 2px 6px rgba(120, 10, 20, .08), 0 20px 42px -16px rgba(180, 20, 30, .3);
+  --rd-card: #FFFFFF; --rd-edge: #F3D3D7;
+  --rd-glow: 0 0 0 1px #F3D3D7, 0 12px 28px -18px rgba(200, 22, 31, .35);
+  --gn-on: #D71F2B;
+  --mkc: 215, 31, 43; --mkt: #FFFFFF;
+}
+
+/* the page: near-black with soft red light at the edges (like the reference) */
+html.aurum[data-theme="dark"] body {
+  background:
+    radial-gradient(900px 520px at 100% -10%, rgba(229, 35, 47, .20), transparent 60%),
+    radial-gradient(700px 600px at -10% 110%, rgba(229, 35, 47, .14), transparent 60%),
+    #070304 !important; background-attachment: fixed !important;
+}
+html.aurum[data-theme="light"] body { background: radial-gradient(900px 500px at 100% -10%, rgba(215, 31, 43, .08), transparent 60%), #FFF6F6 !important; background-attachment: fixed !important; }
+
+/* phone header: red glass instead of navy */
+html.aurum[data-theme="dark"] .topbar { background: linear-gradient(135deg, #2B0A0E 0%, #4A0D14 55%, #1A0709 100%) !important; border: 1px solid rgba(229, 35, 47, .35) !important; box-shadow: 0 18px 40px -22px rgba(229, 35, 47, .7) !important; }
+html.aurum[data-theme="light"] .topbar { background: linear-gradient(135deg, #D71F2B 0%, #A50F18 100%) !important; border-color: transparent !important; }
+html.aurum .topbar .icon-btn, html.aurum .topbar button { border-color: rgba(255, 90, 100, .28) !important; }
+html.aurum[data-theme="dark"] .topbar .icon-btn { background: rgba(229, 35, 47, .12) !important; }
+
+/* cards: dark red glass with a thin red edge */
+html.aurum .card, html.aurum .mh-k, html.aurum .mh-tile, html.aurum .stat-card, html.aurum .kpi-card, html.aurum .pg-card, html.aurum .ax-kpi, html.aurum .sl-row {
+  background: var(--rd-card) !important; border-color: var(--rd-edge) !important; box-shadow: var(--rd-glow) !important;
+}
+html.aurum .mh-ti { background: rgba(229, 35, 47, .14) !important; color: var(--ax-gold) !important; }
+html.aurum .mh-tile { --tc: #FF3B47 !important; }
+
+/* main buttons + the active things */
+html.aurum .btn-primary, html.aurum .btn.btn-primary { background: linear-gradient(180deg, #F0313C, #C8161F) !important; color: #fff !important; border-color: transparent !important; box-shadow: 0 10px 24px -12px rgba(229, 35, 47, .8) !important; }
+html.aurum .mh-xl { background: linear-gradient(135deg, #E5232F, #9E0E17) !important; box-shadow: 0 16px 36px -18px rgba(229, 35, 47, .9) !important; }
+html.aurum .mh-xl-i { background: rgba(255, 255, 255, .16) !important; }
+
+/* side menu: the open section is a solid red pill */
+html.aurum .nav-item.active { background-image: none !important; background: linear-gradient(180deg, #F0313C, #C8161F) !important; color: #fff !important;
+  border-radius: 14px !important; transform: none !important; box-shadow: 0 10px 24px -12px rgba(229, 35, 47, .85) !important; }
+html.aurum .nav-item.active .icon { color: #fff !important; }
+html.aurum .nav-item .icon { color: var(--ax-muted) !important; }
+html.aurum[data-theme="dark"] .sidebar { background: linear-gradient(180deg, #120607, #0A0304) !important; border-color: #2C1114 !important; }
+
+/* the live dashboard scene: red light instead of violet */
+html.aurum .pxs { --bg: #0E0406 !important; --gc: #FF4A55 !important; }
+html.aurum[data-theme="light"] .pxs { --bg: #3E070C !important; }
+html.aurum[data-theme="dark"] .pxs { box-shadow: 0 0 0 1px rgba(229, 35, 47, .28), 0 24px 50px -26px rgba(229, 35, 47, .6) !important; }
+html.aurum .pxs-g1 { background: radial-gradient(circle, rgba(229, 35, 47, .55), transparent 70%) !important; }
+html.aurum .pxs-g2 { background: radial-gradient(circle, rgba(140, 10, 25, .55), transparent 70%) !important; }
+html.aurum .pxs-c { border-color: rgba(255, 110, 120, .3) !important; }
+html.aurum .pxs-c.on { background: #E5232F !important; border-color: #FF5A65 !important; box-shadow: 0 0 14px rgba(229, 35, 47, .6) !important; }
+html.aurum .pxs-c svg { stroke: #2A0508 !important; }
+html.aurum .pxs-cap-dot { background: #FF3B47 !important; box-shadow: 0 0 10px #FF3B47 !important; }
+
+/* bottom bar (glass): the open tab glows red */
+html.aurum #bottom-nav .bn-glass { background: rgba(229, 35, 47, .16) !important; }
+html.aurum[data-theme="dark"] #bottom-nav { border-color: rgba(229, 35, 47, .28) !important; }
+
+/* tabs / chips that were white or navy when selected */
+html.aurum .seg button.on, html.aurum .tabs .on, html.aurum .chip.on, html.aurum .ax-seg .on, html.aurum .filter-chip.active { background: #E5232F !important; color: #fff !important; border-color: transparent !important; }
+html.aurum table thead th { color: var(--ax-gold-2) !important; }
+html.aurum .page-title, html.aurum h2 .icon { color: inherit; }
+html.aurum .brand-name, html.aurum .banner-name { letter-spacing: .01em; }
+
+/* the first KPI (sales today) = the big red card of the reference */
+html.aurum .mh-k.hi, html.aurum[data-theme="dark"] .mh-k.hi, html.aurum[data-theme="light"] .mh-k.hi {
+  background: radial-gradient(120% 140% at 100% 0%, #FF4651 0%, #D11A25 45%, #7E0A12 100%) !important; border: 1px solid rgba(255, 120, 128, .55) !important;
+  box-shadow: 0 18px 40px -18px rgba(229, 35, 47, .9), inset 0 1px 0 rgba(255, 255, 255, .25) !important; }
+html.aurum .mh-k.hi .mh-kl, html.aurum .mh-k.hi b, html.aurum .mh-k.hi em,
+html.aurum[data-theme="dark"] .mh-k.hi .mh-kl, html.aurum[data-theme="dark"] .mh-k.hi b, html.aurum[data-theme="dark"] .mh-k.hi em { color: #FFFFFF !important; }
+
+/* bottom bar: the open tab is red */
+html.aurum #bottom-nav .bn-item.active, html.aurum #bottom-nav .bn-item.active svg, html.aurum #bottom-nav .bn-item.bn-hot, html.aurum #bottom-nav .bn-ghost.bn-hot { color: #FF3B47 !important; }
+html.aurum[data-theme="light"] #bottom-nav .bn-item.active, html.aurum[data-theme="light"] #bottom-nav .bn-item.active svg { color: #D71F2B !important; }
+
+/* the live chart line in red */
+html.aurum .pxs, html.aurum .pxs .pxs-plot { --gc: #FF3B47 !important; }
+html.aurum .pxs stop { stop-color: #FF3B47 !important; }
+html.aurum[data-theme="light"] .ax-hl.hlk-b, html.aurum[data-theme="light"] thead .ax-hl { --hl: rgba(215, 31, 43, .16) !important; }

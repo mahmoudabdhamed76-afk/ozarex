@@ -1,13 +1,13 @@
 {
-  "name": "نظام الحسابات — إدارة التوريدات",
-  "short_name": "الحسابات",
+  "name": "Ozarex — إدارة التوريدات",
+  "short_name": "Ozarex",
   "description": "نظام إدارة التوريدات والمحاسبة المتكامل",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#121212",
-  "theme_color": "#121212",
+  "background_color": "#070304",
+  "theme_color": "#070304",
   "dir": "rtl",
   "lang": "ar",
   "icons": [

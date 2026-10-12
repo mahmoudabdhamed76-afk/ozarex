@@ -31,6 +31,8 @@ try {
 // 4.20 · a weak password (e.g. the first admin/admin) must be changed before anything else is allowed
 // 4.20 · drop any settings row named like an object internal (could only have come from a crafted request)
 try { db.exec("DELETE FROM settings WHERE key IN ('__proto__', 'constructor', 'prototype')"); } catch (e) {}
+// 4.31 · the old default company name becomes Ozarex (a name the buyer typed himself stays as it is)
+try { db.prepare("UPDATE settings SET value = 'Ozarex' WHERE key = 'companyName' AND value IN ('نظام الحسابات', '\"نظام الحسابات\"')").run(); } catch (e) { console.error('companyName migration:', e.message); }
 db.exec('CREATE TABLE IF NOT EXISTS user_flags (user_id TEXT PRIMARY KEY, must_change INTEGER NOT NULL DEFAULT 0)');
 
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get().c;

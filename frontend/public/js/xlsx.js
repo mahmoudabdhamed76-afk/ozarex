@@ -146,7 +146,7 @@
       ['صافي الكاش (تحصيل − موردين − مصروفات)', { f: 'B5-B10-B12', v: vPay - vSp - vExp, s: 4 }]
     ];
     var now = new Date();
-    sumRows.push(['', null], ['الشركة', S().companyName || 'نظام الحسابات'], ['تاريخ التصدير', now.toLocaleString('en-GB')]);
+    sumRows.push(['', null], ['الشركة', S().companyName || 'Ozarex'], ['تاريخ التصدير', now.toLocaleString('en-GB')]);
     sheets.unshift({ name: 'ملخص', first: true, noFilter: true, cols: [{ h: 'البند', w: 40 }, { h: 'القيمة', t: 'n', w: 22 }], rows: sumRows });
     return sheets;
   }
@@ -167,7 +167,7 @@
       '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>');
     var iso = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
     put('docProps/core.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' +
-      '<dc:title>' + x((S().companyName || 'نظام الحسابات') + ' — كل البيانات') + '</dc:title><dc:creator>ERP</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">' + iso + '</dcterms:created></cp:coreProperties>');
+      '<dc:title>' + x((S().companyName || 'Ozarex') + ' — كل البيانات') + '</dc:title><dc:creator>ERP</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">' + iso + '</dcterms:created></cp:coreProperties>');
     put('docProps/app.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Microsoft Excel</Application></Properties>');
     put('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
       '<workbookPr/><bookViews><workbookView xWindow="0" yWindow="0" windowWidth="20000" windowHeight="12000" activeTab="0"/></bookViews><sheets>' +

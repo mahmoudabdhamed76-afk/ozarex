@@ -11,7 +11,7 @@
   'use strict';
   var MQ = window.matchMedia('(max-width: 768px)');
   var RM = window.matchMedia('(prefers-reduced-motion: reduce)');
-  var ALSO = { sales: 'issuances' };                       // a page shown under another tab
+  var ALSO = { sales: 'issuances', stock: 'inventory' };   // a page shown under another tab (4.31: «مخزوني وجرد» lights «المخزن»)
   var drag = null, blockClicksUntil = 0;
 
   function page() { return typeof currentPage !== 'undefined' ? currentPage : ''; }
@@ -31,7 +31,7 @@
   /* ── resting state: the lens under the open tab ── */
   function sync() {
     var bn = nav(); if (!bn) return;
-    var p = page(), tab = ALSO[p] || p, act = null;
+    var p = page(), tab = ALSO[p] && bn.querySelector(':scope > .bn-item[data-page="' + ALSO[p] + '"]') ? ALSO[p] : p, act = null;
     tabs(bn).forEach(function (b) {
       var on = !!b.dataset.page && b.dataset.page === tab;
       b.classList.toggle('active', on);

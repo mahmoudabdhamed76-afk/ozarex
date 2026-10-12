@@ -399,7 +399,7 @@
       '<button class="btn btn-secondary" onclick="AXCount.printReport(\'' + c.id + '\')">' + SVG.print + ' طباعة</button><button class="btn btn-ghost" onclick="closeModal()">إغلاق</button>', 'large');
   }
   function printDoc(title, inner) {
-    var co = S().companyName || 'نظام الحسابات';
+    var co = S().companyName || 'Ozarex';
     var w = window.open('', '_blank'); if (!w) { if (typeof toast === 'function') toast('المتصفح منع نافذة الطباعة', 'error'); return; }
     w.document.write('<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>' + esc(title) + '</title>' +
       '<style>@page{size:A4;margin:14mm}body{font-family:"Zain","IBM Plex Sans Arabic","Cairo",Tahoma,sans-serif;color:#000;margin:0}' +

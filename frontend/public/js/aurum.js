@@ -79,7 +79,7 @@
     root.setAttribute('data-theme', t);
     try { localStorage.setItem('theme', t); } catch (e) {}
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', t === 'light' ? '#002055' : '#000000');
+    if (meta) meta.setAttribute('content', t === 'light' ? '#B3121B' : '#070304');
     if (typeof updateThemeIcon === 'function') { try { updateThemeIcon(t); } catch (e) {} }
     if (typeof currentPage !== 'undefined' && currentPage === 'dashboard' && typeof renderDashboard === 'function') {
       try { renderDashboard(); } catch (e) {}
@@ -423,7 +423,7 @@
       'table{width:100%;border-collapse:collapse;font-size:13px}td,th{border:1px solid #e6e6e6;padding:6px 8px;text-align:right}th{background:#f2f2f2;font-weight:600}.n{text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap}.e{color:#9a9a9a;text-align:center}' +
       '.sig{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:44px;text-align:center;font-size:13px}.sig div{border-top:1.5px solid #000;padding-top:6px}' +
       '@media print{body{padding:0}@page{margin:12mm}}</style></head><body><div class="frame">' +
-      '<header><img src="' + logo + '" alt=""><h1>' + esc(s.companyName || 'نظام الحسابات') + '</h1><div class="d">' + esc(dateLabel) + '</div><h2>تقرير تقفيل اليومية</h2></header>' +
+      '<header><img src="' + logo + '" alt=""><h1>' + esc(s.companyName || 'Ozarex') + '</h1><div class="d">' + esc(dateLabel) + '</div><h2>تقرير تقفيل اليومية</h2></header>' +
       '<div class="tiles"><div class="t"><span>المبيعات</span><b>' + money(r.sales) + '</b></div><div class="t"><span>المحصّل</span><b>' + money(r.collected) + '</b></div>' +
       '<div class="t"><span>المصروف والسداد</span><b>' + money(r.spent + r.toSuppliers) + '</b></div><div class="t g"><span>صافي الخزنة</span><b>' + money(r.net) + '</b></div></div>' +
       '<div class="cols"><div>' + tbl('التحصيل حسب طريقة الدفع', r.byMethod, money) + tbl('المصروفات حسب البند', r.byCat, money) + '</div>' +
