@@ -1,6 +1,6 @@
 /* 4.27 · «الأمان والنسخ» + «المستخدمين» behind the settings password · «المزيد» on the computer (smaller, animated)
    · the new «المبيعات» page (phone: the attached design · computer: like «الفواتير»). */
-import { test, expect, openSignedIn, watchErrors, unlockSection, LOCK_PW } from './fixtures.mjs';
+import { test, expect, openSignedIn, watchErrors, unlockSection, LOCK_PW, ADMIN_PASSWORD, waitForApp } from './fixtures.mjs';
 import { login, adminLogin, send, ops, col } from '../helpers/api.mjs';
 
 const isDesktop = () => test.info().project.name === 'desktop';
@@ -49,8 +49,10 @@ test('«الأمان والنسخ» and «المستخدمين» are locked like
 test('«المزيد» on the computer: a smaller panel that opens with motion', async ({ app: page }) => {
   test.skip(!isDesktop(), 'desktop only');
   await page.click('#ax-more-fab');
+  /* look at the very first frame (rewind + pause, so a busy machine can't make us sample a late one), then let it play */
   const first = await page.evaluate(() => { const p = document.querySelector('#mh-more .mh-panel'), cs = getComputedStyle(p);
-    return { anim: cs.animationName, scale: new DOMMatrix(cs.transform).a }; });
+    const an = p.getAnimations().filter(a => a.animationName === 'axMorePanelIn'); an.forEach(a => { a.pause(); a.currentTime = 0; });
+    const r = { anim: cs.animationName, scale: new DOMMatrix(cs.transform).a }; an.forEach(a => a.play()); return r; });
   expect(first.anim).toBe('axMorePanelIn');
   expect(first.scale).toBeLessThan(0.9);                                    // starts small (grows out of the button)
   await expect.poll(() => page.evaluate(() => document.querySelector('#mh-more .mh-panel').getAnimations().filter(a => a.playState === 'running').length), { timeout: 5000 }).toBe(0);
@@ -247,4 +249,35 @@ test('4.29 phone: pressing a tab grows the glass lens; dragging moves it; releas
   await page.mouse.click(home.x + home.width / 2, home.y + home.height / 2);
   await expect.poll(() => page.evaluate(() => currentPage), { timeout: 5000 }).toBe('dashboard');
   expect(errors).toEqual([]);
+});
+
+/* ── 4.30 · welcome screen ── */
+test('4.30 welcome screen: brand on red shows once per launch, covers the app, then lifts away', async ({ page, context, server }) => {
+  const errors = watchErrors(page);
+  const l = await login(server.base, 'admin', ADMIN_PASSWORD);
+  await context.addCookies([{ name: 'emx_sid', value: l.token, domain: new URL(server.base).hostname, path: '/', httpOnly: true, sameSite: 'Lax' }]);
+  await page.addInitScript(t => { try { localStorage.setItem('emx_tok', t); } catch (_) {} }, l.token);
+  await page.clock.install({ time: new Date('2026-01-01T10:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-01-01T10:00:01Z'));                  // time stands still, so a slow machine can't make us miss it
+  await page.goto(server.base + '/?splash=1');
+  const sp = page.locator('#ax-splash');
+  await expect(sp).toBeVisible();
+  await expect(sp.locator('.axs-name')).toHaveText('OZAREX');
+  await expect(sp.locator('.axs-sub')).toContainText('تجربة مختلفة');
+  expect(await sp.evaluate(e => getComputedStyle(e).backgroundColor)).toBe('rgb(225, 83, 99)');
+  const box = await sp.boundingBox(); const vp = page.viewportSize();
+  expect(box.width).toBeGreaterThanOrEqual(vp.width - 1); expect(box.height).toBeGreaterThanOrEqual(vp.height - 1);
+  await page.clock.resume();                                                   // now let it run its course
+  await waitForApp(page);
+  await expect(sp).toHaveCount(0, { timeout: 10000 });                         // lifted away and removed
+  expect(await page.evaluate(() => document.documentElement.classList.contains('ax-splash-on'))).toBe(false);
+  /* same launch (same tab): a reload does not show it again */
+  await page.goto(server.base + '/?splash=1');
+  await waitForApp(page);
+  expect(await page.locator('#ax-splash').count()).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('4.30 the welcome screen never shows under automation unless asked, so tests are not blocked', async ({ app: page }) => {
+  expect(await page.locator('#ax-splash').count()).toBe(0);
 });

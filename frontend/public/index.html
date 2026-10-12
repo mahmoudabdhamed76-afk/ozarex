@@ -38,10 +38,27 @@
   /* 4.9 · no splash: the login form shows at once. Only when this device was
      signed in before do we keep it hidden for the moment the session check
      takes, so a signed-in user never sees it flash. */
+  /* 4.30 · welcome screen once per launch of the app (a new tab / a cold start of the installed app) */
+  try { if ((!navigator.webdriver || /[?&]splash=1/.test(location.search)) && !sessionStorage.getItem('ax_splash')) { sessionStorage.setItem('ax_splash', '1'); d.classList.add('ax-splash-on'); window.__axSplashAt = Date.now(); } } catch (e) {}
   try { if (localStorage.getItem('emx_last_user')) { d.classList.add('ax-resume'); setTimeout(function () { d.classList.remove('ax-resume'); }, 8000); } } catch (e) {}
 })();
 </script>
 <style>html.ax-resume #login-page { visibility: hidden; }</style>
+<style>
+/* 4.30 · welcome screen: the brand on red, a short line that fills, then it lifts away — once per launch */
+#ax-splash{position:fixed;inset:0;z-index:2147483000;display:none;flex-direction:column;align-items:center;justify-content:center;background:#E15363;color:#fff;
+  text-align:center;direction:rtl;-webkit-tap-highlight-color:transparent;transition:opacity .55s ease,transform .55s cubic-bezier(.2,.7,.2,1),visibility 0s linear .55s}
+html.ax-splash-on #ax-splash{display:flex}
+html.ax-splash-on body{overflow:hidden}
+#ax-splash.out{opacity:0;transform:scale(1.04);visibility:hidden;pointer-events:none}
+#ax-splash .axs-name{font-family:'Inter','Helvetica Neue',Arial,sans-serif!important;font-weight:800!important;font-size:clamp(40px,11.5vw,96px)!important;line-height:1!important;letter-spacing:.01em;margin:0!important;animation:axsRise .7s cubic-bezier(.2,.8,.2,1) both}
+#ax-splash .axs-sub{margin:18px 0 0;font:500 clamp(13px,3.6vw,17px)/1.5 var(--ax-font,'IBM Plex Sans Arabic','Cairo',sans-serif);opacity:.88;animation:axsRise .7s .18s cubic-bezier(.2,.8,.2,1) both}
+#ax-splash .axs-bar{width:min(34vw,150px);height:3px;margin-top:38px;border-radius:3px;background:rgba(255,255,255,.28);overflow:hidden;animation:axsRise .7s .3s both}
+#ax-splash .axs-bar i{display:block;height:100%;width:100%;background:#fff;border-radius:3px;transform-origin:right center;transform:scaleX(0);animation:axsFill 1.5s .35s cubic-bezier(.4,0,.2,1) forwards}
+@keyframes axsRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes axsFill{to{transform:scaleX(1)}}
+@media (prefers-reduced-motion:reduce){#ax-splash .axs-name,#ax-splash .axs-sub,#ax-splash .axs-bar{animation:none}#ax-splash .axs-bar i{animation:none;transform:scaleX(1)}#ax-splash{transition:opacity .2s}}
+</style>
 <style>
 /* ========================= VARIABLES ========================= */
 :root {
@@ -9473,6 +9490,26 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 <link rel="stylesheet" href="css/aurum.css">
 </head>
 <body>
+<div id="ax-splash" role="presentation" aria-hidden="true">
+  <h1 class="axs-name">OZAREX</h1>
+  <p class="axs-sub">تجربة مختلفة لإدارة أعمالك</p>
+  <div class="axs-bar"><i></i></div>
+</div>
+<script>
+/* the welcome screen stays at least ~1.9 s (the line fills), then goes as soon as the app is ready (never later than 5 s) */
+(function(){
+  var d = document.documentElement, el = document.getElementById('ax-splash'), t0 = window.__axSplashAt || Date.now(), ready = false, gone = false;
+  if (!el || !d.classList.contains('ax-splash-on')) { if (el) el.remove(); window.AXSplash = { done: function(){} }; return; }
+  function go(){
+    if (gone) return; gone = true;
+    el.classList.add('out');
+    setTimeout(function(){ d.classList.remove('ax-splash-on'); if (el.parentNode) el.remove(); }, 650);
+  }
+  function tryGo(){ if (!ready) return; var left = 1900 - (Date.now() - t0); if (left > 0) setTimeout(go, left); else go(); }
+  window.AXSplash = { done: function(){ ready = true; tryGo(); } };
+  setTimeout(function(){ ready = true; go(); }, 5000);
+})();
+</script>
 <div id="route-progress"><div class="rp-bar"></div></div>
 
 <!-- ============== LOGIN PAGE ============== -->
@@ -9633,7 +9670,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">نظام الحسابات</span></div>
-      <div class="version">الإصدار 4.29</div>
+      <div class="version">الإصدار 4.30</div>
     </footer>
   </div>
 </div>
@@ -11792,7 +11829,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.notify-overlay:not(.show)').forEach(o => o.remove());
   }, true);
   /* 4.7 · who is this browser? (server session cookie) */
-  const dismissBoot = () => document.documentElement.classList.remove('ax-resume');
+  const dismissBoot = () => { document.documentElement.classList.remove('ax-resume'); try { if (window.AXSplash) AXSplash.done(); } catch (_) {} };
   const prepareData = () => {
     if (!DB.load()) seedData();
     OfflineManager.setBase(DB.data);      // what the server has → every save sends only the difference
