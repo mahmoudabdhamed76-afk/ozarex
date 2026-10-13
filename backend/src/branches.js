@@ -93,7 +93,10 @@ function update(id, b) {
     if (id === 'main' && !b.active) throw new BranchError('main_always', 'الفرع الأساسي مينفعش يتقفل');
     next.active = !!b.active;
   }
-  db.prepare('UPDATE branches SET name = ?, code = ?, active = ?, sort = ?, data = ? WHERE id = ?').run(next.name, next.code, next.active ? 1 : 0, next.sort, JSON.stringify({ color: next.color }), id);
+  /* the row's other notes (one-time setup flags) are kept — only the colour is ours to change */
+  let extra; try { const r = db.prepare('SELECT data FROM branches WHERE id = ?').get(id); extra = (r && r.data && JSON.parse(r.data)) || {}; } catch (_) { extra = {}; }
+  extra.color = next.color;
+  db.prepare('UPDATE branches SET name = ?, code = ?, active = ?, sort = ?, data = ? WHERE id = ?').run(next.name, next.code, next.active ? 1 : 0, next.sort, JSON.stringify(extra), id);
   return get(id);
 }
 /* (no delete on purpose: a branch with records is switched off, never wiped) */

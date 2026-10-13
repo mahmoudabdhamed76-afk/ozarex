@@ -4,7 +4,7 @@
 import { test, expect, watchErrors, waitForApp, ADMIN_PASSWORD, SALES } from './fixtures.mjs';
 import { login, req } from '../helpers/api.mjs';
 
-const MN = 'b_menouf0001', CA = 'b_cairo00001';
+const MN = 'b_minya00001', CA = 'b_cairo00001';   // MN: «فرع المنيا» (the main branch is منوف)
 const apiData = async (base, branch) => { const t = (await login(base, 'admin', ADMIN_PASSWORD)).token; return (await req(base, 'GET', '/api/data', { token: t, headers: { 'X-Branch': branch } })).json; };
 const idbKeys = page => page.evaluate(() => new Promise(res => { const r = indexedDB.open('erp-offline', 1); r.onsuccess = () => { const db = r.result; if (!db.objectStoreNames.contains('data_snapshot')) return res({}); const out = {}; const tx = db.transaction(['data_snapshot', 'sync_queue']);
   tx.objectStore('data_snapshot').openCursor().onsuccess = e => { const c = e.target.result; if (c) { out[c.key] = { branch: c.value.branch || 'main', n: (JSON.parse(c.value.json || '{}').customers || []).length }; c.continue(); } };
@@ -14,23 +14,24 @@ const switchTo = async (page, id) => { await page.evaluate(id => AXBranch.go(id)
 
 test.describe.configure({ mode: 'serial' });
 
-test('the open branch is always shown; the picker lists منوف / القاهرة / المنيا; switching opens that branch only', async ({ app: page, server }, info) => {
+test('the open branch is always shown (main = فرع منوف); the picker lists القاهرة / المنيا; switching opens that branch only', async ({ app: page, server }, info) => {
   const errors = watchErrors(page);
   const phone = info.project.name !== 'desktop';
   const chip = page.locator(phone ? '#axb-chip-m' : '#axb-chip-d');
   await expect(chip).toBeVisible();
-  await expect(chip).toContainText('الفرع الأساسي');
+  await expect(chip).toContainText('فرع منوف');
   const mainCustomers = await page.evaluate(() => DB.data.customers.length);
   expect(mainCustomers).toBeGreaterThan(0);
   await chip.click();
   const rows = page.locator('#axb-sheet .axb-row');
-  await expect(rows).toHaveCount(4);
+  await expect(rows).toHaveCount(3);
   await expect(rows.nth(0)).toHaveAttribute('aria-current', 'true');
   for (const n of ['فرع منوف', 'فرع القاهرة', 'فرع المنيا']) await expect(page.locator('#axb-sheet')).toContainText(n);
-  await rows.filter({ hasText: 'فرع منوف' }).click();
-  await page.waitForFunction(() => { try { return Branch.get() === 'b_menouf0001' && !!currentUser; } catch (_) { return false; } }, null, { timeout: 30000 });
+  await expect(rows.nth(0)).toContainText('الفرع الأساسي');
+  await rows.filter({ hasText: 'فرع المنيا' }).click();
+  await page.waitForFunction(() => { try { return Branch.get() === 'b_minya00001' && !!currentUser; } catch (_) { return false; } }, null, { timeout: 30000 });
   await waitForApp(page);
-  await expect(page.locator(phone ? '#axb-chip-m' : '#axb-chip-d')).toContainText('فرع منوف');
+  await expect(page.locator(phone ? '#axb-chip-m' : '#axb-chip-d')).toContainText('فرع المنيا');
   expect(await page.evaluate(() => DB.data.customers.length)).toBe(0);         // a new branch: empty
   expect(await page.evaluate(() => DB.data.invoices.length)).toBe(0);
   /* remembered on this device: a reload stays on منوف */
@@ -41,7 +42,7 @@ test('the open branch is always shown; the picker lists منوف / القاهر�
   expect(errors).toEqual([]);
 });
 
-test('a record saved in منوف goes to منوف only (the server and the screens)', async ({ app: page, server }) => {
+test('a record saved in المنيا goes to المنيا only (the server and the screens)', async ({ app: page, server }) => {
   const errors = watchErrors(page);
   await switchTo(page, MN);
   const id = 'c_mn_' + test.info().project.name;
@@ -62,7 +63,7 @@ test('a record saved in منوف goes to منوف only (the server and the scree
   expect(errors).toEqual([]);
 });
 
-test('offline in منوف: the change waits in the queue tagged منوف and is sent to منوف when back online', async ({ app: page, server, context }) => {
+test('offline in المنيا: the change waits in the queue tagged المنيا and is sent to المنيا when back online', async ({ app: page, server, context }) => {
   await switchTo(page, MN);
   const id = 'c_off_' + test.info().project.name;
   await context.setOffline(true);
@@ -79,12 +80,12 @@ test('offline in منوف: the change waits in the queue tagged منوف and is 
 test('the admin manages branches: add one, and choose who opens which (enforced by the server)', async ({ app: page, server }, info) => {
   const errors = watchErrors(page);
   await page.evaluate(() => AXBranch.manage());
-  await expect(page.locator('#axb-sheet .axb-br')).toHaveCount(4);
+  await expect(page.locator('#axb-sheet .axb-br')).toHaveCount(3);
   const name = 'فرع طنطا ' + info.project.name;
   await page.fill('#axb-new-n', name);
   await page.fill('#axb-new-c', 'TN');
   await page.locator('#axb-sheet .axb-new .axb-btn').click();
-  await expect(page.locator('#axb-sheet .axb-br')).toHaveCount(5);
+  await expect(page.locator('#axb-sheet .axb-br')).toHaveCount(4);
   expect(await page.evaluate(n => Branch.list().some(b => b.name === n), name)).toBe(true);
   /* make sure the restricted user exists, then give her منوف */
   const t = (await login(server.base, 'admin', ADMIN_PASSWORD)).token;
@@ -93,12 +94,36 @@ test('the admin manages branches: add one, and choose who opens which (enforced 
   await page.evaluate(() => AXBranch.close());
   await page.evaluate(() => AXBranch.manage());
   const row = page.locator('#axb-sheet .axb-u').filter({ hasText: SALES.name });
-  await row.locator('.axb-ch', { hasText: 'فرع منوف' }).click();
-  await expect(row.locator('.axb-ch.on', { hasText: 'فرع منوف' })).toHaveCount(1);
+  await row.locator('.axb-ch', { hasText: 'فرع المنيا' }).click();
+  await expect(row.locator('.axb-ch.on', { hasText: 'فرع المنيا' })).toHaveCount(1);
   await page.locator('#axb-sheet .axb-btn.wide').click();
   const st = (await login(server.base, SALES.username, SALES.password)).token;
-  await expect.poll(async () => (await req(server.base, 'GET', '/api/branches', { token: st })).json.allowed.sort(), { timeout: 10000 }).toEqual(['b_menouf0001', 'main'].sort());
+  await expect.poll(async () => (await req(server.base, 'GET', '/api/branches', { token: st })).json.allowed.sort(), { timeout: 10000 }).toEqual(['b_minya00001', 'main'].sort());
   expect((await req(server.base, 'GET', '/api/data', { token: st, headers: { 'X-Branch': CA } })).status).toBe(403);
   await page.evaluate(() => AXBranch.close());
+  expect(errors).toEqual([]);
+});
+
+test('«جميع الفروع» (admin): totals + every branch, periods, and one tap opens a branch', async ({ app: page }) => {
+  const errors = watchErrors(page);
+  await page.evaluate(() => AXBranch.open());
+  await expect(page.locator('#axb-sheet .axb-all')).toBeVisible();
+  await page.locator('#axb-sheet .axb-all').click();
+  await expect(page.locator('#axb-sheet[data-k="all"] .axo-hero')).toBeVisible({ timeout: 10000 });
+  const cards = page.locator('#axb-sheet .axo-c');
+  expect(await cards.count()).toBeGreaterThanOrEqual(3);
+  await expect(cards.first()).toContainText('فرع منوف');
+  await expect(cards.first()).toContainText('انت فيه دلوقتي');
+  /* the hero = what the server says the total is */
+  const j = await page.evaluate(() => fetch('/api/branches/summary?p=month', { credentials: 'same-origin' }).then(r => r.json()));
+  await expect(page.locator('#axb-sheet .axo-hero b').first()).toContainText(Math.round(j.total.sales).toLocaleString('en-US'));
+  await page.locator('#axb-sheet .axo-per button', { hasText: 'الكل' }).click();
+  await expect(page.locator('#axb-sheet .axo-per button.on')).toHaveText('الكل');
+  await expect(page.locator('#axb-sheet .axo-hero')).toContainText('من أول يوم');
+  /* one tap → that branch */
+  await page.locator('#axb-sheet .axo-c', { hasText: 'فرع القاهرة' }).locator('.axb-btn.pri').click();
+  await page.waitForFunction(() => { try { return Branch.get() === 'b_cairo00001' && !!currentUser; } catch (_) { return false; } }, null, { timeout: 30000 });
+  await waitForApp(page);
+  await switchTo(page, 'main');
   expect(errors).toEqual([]);
 });

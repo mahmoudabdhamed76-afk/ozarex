@@ -17,6 +17,8 @@
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
     x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
     gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+    chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v3M11 11v7M15 7v11M19 4v14"/></svg>',
+    left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'
   };
   function B() { return window.Branch; }
@@ -78,10 +80,12 @@
     var rows = B().list().filter(function (b) { return allowed.indexOf(b.id) >= 0; }).map(function (b) {
       var on = b.id === cur;
       return '<button type="button" class="axb-row' + (on ? ' on' : '') + '" onclick="AXBranch.go(\'' + q(b.id) + '\')"' + (on ? ' aria-current="true"' : '') + '>' +
-        '<span class="axb-ri">' + IC.shop + '</span><span class="axb-rt"><b>' + esc(b.name) + '</b><em>' + (b.main ? 'البيانات الحالية للشركة' : 'مخزن وحسابات مستقلة') + (b.code ? ' · ' + esc(b.code) : '') + '</em></span>' +
+        '<span class="axb-ri">' + IC.shop + '</span><span class="axb-rt"><b>' + esc(b.name) + '</b><em>' + (b.main ? 'الفرع الأساسي · بياناتك الحالية' : 'مخزن وحسابات مستقلة') + (b.code ? ' · ' + esc(b.code) : '') + '</em></span>' +
         (on ? '<span class="axb-ok">' + IC.check + '</span>' : '') + '</button>';
     }).join('');
-    sheet('pick', 'اختار الفرع', '<p class="axb-lead">كل فرع ليه مخزنه وعملاءه وموردينه وفواتيره وخزنته. اللي هتشوفه وتسجّله بعد الاختيار بيخص الفرع ده بس.</p>' +
+    var all = isAdmin() && B().list().filter(function (b) { return b.active; }).length > 1
+      ? '<button type="button" class="axb-all" onclick="AXBranch.overview()"><span class="axb-ri">' + IC.chart + '</span><span class="axb-rt"><b>جميع الفروع</b><em>مبيعات وأرباح وخزائن ومخزون كل فرع والإجمالي</em></span><i class="axb-go">' + IC.left + '</i></button>' : '';
+    sheet('pick', 'اختار الفرع', all + '<p class="axb-lead">كل فرع ليه مخزنه وعملاءه وموردينه وفواتيره وخزنته. اللي هتشوفه وتسجّله بعد الاختيار بيخص الفرع ده بس.</p>' +
       '<div class="axb-list">' + rows + '</div>' +
       (isAdmin() ? '<button type="button" class="axb-manage" onclick="AXBranch.manage()">' + IC.gear + ' إدارة الفروع</button>' : ''));
   }
@@ -186,6 +190,64 @@
     draft = null; redraw();
   }
 
+  /* ── «جميع الفروع» (admin) — 4.33 · المرحلة 3 ── */
+  var ov = { p: 'month', from: '', to: '', data: null, busy: false };
+  var PERIODS = [['today', 'النهارده'], ['month', 'الشهر ده'], ['last', 'الشهر اللي فات'], ['year', 'السنة دي'], ['all', 'الكل']];
+  function money(n) { var v = Math.round(Number(n) || 0); try { if (typeof fmtCurrency === 'function') return fmtCurrency(v).replace(/\.00(?=\D|$)/, ''); } catch (_) { /* plain */ } return v.toLocaleString('en-US') + ' ج.م'; }
+  function num(n) { return Math.round(Number(n) || 0).toLocaleString('en-US'); }
+  function dmy(s) { var p = String(s || '').split('-'); return p.length === 3 ? (+p[2]) + '/' + (+p[1]) + '/' + p[0] : s; }
+  function overviewHtml() {
+    var d = ov.data;
+    var chips = '<div class="axo-per" role="tablist">' + PERIODS.map(function (x) { return '<button type="button" role="tab" aria-selected="' + (ov.p === x[0]) + '" class="' + (ov.p === x[0] ? 'on' : '') + '" onclick="AXBranch.period(\'' + x[0] + '\')">' + x[1] + '</button>'; }).join('') + '</div>';
+    if (!d) return chips + '<div class="axo-load">' + (ov.busy ? 'بيحسب أرقام الفروع…' : 'مفيش اتصال بالسيرفر — جرّب تاني') + '</div>';
+    var t = d.total, list = d.branches.slice(), maxS = Math.max(1, Math.max.apply(null, list.map(function (b) { return b.sales; })));
+    var when = d.period === 'all' ? 'من أول يوم' : (d.from === d.to ? dmy(d.from) : dmy(d.from) + ' ← ' + dmy(d.to));
+    var k = function (lbl, v, sub, cls) { return '<div class="axo-k' + (cls ? ' ' + cls : '') + '"><span>' + lbl + '</span><b>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>'; };
+    var head = '<div class="axo-hero"><div><span>إجمالي مبيعات كل الفروع · ' + esc(when) + '</span><b>' + money(t.sales) + '</b><em>' + num(t.salesDocs) + ' عملية بيع · ' + list.length + ' فروع</em></div>' +
+      '<div class="axo-hp"><span>صافي الربح</span><b class="' + (t.profit < 0 ? 'neg' : '') + '">' + money(t.profit) + '</b><em>بعد التكلفة والمصروفات</em></div></div>';
+    var grid = '<div class="axo-grid">' +
+      k('التحصيل', money(t.collections), num(t.collectionsCount) + ' عملية') +
+      k('المشتريات', money(t.purchases), 'فواتير الشراء') +
+      k('المصروفات', money(t.expenses), 'من غير المشتريات') +
+      k('الخزائن', money(t.treasury), 'الرصيد الحالي', t.treasury < 0 ? 'neg' : '') +
+      k('مديونيات العملاء', money(t.receivables), num(t.customers) + ' عميل') +
+      k('مستحق للموردين', money(t.payables), num(t.suppliers) + ' مورد') +
+      k('قيمة المخزون', money(t.stockValue), num(t.products) + ' صنف' + (t.lowStock ? ' · ' + num(t.lowStock) + ' تحت الحد' : '')) +
+      k('الربح الإجمالي', money(t.gross), 'المبيعات − التكلفة') + '</div>';
+    var bars = '<h4 class="axb-h">المبيعات حسب الفرع</h4><div class="axo-bars">' + list.map(function (b) {
+      var pc = t.sales > 0 ? Math.round(b.sales / t.sales * 100) : 0;
+      return '<div class="axo-bar"><span class="axo-bn">' + esc(b.name) + '</span><span class="axo-bt"><i style="width:' + Math.max(b.sales > 0 ? 2 : 0, b.sales / maxS * 100).toFixed(1) + '%"></i></span><span class="axo-bv">' + money(b.sales) + ' <small>' + pc + '%</small></span></div>';
+    }).join('') + '</div>';
+    var cards = '<h4 class="axb-h">كل فرع لوحده</h4><div class="axo-cards">' + list.map(function (b) {
+      var cur = b.id === B().get();
+      var r = function (l, v, cls) { return '<div class="axo-r' + (cls ? ' ' + cls : '') + '"><span>' + l + '</span><b>' + v + '</b></div>'; };
+      return '<article class="axo-c' + (cur ? ' cur' : '') + '"><header><span class="axb-ri">' + IC.shop + '</span><div><b>' + esc(b.name) + '</b><em>' + (b.main ? 'الفرع الأساسي' : 'فرع') + (b.code ? ' · ' + esc(b.code) : '') + (cur ? ' · مفتوح دلوقتي' : '') + '</em></div></header>' +
+        '<div class="axo-cs"><span>المبيعات</span><b>' + money(b.sales) + '</b><em>' + num(b.salesDocs) + ' عملية</em></div>' +
+        r('صافي الربح', money(b.profit), b.profit < 0 ? 'neg' : 'pos') + r('التحصيل', money(b.collections)) + r('المشتريات', money(b.purchases)) + r('المصروفات', money(b.expenses)) +
+        r('الخزنة', money(b.treasury), b.treasury < 0 ? 'neg' : '') + r('مديونيات العملاء', money(b.receivables)) + r('مستحق للموردين', money(b.payables)) + r('قيمة المخزون', money(b.stockValue)) +
+        (cur ? '<button type="button" class="axb-btn wide" disabled>انت فيه دلوقتي</button>' : (B().allowed().indexOf(b.id) >= 0 ? '<button type="button" class="axb-btn pri wide" onclick="AXBranch.go(\'' + q(b.id) + '\')">افتح ' + esc(b.name) + '</button>' : '')) +
+        '</article>';
+    }).join('') + '</div>';
+    return chips + head + grid + bars + cards + '<p class="axb-note">المبيعات = الصرف + الفواتير اللي مش طالعة من صرف · الربح = المبيعات بعد الخصم − تكلفة الأصناف − المصروفات · الخزنة = التحصيل − المصروفات − سداد الموردين (زي لوحة التحكم). التحويلات بين الفروع مش بتتحسب مبيعات.</p>';
+  }
+  function redrawOv() { var el = document.getElementById('axb-sheet'); if (el && el.getAttribute('data-k') === 'all') el.querySelector('.axb-body').innerHTML = overviewHtml(); }
+  async function loadOv() {
+    ov.busy = true; redrawOv();
+    try {
+      var r = await fetch(API_BASE + '/api/branches/summary?p=' + encodeURIComponent(ov.p), { credentials: 'same-origin', cache: 'no-store', headers: { 'X-Branch': 'main' } });
+      ov.data = r.ok ? await r.json() : null;
+    } catch (_) { ov.data = null; }
+    ov.busy = false; redrawOv();
+  }
+  function overview() {
+    if (!isAdmin()) return;
+    ov.data = null;
+    var el = sheet('all', 'جميع الفروع', overviewHtml());
+    el.classList.add('axo');
+    loadOv();
+  }
+  function period(p) { ov.p = p; ov.data = null; loadOv(); }
+
   /* keep the chip in place: the header is rebuilt on every page change */
   var o = window.updateHomeFab;
   if (typeof o === 'function' && !o._axb) {
@@ -195,5 +257,5 @@
   document.addEventListener('ax:branch', function () { try { mount(); } catch (_) { /* before the app is drawn */ } });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && document.getElementById('axb-sheet')) close(); });
 
-  window.AXBranch = { mount: mount, open: open, close: close, go: go, manage: manage, addBranch: addBranch, saveBranch: saveBranch, toggleUser: toggleUser, saveUsers: saveUsers };
+  window.AXBranch = { overview: overview, period: period, mount: mount, open: open, close: close, go: go, manage: manage, addBranch: addBranch, saveBranch: saveBranch, toggleUser: toggleUser, saveUsers: saveUsers };
 })();

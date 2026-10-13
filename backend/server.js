@@ -299,6 +299,22 @@ const server = http.createServer(async (req, res) => {
         try { const br = branches.create(b); store.logEvent(me, { operation: 'add', table: 'branches', recordId: br.id, recordLabel: br.name, after: br }); notifyAllBranches({ type: 'branches' }); return sendJSON(res, 200, { ok: true, branch: br }); }
         catch (e) { if (e instanceof branches.BranchError) return sendJSON(res, e.status, { error: e.code, message: e.message }); throw e; }
       }
+      /* 4.33 · «جميع الفروع»: every branch's numbers + the total (admin) — the same rules as the screens (js/branchstats.js) */
+      if (pathname === '/api/branches/summary' && req.method === 'GET') {
+        if (!admin) return adminOnly();
+        const BS = require(path.join(PUBLIC, 'js', 'branchstats.js'));
+        const tz = process.env.TZ || 'Africa/Cairo';
+        const today = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+        const okDay = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+        const p = ['today', 'month', 'last', 'year', 'all', 'custom'].includes(parsed.query.p) ? parsed.query.p : 'month';
+        let r = BS.range(p === 'custom' ? 'month' : p, today);
+        if (p === 'custom' && okDay(parsed.query.from) && okDay(parsed.query.to)) r = [String(parsed.query.from), String(parsed.query.to)].sort();
+        const rows = branches.list().filter(b => b.active || b.main).map(b => {
+          const bs = branches.storeOf(b.id);
+          return Object.assign({ id: b.id, name: b.name, code: b.code, main: b.main }, BS.summary(bs ? bs.data() : {}, r));
+        });
+        return sendJSON(res, 200, { period: p, from: r[0], to: r[1], today, branches: rows, total: BS.total(rows) });
+      }
       { const m = /^\/api\/branches\/([A-Za-z0-9_]{1,40})$/.exec(pathname);
         if (m && req.method === 'PUT') {
           if (!admin) return adminOnly();

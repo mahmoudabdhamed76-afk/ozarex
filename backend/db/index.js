@@ -79,11 +79,47 @@ try {
   if (!md.seeded && process.env.EMX_NO_SEED_BRANCHES !== '1') {
     const add = db.prepare('INSERT OR IGNORE INTO branches (id, name, code, active, sort) VALUES (?, ?, ?, 1, ?)');
     const have = new Set(db.prepare('SELECT name FROM branches').all().map(r => r.name));
-    [['b_menouf0001', 'فرع منوف', 'MN', 1], ['b_cairo00001', 'فرع القاهرة', 'CA', 2], ['b_minya00001', 'فرع المنيا', 'MI', 3]]
+    [['b_cairo00001', 'فرع القاهرة', 'CA', 2], ['b_minya00001', 'فرع المنيا', 'MI', 3]]
       .forEach(([id, name, code, sort]) => { if (!have.has(name)) add.run(id, name, code, sort); });
     md.seeded = true;
     db.prepare("UPDATE branches SET data = ? WHERE id = 'main'").run(JSON.stringify(md));
   }
 } catch (e) { console.error('branches seed:', e.message); }
+/* 4.33 · the main branch IS منوف: it is named «فرع منوف» and the separate «فرع منوف» made in 4.32 goes away —
+   deleted only when nothing was ever written in it (its file is kept in backups/removed); if it holds any
+   record it is switched off and renamed «منوف (قديم)» instead, so nothing is ever lost. Runs once. */
+try {
+  const m = db.prepare("SELECT name, data FROM branches WHERE id = 'main'").get();
+  let md = {}; try { md = m && m.data ? JSON.parse(m.data) || {} : {}; } catch (_) { md = {}; }
+  if (!md.menoufMain) {
+    db.prepare("UPDATE branches SET name = 'فرع منوف', code = 'MN' WHERE id = 'main'").run();
+    const old = db.prepare("SELECT id FROM branches WHERE id = 'b_menouf0001'").get();
+    if (old) {
+      const file = path.join(BRANCH_DIR, 'b_menouf0001.db');
+      let rows = 0;
+      if (fs.existsSync(file)) {
+        const bd = new DatabaseSync(file);
+        try {
+          for (const t of ['customers', 'suppliers', 'products', 'employees', 'expenses', 'payments', 'supplier_payments', 'stock_moves', 'bank_transfers', 'salary_runs', 'notes', 'invoices', 'issuances', 'settings']) {
+            try { rows += bd.prepare('SELECT COUNT(*) AS c FROM ' + t).get().c; } catch (_) { /* table missing = empty */ }
+          }
+        } finally { bd.close(); }
+      }
+      if (rows === 0) {
+        db.prepare("DELETE FROM branches WHERE id = 'b_menouf0001'").run();
+        if (fs.existsSync(file)) {
+          const keep = path.join(DATA_DIR, 'backups', 'removed'); fs.mkdirSync(keep, { recursive: true });
+          for (const ext of ['', '-wal', '-shm']) if (fs.existsSync(file + ext)) fs.renameSync(file + ext, path.join(keep, 'b_menouf0001-' + Date.now() + '.db' + ext));
+        }
+        console.log('[branches] «فرع منوف» (empty) removed — the main branch is منوف now');
+      } else {
+        db.prepare("UPDATE branches SET name = 'منوف (قديم)', active = 0 WHERE id = 'b_menouf0001'").run();
+        console.warn('[branches] «فرع منوف» had ' + rows + ' record(s): switched off and renamed «منوف (قديم)» — nothing deleted');
+      }
+    }
+    md.menoufMain = true;
+    db.prepare("UPDATE branches SET data = ? WHERE id = 'main'").run(JSON.stringify(md));
+  }
+} catch (e) { console.error('branches · منوف:', e.message); }
 
 module.exports = { db, DB_FILE, DATA_DIR, BRANCH_DIR, openDb };
