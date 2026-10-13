@@ -39,14 +39,17 @@ test('the main branch is there, named, and is what a request without a branch ge
 test('only the admin creates branches; a new branch starts empty with its own numbering', async () => {
   const sales = await createUser(s.base, admin, SALES);
   assert.equal((await req(s.base, 'POST', '/api/branches', { token: sales, body: { name: 'فرع ممنوع' } })).status, 403);
-  const a = await req(s.base, 'POST', '/api/branches', { token: admin, body: { name: 'فرع منوف', code: 'MN' } });
-  assert.equal(a.status, 200, a.text); menouf = a.json.branch.id;
-  const b = await req(s.base, 'POST', '/api/branches', { token: admin, body: { name: 'فرع القاهرة', code: 'CA' } });
-  cairo = b.json.branch.id;
-  assert.match(menouf, /^b_[a-z0-9]+$/);
+  /* Phase 2 · منوف / القاهرة / المنيا are made once at the first start (empty) */
+  const seeded = (await req(s.base, 'GET', '/api/branches', { token: admin })).json.branches;
+  assert.deepEqual(seeded.map(b => b.name), ['الفرع الأساسي', 'فرع منوف', 'فرع القاهرة', 'فرع المنيا']);
+  menouf = seeded.find(b => b.name === 'فرع منوف').id; cairo = seeded.find(b => b.name === 'فرع القاهرة').id;
+  const a = await req(s.base, 'POST', '/api/branches', { token: admin, body: { name: 'فرع طنطا', code: 'TN' } });
+  assert.equal(a.status, 200, a.text);
+  assert.match(a.json.branch.id, /^b_[a-z0-9]+$/);
+  assert.ok(existsSync(path.join(s.dataDir, 'branches', a.json.branch.id + '.db')), 'a new branch gets its file at once');
   assert.equal((await req(s.base, 'POST', '/api/branches', { token: admin, body: { name: 'فرع منوف' } })).status, 400, 'same name twice');
-  assert.ok(existsSync(path.join(s.dataDir, 'branches', menouf + '.db')), 'its own database file');
   const d = await dataB(admin, menouf);
+  assert.ok(existsSync(path.join(s.dataDir, 'branches', menouf + '.db')), 'its own database file');
   ['customers', 'products', 'invoices', 'issuances', 'payments', 'expenses', 'suppliers', 'stockMoves'].forEach(k => assert.deepEqual(d[k], [], k + ' starts empty'));
   assert.equal(d.counters.invoice, 1000);
   assert.ok(d.users.some(u => u.username === 'admin'), 'the company users are shown');
@@ -187,4 +190,20 @@ test('a center link (/p/…) made in a branch opens that branch\'s center', asyn
   assert.equal(r.status, 200);
   assert.match(await r.text(), /مركز رابط منوف/);
   assert.ok(!((await data(s.base, admin)).settings._portal || {}).pc1, 'the link list stays in its branch');
+});
+
+test('the three branches are made only once — a restart never brings a renamed one back', async () => {
+  assert.equal((await req(s.base, 'PUT', '/api/branches/' + cairo, { token: admin, body: { name: 'فرع القاهرة الجديدة' } })).status, 200);
+  await s.restart(); await relogin();
+  const names = (await req(s.base, 'GET', '/api/branches', { token: admin })).json.branches.map(b => b.name);
+  assert.ok(!names.includes('فرع القاهرة'), 'not made again');
+  assert.equal(names.filter(n => n === 'فرع منوف').length, 1);
+});
+
+test('the version a device polls is its own branch\'s', async () => {
+  const v1 = (await req(s.base, 'GET', '/api/version?branch=' + menouf)).json.version;
+  const vm = (await req(s.base, 'GET', '/api/version')).json.version;
+  assert.equal((await sendB(admin, menouf, ops({ cols: { notes: col({ added: [{ id: 'n_v', title: 'x', body: 'y' }] }) } }))).status, 200);
+  assert.ok((await req(s.base, 'GET', '/api/version?branch=' + menouf)).json.version > v1);
+  assert.equal((await req(s.base, 'GET', '/api/version')).json.version, vm, 'main did not move');
 });

@@ -72,5 +72,18 @@ db.exec(`CREATE TABLE IF NOT EXISTS branches (
   sort INTEGER NOT NULL DEFAULT 0, data TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now'))
 )`);
 db.prepare("INSERT OR IGNORE INTO branches (id, name, code, active, sort) VALUES ('main', 'الفرع الأساسي', 'A', 1, 0)").run();
+/* 4.32 · المرحلة 2 · the three branches asked for — made once (empty); later renamed / switched off from «إدارة الفروع» */
+try {
+  const m = db.prepare("SELECT data FROM branches WHERE id = 'main'").get();
+  let md = {}; try { md = m && m.data ? JSON.parse(m.data) || {} : {}; } catch (_) { md = {}; }
+  if (!md.seeded && process.env.EMX_NO_SEED_BRANCHES !== '1') {
+    const add = db.prepare('INSERT OR IGNORE INTO branches (id, name, code, active, sort) VALUES (?, ?, ?, 1, ?)');
+    const have = new Set(db.prepare('SELECT name FROM branches').all().map(r => r.name));
+    [['b_menouf0001', 'فرع منوف', 'MN', 1], ['b_cairo00001', 'فرع القاهرة', 'CA', 2], ['b_minya00001', 'فرع المنيا', 'MI', 3]]
+      .forEach(([id, name, code, sort]) => { if (!have.has(name)) add.run(id, name, code, sort); });
+    md.seeded = true;
+    db.prepare("UPDATE branches SET data = ? WHERE id = 'main'").run(JSON.stringify(md));
+  }
+} catch (e) { console.error('branches seed:', e.message); }
 
 module.exports = { db, DB_FILE, DATA_DIR, BRANCH_DIR, openDb };

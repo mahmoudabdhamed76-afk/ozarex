@@ -1,8 +1,8 @@
 'use strict';
 
-const CACHE      = 'erp-v2.3';   // bump on every release that changes a cached file (4.31)
+const CACHE      = 'erp-v2.4';   // bump on every release that changes a cached file (4.32)
 // relative to the SW scope, so it also works when the app lives under APP_PATH
-const APP_SHELL  = ['./', './index.html', './manifest.json', './css/aurum.css', './js/aurum.js', './js/glowchart.js', './js/stockhub.js', './js/stockcount.js', './js/debts.js', './js/business.js', './js/custody.js', './js/axcore.js', './js/rules.js', './js/forecast.js', './js/purchases.js', './js/xlsx.js', './js/credit.js', './js/monthly.js', './js/notify.js', './js/approvals.js', './js/security.js', './js/aging.js', './js/cheques.js', './js/profit.js', './js/purchase.js', './js/requests.js', './js/isscards.js', './js/users.js', './js/assistant.js', './js/papermeter.js', './js/ticker.js', './js/pulsescene.js', './js/mhome.js', './js/marker.js', './js/picker.js', './js/auditx.js', './js/fxtape.js', './js/forcepw.js', './js/centerstmt.js', './js/navsmart.js', './js/deskmore.js', './js/aibot.js', './js/settingsx.js', './js/sales.js', './js/glassnav.js', './vendor/gsap.min.js',
+const APP_SHELL  = ['./', './index.html', './manifest.json', './css/aurum.css', './js/aurum.js', './js/glowchart.js', './js/stockhub.js', './js/stockcount.js', './js/debts.js', './js/business.js', './js/custody.js', './js/axcore.js', './js/rules.js', './js/forecast.js', './js/purchases.js', './js/xlsx.js', './js/credit.js', './js/monthly.js', './js/notify.js', './js/approvals.js', './js/security.js', './js/aging.js', './js/cheques.js', './js/profit.js', './js/purchase.js', './js/requests.js', './js/isscards.js', './js/users.js', './js/assistant.js', './js/papermeter.js', './js/ticker.js', './js/pulsescene.js', './js/mhome.js', './js/marker.js', './js/picker.js', './js/auditx.js', './js/fxtape.js', './js/forcepw.js', './js/centerstmt.js', './js/navsmart.js', './js/deskmore.js', './js/aibot.js', './js/settingsx.js', './js/sales.js', './js/glassnav.js', './js/branches.js', './vendor/gsap.min.js',
                     './fonts/fonts.css', './vendor/chart.umd.js', './vendor/modern-screenshot.js',
                     './icons/logo-square.png'];
 const DB_NAME    = 'erp-offline';
@@ -164,7 +164,7 @@ async function flushQueue() {
       if (!it.ops) { await removeItem(it.id); continue; }       // old full-copy item (before 4.7)
       const res = await fetch(new URL('./api/ops', self.registration.scope).href, {
         method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json', 'X-Offline-Sync': '1' },
+        headers: { 'Content-Type': 'application/json', 'X-Offline-Sync': '1', 'X-Branch': it.branch || 'main' },   // 4.32 · each change goes to the branch it was made in
         body: JSON.stringify({ ops: it.ops, opId: it.opId })
       });
       codes.push(res.status);

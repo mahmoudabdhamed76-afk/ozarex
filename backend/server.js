@@ -237,7 +237,7 @@ const server = http.createServer(async (req, res) => {
       const logo = typeof st.companyLogo === 'string' && /^data:image\/(png|jpe?g|webp|gif);base64,/.test(st.companyLogo) ? st.companyLogo : '';
       return sendJSON(res, 200, { name: String(st.companyName || '').slice(0, 120), logo });
     }
-    if (pathname === '/api/version' && req.method === 'GET') return sendJSON(res, 200, { version: verOf('main') });
+    if (pathname === '/api/version' && req.method === 'GET') { const vb = String(parsed.query.branch || 'main'); return sendJSON(res, 200, { version: branches.get(vb) ? verOf(vb) : verOf('main') }); }
     /* a center's own read-only page (token link) */
     if (pathname.startsWith('/p/') && portal.handle(req, res, pathname, () => branches.allStores().map(st => st.data()))) return;   // 4.32 · a center's link works in any branch
 

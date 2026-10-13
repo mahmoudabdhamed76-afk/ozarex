@@ -9670,7 +9670,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 4.31</div>
+      <div class="version">الإصدار 4.32</div>
     </footer>
   </div>
 </div>
@@ -9808,17 +9808,53 @@ const DeviceToken = {
   get() { try { return localStorage.getItem(this.KEY) || ''; } catch (_) { return ''; } },
   set(t) { try { if (t) localStorage.setItem(this.KEY, t); else localStorage.removeItem(this.KEY); } catch (_) {} }
 };
+/* 4.32 · the branch open on this device. Every API call names it (X-Branch) — the server only ever
+   answers with that branch's records. Switching branch reloads the app (nothing of the old branch stays
+   in memory). The choice is remembered per user on this device. */
+const Branch = {
+  _cur: 'main', _list: [], _allowed: ['main'], _uid: '',
+  get() { return this._cur || 'main'; },
+  list() { return this._list.slice(); },
+  allowed() { return this._allowed.slice(); },
+  info(id) { id = id || this.get(); return this._list.find(b => b.id === id) || { id, name: id === 'main' ? 'الفرع الأساسي' : 'فرع', code: '', main: id === 'main', active: true }; },
+  _k(uid, x) { return 'ax_branch' + (x || '') + '_' + (uid || 'x'); },
+  set(got) {
+    this._list = (got && Array.isArray(got.branches) && got.branches.length) ? got.branches : [{ id: 'main', name: 'الفرع الأساسي', code: 'A', active: true, main: true }];
+    this._allowed = (got && Array.isArray(got.allowed) && got.allowed.length) ? got.allowed : ['main'];
+  },
+  async init(uid, offline) {
+    this._uid = uid || '';
+    let stored = '', got = null;
+    try { stored = localStorage.getItem(this._k(uid)) || ''; } catch (_) {}
+    if (!offline) {
+      try {
+        const r = await fetch(API_BASE + '/api/branches', { cache: 'no-store', credentials: 'same-origin', signal: AbortSignal.timeout(6000), headers: { 'X-Branch': 'main' } });
+        if (r.ok) got = await r.json();
+      } catch (_) {}
+    }
+    if (got && Array.isArray(got.branches)) { try { localStorage.setItem(this._k(uid, 's'), JSON.stringify(got)); } catch (_) {} }
+    else { try { got = JSON.parse(localStorage.getItem(this._k(uid, 's')) || 'null'); } catch (_) { got = null; } }
+    this.set(got);
+    this._cur = this._allowed.includes(stored) ? stored : (this._allowed.includes('main') ? 'main' : this._allowed[0]);
+    document.documentElement.setAttribute('data-branch', this._cur);
+    try { document.dispatchEvent(new CustomEvent('ax:branch', { detail: { id: this._cur } })); } catch (_) {}
+    return this._cur;
+  },
+  remember(id) { try { localStorage.setItem(this._k(this._uid), id); } catch (_) {} }
+};
+window.Branch = Branch;
 (function () {
   const _f = window.fetch.bind(window);
   window.fetch = function (input, init) {
     try {
       const url = typeof input === 'string' ? input : (input && input.url) || '';
       const same = !/^https?:/i.test(url) || url.indexOf(location.origin) === 0;
-      const t = DeviceToken.get();
-      if (t && same && url.indexOf('/api/') >= 0) {
+      if (same && url.indexOf('/api/') >= 0) {
+        const t = DeviceToken.get();
         init = Object.assign({}, init || {});
         const h = new Headers(init.headers || (typeof input !== 'string' && input.headers) || undefined);
-        if (!h.has('Authorization')) h.set('Authorization', 'Bearer ' + t);
+        if (t && !h.has('Authorization')) h.set('Authorization', 'Bearer ' + t);
+        if (!h.has('X-Branch')) h.set('X-Branch', Branch.get());       // 4.32 · a queued change keeps its own branch
         init.headers = h;
       }
     } catch (_) {}
@@ -9890,6 +9926,7 @@ const Auth = {
     /* Phase 2 · I11: nothing of the company stays on this device after signing out —
        the offline copy, the offline password check, the queue (already sent or knowingly dropped) */
     ['em_offline_snap', 'emx_offline_auth', 'emx_last_user', 'emx_tok', 'erp_client_ip', 'ax_tk_inv'].forEach(k => { try { localStorage.removeItem(k); } catch (_) {} });
+    try { Object.keys(localStorage).filter(k => k.indexOf('ax_branchs_') === 0).forEach(k => localStorage.removeItem(k)); } catch (_) {}   // 4.32 · the cached branch list
     try { sessionStorage.removeItem('emx_weak'); } catch (_) {}
     try { await OfflineManager.wipe(); } catch (_) {}
   },
@@ -10016,7 +10053,8 @@ const OfflineManager = (() => {
   const IDB_NAME = 'erp-offline';
   const QUEUE_STORE = 'sync_queue';
   const SNAP_STORE = 'data_snapshot';      // same database, its own store — never mixed with the queue
-  const SNAP_KEY = 'snapshot';
+  const SNAP_MAIN = 'snapshot';             // the main branch keeps the key it always had
+  const snapKey = () => (Branch.get() === 'main' ? SNAP_MAIN : 'snapshot@' + Branch.get());   // 4.32 · one copy per branch
   const LS_SNAP = 'em_offline_snap';       // before Phase 3 the copy lived here — read only to migrate it
 
   let _db = null, _sw = null;
@@ -10105,7 +10143,7 @@ const OfflineManager = (() => {
   function idbReq(r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
   async function snapGet() {
     const db = await openDB();
-    return idbReq(db.transaction(SNAP_STORE).objectStore(SNAP_STORE).get(SNAP_KEY));
+    return idbReq(db.transaction(SNAP_STORE).objectStore(SNAP_STORE).get(snapKey()));
   }
   async function snapPut(rec) {
     const db = await openDB();
@@ -10141,11 +10179,12 @@ const OfflineManager = (() => {
       try { old = JSON.parse(raw); } catch (e) { console.error('[Offline] old offline copy is unreadable — left in place:', e); return false; }
       if (!old || typeof old !== 'object' || !old.data) { console.error('[Offline] old offline copy has no data — left in place'); return false; }
       try {
-        const cur = await snapGet();
+        const db0 = await openDB(), getMain = () => idbReq(db0.transaction(SNAP_STORE).objectStore(SNAP_STORE).get(SNAP_MAIN));   // the old copy was the main branch's
+        const cur = await getMain();
         if (!(cur && cur.json && (cur.ts || 0) >= (old.ts || 0))) {      // IndexedDB already holds a newer copy → keep that one
           const json = JSON.stringify(old.data);
-          await snapPut({ key: SNAP_KEY, v: 1, json, ts: old.ts || Date.now(), owner: old.owner || null, bytes: json.length, from: 'localStorage' });
-          const back = await snapGet();
+          await snapPut({ key: SNAP_MAIN, v: 1, json, ts: old.ts || Date.now(), owner: old.owner || null, bytes: json.length, from: 'localStorage' });
+          const back = await getMain();
           if (!back || back.json !== json || (back.owner || null) !== (old.owner || null)) throw new Error('read-back check failed');
         }
         localStorage.removeItem(LS_SNAP);
@@ -10165,7 +10204,7 @@ const OfflineManager = (() => {
     let rec;
     try {
       const json = JSON.stringify(data);
-      rec = { key: SNAP_KEY, v: 1, json, ts: Date.now(), owner: (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null, bytes: json.length };
+      rec = { key: snapKey(), v: 1, json, ts: Date.now(), owner: (typeof currentUser !== 'undefined' && currentUser && currentUser.id) || null, bytes: json.length, branch: Branch.get() };
     } catch (e) { snapFailed('offline copy could not be prepared', e); return Promise.resolve(false); }
     _snapNext = rec;
     if (_snapQueued) return _snapChain.then(() => _snapStatus.ok === true);
@@ -10188,10 +10227,10 @@ const OfflineManager = (() => {
     await _snapChain;                          // a save still being written is the newest copy
     try {
       const rec = await snapGet();
-      if (rec && rec.json) return { data: JSON.parse(rec.json), ts: rec.ts, owner: rec.owner || null };
+      if (rec && rec.json && (rec.branch || 'main') === Branch.get()) return { data: JSON.parse(rec.json), ts: rec.ts, owner: rec.owner || null };
     } catch (e) { console.error('[Offline] reading the offline copy from IndexedDB failed:', e); }
-    /* migration not possible on this device (IndexedDB refused) → the old copy is still usable as it is */
-    try { const raw = localStorage.getItem(LS_SNAP); if (raw) return JSON.parse(raw); } catch (e) { console.error('[Offline] old offline copy unreadable:', e); }
+    /* migration not possible on this device (IndexedDB refused) → the old copy is still usable as it is (it is the main branch's) */
+    if (Branch.get() === 'main') { try { const raw = localStorage.getItem(LS_SNAP); if (raw) return JSON.parse(raw); } catch (e) { console.error('[Offline] old offline copy unreadable:', e); } }
     return null;
   }
 
@@ -10200,7 +10239,7 @@ const OfflineManager = (() => {
     _lastSaveAt = Date.now();
     const res = await fetch(API_BASE + '/api/ops', {
       method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-Client-Id': _CLIENT_ID },
+      headers: { 'Content-Type': 'application/json', 'X-Client-Id': _CLIENT_ID, 'X-Branch': item.branch || 'main' },   // older queued items were the main branch's
       body: JSON.stringify({ ops: item.ops, opId: item.opId, cid: _CLIENT_ID }),
       signal: AbortSignal.timeout(15000)
     });
@@ -10227,7 +10266,7 @@ const OfflineManager = (() => {
     if (!_base || typeof AXCore === 'undefined') { setBase(data); return; }
     const r = AXCore.diff(_base, data, {});
     if (!r.df.n) return;
-    const item = { ops: AXCore.wire(r.df), opId: opId() };
+    const item = { ops: AXCore.wire(r.df), opId: opId(), branch: Branch.get() };   // 4.32 · sent to this branch even if the device switches later
     _base = r.cur;
     _changeSeq++;                              // Phase 4: a pull that started before this change must not overwrite it
     /* plain passwords never stay on this device (the server keeps a hash) */
@@ -10490,6 +10529,7 @@ const SyncEngine = (() => {
       smartPageUpdate(reason);
       setStatus('connected');
     } catch (e) {
+      if (window.__axLeaving) return;            // 4.32 · the page is reopening (branch switch / reload): a cut-off pull is expected
       console.error('[Sync] pull failed:', e);
       setStatus(_online ? 'error' : 'offline');
     } finally {
@@ -10515,9 +10555,9 @@ const SyncEngine = (() => {
   async function streamUrl() {
     try {
       const r = await fetch(API_BASE + '/api/me', { cache: 'no-store', credentials: 'same-origin' });
-      if (r.ok) { const j = await r.json(); if (j && j.streamTicket) return API_BASE + '/api/events?st=' + encodeURIComponent(j.streamTicket); }
+      if (r.ok) { const j = await r.json(); if (j && j.streamTicket) return API_BASE + '/api/events?st=' + encodeURIComponent(j.streamTicket) + '&branch=' + encodeURIComponent(Branch.get()); }
     } catch (_) {}
-    return API_BASE + '/api/events';            // the session cookie alone
+    return API_BASE + '/api/events?branch=' + encodeURIComponent(Branch.get());            // the session cookie alone
   }
   function open(url) {
     if (_es) { try { _es.close(); } catch(_) {} _es = null; }
@@ -10573,7 +10613,7 @@ const SyncEngine = (() => {
       // fallback poll when disconnected
       if (!_connected) {
         try {
-          const r = await fetch(API_BASE + '/api/version', { cache: 'no-store' });
+          const r = await fetch(API_BASE + '/api/version?branch=' + encodeURIComponent(Branch.get()), { cache: 'no-store' });
           if (!r.ok) return;
           const { version } = await r.json();
           if (version && version > DB._serverVersion) throttledPull('polling');
@@ -11525,6 +11565,8 @@ window.addEventListener('resize', function () {
    STARTUP
 ========================================================= */
 /* ═══ the buyer's own brand: company name + logo from الإعدادات → الشركة, everywhere (login too) ═══ */
+/* 4.32 · printed papers from a branch say which branch (nothing for the main branch) */
+function branchPrintLine() { try { if (!window.Branch || Branch.get() === 'main') return ''; const b = Branch.info(); return b.name + (b.code ? ' (' + b.code + ')' : ''); } catch (_) { return ''; } }
 const BRAND_DEFAULT = 'Ozarex';
 function applyBrand(src) {
   try {
@@ -11864,7 +11906,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   let me = await Auth.me();
   if (me && me !== 'offline') {
-    try { await bootstrapFromServer(); prepareData(); launch(me); }
+    try { await Branch.init(me.id); await bootstrapFromServer(); prepareData(); launch(me); }
     catch (e) { console.error(e); if (await loadOffline(me.id)) launch(me); else alert('فشل تحميل البيانات من السيرفر: ' + e.message); }
   } else if (me === 'offline') {
     /* Phase 2 · I11: no automatic entry when the server can't be reached — the login form checks the
@@ -11893,6 +11935,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const j = await Auth.login(u, p);
       if (j.token) DeviceToken.set(j.token);
       await OfflineAuth.save(u, p, j.user);
+      await Branch.init(j.user && j.user.id);
       await bootstrapFromServer();
       prepareData();
       launch(j.user);
@@ -11905,6 +11948,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       else {
         // server unreachable → offline login with the verifier saved on this device
         const ou = await OfflineAuth.check(u, p);
+        if (ou) await Branch.init(ou.id, true);
         if (ou && await loadOffline(ou.id)) { launch(ou); toast('دخلت أوف لاين — التعديلات هتترفع أول ما النت يرجع', 'warning', 6000); }
         else toast('مفيش اتصال بالسيرفر' + (ou ? '' : ' — ولازم تكون دخلت مرة من الجهاز ده وإنت أونلاين'), 'error', 6000);
       }
@@ -16229,6 +16273,7 @@ function buildInvoiceHTML(inv, opts) {
       <div class="top">
         ${s.companyLogo ? `<img class="logo" src="${s.companyLogo}" alt="شعار">` : `<img class="logo" src="icons/logo-square.png" onerror="this.style.display='none'" alt="شعار">`}
         <h1>${escapeHtml(s.companyName||'الشركة')}</h1>
+        ${branchPrintLine() ? `<div class="info" style="font-weight:800">${escapeHtml(branchPrintLine())}</div>` : ''}
         <div class="info">
           ${s.companyAddress ? `${escapeHtml(s.companyAddress)} • ` : ''}${s.companyPhone ? `📞 ${escapeHtml(s.companyPhone)}` : ''}${s.taxNumber ? ` • سجل ضريبي: ${escapeHtml(s.taxNumber)}` : ''}
         </div>
@@ -16420,7 +16465,7 @@ async function renderInvoiceToPngBlob(inv, c) {
   <div style="text-align:center;border-bottom:3px solid #111827;padding-bottom:18px;margin-bottom:20px">
     ${s.companyLogo ? `<img src="${s.companyLogo}" alt="logo" style="display:block;margin:0 auto 12px;max-height:84px;max-width:240px;object-fit:contain" crossorigin="anonymous">` : ''}
     <div style="font-size:30px;font-weight:900;color:#0a0a0a;letter-spacing:-0.5px;line-height:1.2">${escapeHtml(s.companyName||'الشركة')}</div>
-    <div style="font-size:12px;color:#059669;margin-top:4px;font-weight:700;letter-spacing:1px"></div>
+    <div style="font-size:12px;color:#B3121B;margin-top:4px;font-weight:800;letter-spacing:.5px">${escapeHtml(branchPrintLine())}</div>
     <div style="font-size:11.5px;color:#525252;margin-top:8px;line-height:1.6">
       ${s.companyAddress ? escapeHtml(s.companyAddress) + ' • ' : ''}${s.companyPhone ? '📞 ' + escapeHtml(s.companyPhone) : ''}${s.taxNumber ? ' • سجل ضريبي: ' + escapeHtml(s.taxNumber) : ''}
     </div>
@@ -26520,5 +26565,6 @@ function exportSuppliersCSV() {
 <script src="js/settingsx.js"></script>
 <script src="js/sales.js"></script>
 <script src="js/glassnav.js"></script>
+<script src="js/branches.js"></script>
 </body>
 </html>

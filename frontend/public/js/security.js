@@ -116,14 +116,14 @@
         '<span>نسخة مضغوطة كل يوم في فولدر لوحدها برا قاعدة البيانات (آخر 30 يوم)، وبتتحدّث طول اليوم.</span></div></header>' +
         '<div class="sec-btns">' +
           '<button class="btn btn-primary" onclick="AXSec.backupNow()">' + IC.ok + ' نسخة دلوقتي</button>' +
-          '<a class="btn btn-secondary" href="' + base() + '/api/backup/download" download>' + IC.down + ' تنزيل نسخة كاملة</a>' +
+          '<a class="btn btn-secondary" href="' + base() + '/api/backup/download?branch=' + encodeURIComponent(window.Branch ? Branch.get() : 'main') + '" download>' + IC.down + ' تنزيل نسخة كاملة</a>' +
           '<button class="btn btn-secondary" onclick="AXSec.pickRestore()">' + IC.up + ' استرجاع من ملف</button>' +
           (tg.configured ? '<button class="btn btn-secondary" onclick="AXSec.telegram()">' + IC.send + ' ابعت لتليجرام دلوقتي</button>' : '') +
         '</div>' +
         (ui.loading && !ui.bk ? '<div class="sec-empty">بيحمّل…</div>' :
           files.length ? '<ul class="sec-files">' + files.slice(0, 30).map(function (f) {
             return '<li><span>' + dmy(fileDate(f.file)) + '</span><em>' + size(f.size) + ' · اتحدّثت ' + when(f.at) + '</em>' +
-              '<a href="' + base() + '/api/backup/download?file=' + encodeURIComponent(f.file) + '" download>' + IC.down + ' تنزيل</a></li>';
+              '<a href="' + base() + '/api/backup/download?branch=' + encodeURIComponent(window.Branch ? Branch.get() : 'main') + '&file=' + encodeURIComponent(f.file) + '" download>' + IC.down + ' تنزيل</a></li>';
           }).join('') + '</ul>' : '<div class="sec-empty">لسه مفيش نسخ — أول نسخة بتتعمل أوتوماتيك بعد تشغيل السيرفر بثواني.</div>') +
         '<details class="sec-tg"' + (tg.configured ? '' : ' open') + '><summary>' + IC.send + ' تليجرام: ' + (tg.configured ? 'شغّال ✓' : 'مش متفعّل') + '</summary>' +
           '<ol><li>في تليجرام افتح <b>@BotFather</b> واكتب <code>/newbot</code> — هيديك <b>توكن</b> البوت.</li>' +
