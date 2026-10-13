@@ -16,9 +16,10 @@ const path = require('node:path');
 const url  = require('node:url');
 
 const { db, DB_FILE } = require('./db');
-const { exportBlob, defaultBlob } = require('./src/bridge');
+const { defaultBlob } = require('./src/bridge');
 const auth  = require('./src/auth');
 const store = require('./src/store');
+const branches = require('./src/branches');
 const portal = require('./src/portal');
 const market = require('./src/market');
 try { market.init(require('./db').DATA_DIR); } catch (e) { console.warn('[market] init', e.message); }
@@ -50,20 +51,31 @@ store.load();
    push a version token to every logged-in device; each device
    then pulls the fresh data itself.
 ═══════════════════════════════════════════════════════ */
-let _dataVersion = Date.now();
-const _clients   = new Map();           // clientId → { res, userId }
+/* 4.32 · one version per branch; a device only hears about the branch it has open */
+const _versions  = new Map([['main', Date.now()]]);
+function verOf(b) { b = b || 'main'; if (!_versions.has(b)) _versions.set(b, Date.now()); return _versions.get(b); }
+const _clients   = new Map();           // clientId → { res, userId, branch }
 let   _clientSeq = 0;
 
-function broadcast(eventName, payload) {
-  const data = JSON.stringify({ event: eventName, version: _dataVersion, ...payload });
+function broadcast(eventName, payload, branch) {
   const dead = [];
   for (const [id, client] of _clients) {
+    if (branch && client.branch !== branch) continue;
+    const data = JSON.stringify({ event: eventName, version: verOf(client.branch), branch: client.branch, ...payload });
     try { client.res.write(`data: ${data}\n\n`); } catch (_) { dead.push(id); }
   }
   dead.forEach(id => _clients.delete(id));
 }
-function notifyDataChanged(meta = {}) {
-  _dataVersion = Date.now();
+function notifyDataChanged(meta = {}, branch = 'main') {
+  _versions.set(branch, Math.max(Date.now(), verOf(branch) + 1));
+  const st = branches.storeOf(branch); if (st) st.markDirty();
+  broadcast('data_changed', { changedAt: new Date().toISOString(), ...meta }, branch);
+}
+/* users / company settings changed (they live in main and every branch shows them) → every branch is told */
+function notifyAllBranches(meta = {}) {
+  branches.refreshOverlays();
+  const now = Date.now();
+  new Set(['main', ...[..._clients.values()].map(c => c.branch)]).forEach(b => { _versions.set(b, Math.max(now, verOf(b) + 1)); });
   store.markDirty();
   broadcast('data_changed', { changedAt: new Date().toISOString(), ...meta });
 }
@@ -140,25 +152,28 @@ function serveStatic(res, filePath) {
   });
 }
 /* an internal snapshot in the database (kept 20) — taken at most every 10 minutes */
-let _lastDbBackup = 0, _lastDbBackupVer = 0;
-function takeBackup(force) {
-  if (!force && (Date.now() - _lastDbBackup < 600e3 || _lastDbBackupVer === _dataVersion)) return null;
-  const json = JSON.stringify(exportBlob());
+const _lastDbBackup = new Map();         // 4.32 · per branch: { at, ver }
+function takeBackup(force, st) {
+  st = st || store;
+  const last = _lastDbBackup.get(st.id) || { at: 0, ver: 0 };
+  if (!force && (Date.now() - last.at < 600e3 || last.ver === verOf(st.id))) return null;
+  const sdb = st.db, json = JSON.stringify(st.bridge.exportBlob());
   const now  = new Date().toISOString();
-  db.exec('BEGIN');
+  sdb.exec('BEGIN');
   try {
-    db.prepare('INSERT INTO backups (created_at, payload) VALUES (?, ?)').run(now, json);
-    const ids = db.prepare('SELECT id FROM backups ORDER BY id DESC').all().map(r => r.id);
-    if (ids.length > MAX_BACKUPS) { const del = db.prepare('DELETE FROM backups WHERE id = ?'); for (const id of ids.slice(MAX_BACKUPS)) del.run(id); }
-    db.exec('COMMIT');
-  } catch (e) { db.exec('ROLLBACK'); throw e; }
-  _lastDbBackup = Date.now(); _lastDbBackupVer = _dataVersion;
+    sdb.prepare('INSERT INTO backups (created_at, payload) VALUES (?, ?)').run(now, json);
+    const ids = sdb.prepare('SELECT id FROM backups ORDER BY id DESC').all().map(r => r.id);
+    if (ids.length > MAX_BACKUPS) { const del = sdb.prepare('DELETE FROM backups WHERE id = ?'); for (const id of ids.slice(MAX_BACKUPS)) del.run(id); }
+    sdb.exec('COMMIT');
+  } catch (e) { sdb.exec('ROLLBACK'); throw e; }
+  _lastDbBackup.set(st.id, { at: Date.now(), ver: verOf(st.id) });
   return now;
 }
-setInterval(() => { try { takeBackup(false); } catch (e) { console.error('[db-backup]', e.message); } }, 600e3);
-/* daily file backup (+ Telegram when configured): on start and every hour */
-setTimeout(() => store.daily(), 5000);
-setInterval(() => store.daily(), 3600e3);
+setInterval(() => { for (const st of branches.allStores()) { try { takeBackup(false, st); } catch (e) { console.error('[db-backup ' + st.id + ']', e.message); } } }, 600e3);
+/* daily file backup (+ Telegram when configured): on start and every hour — every branch */
+async function dailyAll() { for (const st of branches.allStores()) { try { await st.daily(); } catch (e) { console.error('[backup ' + st.id + ']', e.message); } } }
+setTimeout(dailyAll, 5000);
+setInterval(dailyAll, 3600e3);
 
 /* changes already applied — a retry (lost response, offline queue, the
    service worker) must never apply the same difference twice */
@@ -222,9 +237,9 @@ const server = http.createServer(async (req, res) => {
       const logo = typeof st.companyLogo === 'string' && /^data:image\/(png|jpe?g|webp|gif);base64,/.test(st.companyLogo) ? st.companyLogo : '';
       return sendJSON(res, 200, { name: String(st.companyName || '').slice(0, 120), logo });
     }
-    if (pathname === '/api/version' && req.method === 'GET') return sendJSON(res, 200, { version: _dataVersion });
+    if (pathname === '/api/version' && req.method === 'GET') return sendJSON(res, 200, { version: verOf('main') });
     /* a center's own read-only page (token link) */
-    if (pathname.startsWith('/p/') && portal.handle(req, res, pathname, store.data)) return;
+    if (pathname.startsWith('/p/') && portal.handle(req, res, pathname, () => branches.allStores().map(st => st.data()))) return;   // 4.32 · a center's link works in any branch
 
     /* ── login / logout / who am I ── */
     if (pathname === '/api/login' && req.method === 'POST') {
@@ -265,6 +280,33 @@ const server = http.createServer(async (req, res) => {
       if (req.method !== 'GET' && pathname !== '/api/password' && mustChange(me.id))
         return sendJSON(res, 403, { error: 'must_change', message: 'غيّر كلمة السر الأول — دي سهلة التخمين' });
 
+      /* 4.32 · which branch this request is about (header X-Branch, or ?branch= for the live stream);
+         nothing given = the main branch, so every older device keeps working exactly as before */
+      const bid = String(req.headers['x-branch'] || parsed.query.branch || 'main').slice(0, 40);
+      const st = branches.storeOf(bid);
+      if (/^\/api\/(data|ops|events|backups|backup\/|reset)/.test(pathname)) {
+        if (!st || !branches.get(bid)) return sendJSON(res, 404, { error: 'branch_not_found', message: 'الفرع ده مش موجود' });
+        if (!branches.canUse(me, bid)) return sendJSON(res, 403, { error: 'branch_forbidden', message: 'مالكش صلاحية على الفرع ده' });
+      }
+
+      /* 4.32 · the branches */
+      if (pathname === '/api/branches' && req.method === 'GET') {
+        return sendJSON(res, 200, { branches: branches.visible(me), allowed: branches.idsFor(me) });
+      }
+      if (pathname === '/api/branches' && req.method === 'POST') {
+        if (!admin) return adminOnly();
+        const b = (await readBody(req, 0.05)) || {};
+        try { const br = branches.create(b); store.logEvent(me, { operation: 'add', table: 'branches', recordId: br.id, recordLabel: br.name, after: br }); notifyAllBranches({ type: 'branches' }); return sendJSON(res, 200, { ok: true, branch: br }); }
+        catch (e) { if (e instanceof branches.BranchError) return sendJSON(res, e.status, { error: e.code, message: e.message }); throw e; }
+      }
+      { const m = /^\/api\/branches\/([A-Za-z0-9_]{1,40})$/.exec(pathname);
+        if (m && req.method === 'PUT') {
+          if (!admin) return adminOnly();
+          const b = (await readBody(req, 0.05)) || {};
+          try { const before = branches.get(m[1]); const br = branches.update(m[1], b); store.logEvent(me, { operation: 'edit', table: 'branches', recordId: br.id, recordLabel: br.name, before, after: br }); notifyAllBranches({ type: 'branches' }); return sendJSON(res, 200, { ok: true, branch: br }); }
+          catch (e) { if (e instanceof branches.BranchError) return sendJSON(res, e.status, { error: e.code, message: e.message }); throw e; }
+        } }
+
       /* live dollar / gold prices for the header tape */
       if (pathname === '/api/market' && req.method === 'GET') {
         try { return sendJSON(res, 200, await market.get()); }
@@ -273,27 +315,35 @@ const server = http.createServer(async (req, res) => {
 
       /* data */
       if (pathname === '/api/data' && req.method === 'GET') {
-        const blob = store.dataFor(me);            // Phase 2 · C1 — only what this user's pages need
-        return sendJSON(res, 200, Object.assign({}, blob, { __version: _dataVersion }));
+        const blob = st.dataFor(me);               // Phase 2 · C1 — only what this user's pages need · 4.32: of this branch
+        return sendJSON(res, 200, Object.assign({}, blob, { __version: verOf(bid), __branch: bid }));
       }
       if (pathname === '/api/ops' && req.method === 'POST') {
         const b = await readBody(req, 15);
         if (!b || typeof b !== 'object' || !b.ops || typeof b.ops !== 'object') return sendJSON(res, 400, { error: 'bad_request' });
-        if (opSeen(b.opId)) return sendJSON(res, 200, { ok: true, dup: true, version: _dataVersion });
-        const prev = _dataVersion;
-        let out;
+        if (opSeen(b.opId)) return sendJSON(res, 200, { ok: true, dup: true, version: verOf(bid) });
+        const prev = verOf(bid);
+        let out, sharedTouched = false;
         try {
-          out = store.apply(me, b.ops);
+          if (bid === 'main') { out = store.apply(me, b.ops); sharedTouched = !(out && out.noop) && branches.touchesShared(b.ops); }
+          else {
+            /* 4.32 · a branch: its own records go to its file; users / company settings go to main */
+            const sp = branches.split(b.ops);
+            if (sp.local) out = st.apply(me, sp.local);
+            if (sp.shared) { const o2 = store.apply(me, sp.shared); if (!(o2 && o2.noop)) sharedTouched = true; if (!out || out.noop) out = o2; }
+            if (!out) out = { noop: true };
+          }
           opDone(b.opId);
         } catch (e) {
           if (e instanceof store.Refused) return sendJSON(res, e.status || 403, Object.assign({ error: e.code, message: e.message }, e.extra));
           throw e;
         }
-        if (out && out.noop) return sendJSON(res, 200, { ok: true, version: _dataVersion, prev, noop: true });   // e.g. only audit entries from an old client
-        notifyDataChanged({ source: req.headers['x-client-id'] || b.cid || 'unknown', by: me.id });
+        if (sharedTouched) notifyAllBranches({ source: req.headers['x-client-id'] || b.cid || 'unknown', by: me.id });
+        if (out && out.noop && !sharedTouched) return sendJSON(res, 200, { ok: true, version: verOf(bid), prev, noop: true });   // e.g. only audit entries from an old client
+        notifyDataChanged({ source: req.headers['x-client-id'] || b.cid || 'unknown', by: me.id }, bid);
         /* «renumbered»: numbers the server changed to keep them unique (extra field — old clients ignore it
            and still get the new number, because the version jump makes them pull the latest data) */
-        return sendJSON(res, 200, Object.assign({ ok: true, version: _dataVersion, prev }, out && out.renumbered && out.renumbered.length ? { renumbered: out.renumbered } : {}));
+        return sendJSON(res, 200, Object.assign({ ok: true, version: verOf(bid), prev }, out && out.renumbered && out.renumbered.length ? { renumbered: out.renumbered } : {}));
       }
       /* full replace — restore / import (admin only) */
       if (pathname === '/api/data' && req.method === 'POST') {
@@ -301,22 +351,23 @@ const server = http.createServer(async (req, res) => {
         const body = await readBody(req, 60);
         if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Invalid body' });
         /* I14 · checked first; nothing is replaced when the file has broken records */
-        takeBackup(true);
-        const r = store.restore(body, me);
+        takeBackup(true, st);
+        const r = st.restore(body, me);            // 4.32 · restores THIS branch only
         if (r.problems.length) return sendJSON(res, 400, { error: 'invalid_backup', message: 'الملف فيه سجلات ناقصة — مترجعش حاجة', count: r.problems.length, problems: r.problems.slice(0, 20) });
-        notifyDataChanged({ source: req.headers['x-client-id'] || 'unknown', type: 'replace' });
-        return sendJSON(res, 200, { ok: true, version: _dataVersion, adminKept: r.adminKept, usersWithoutPassword: r.usersWithoutPassword });
+        if (bid === 'main') notifyAllBranches({ source: req.headers['x-client-id'] || 'unknown', type: 'replace' });
+        notifyDataChanged({ source: req.headers['x-client-id'] || 'unknown', type: 'replace' }, bid);
+        return sendJSON(res, 200, { ok: true, version: verOf(bid), adminKept: r.adminKept, usersWithoutPassword: r.usersWithoutPassword });
       }
 
       /* live updates */
       if (pathname === '/api/events' && req.method === 'GET') {
         const clientId = (++_clientSeq).toString();
         res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-store', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
-        res.write(`data: ${JSON.stringify({ event: 'connected', clientId, version: _dataVersion })}\n\n`);
+        res.write(`data: ${JSON.stringify({ event: 'connected', clientId, version: verOf(bid), branch: bid })}\n\n`);
         /* at most 6 live streams per user — the oldest one is closed */
         const mine = [..._clients].filter(([, c]) => c.userId === me.id);
         if (mine.length >= 6) mine.slice(0, mine.length - 5).forEach(([id, c]) => { _clients.delete(id); try { c.res.end(); } catch (_) {} });
-        _clients.set(clientId, { res, userId: me.id });
+        _clients.set(clientId, { res, userId: me.id, branch: bid });
         const keepalive = setInterval(() => { if (res.writableEnded || res.destroyed) return done(); try { res.write(`: heartbeat\n\n`); } catch { done(); } }, 15000);
         function done() { clearInterval(keepalive); _clients.delete(clientId); }
         req.on('close', done); req.on('error', done); res.on('close', done);
@@ -326,27 +377,27 @@ const server = http.createServer(async (req, res) => {
       /* backups (admin) */
       if (pathname === '/api/backups' && req.method === 'GET') {
         if (!admin) return adminOnly();
-        return sendJSON(res, 200, { files: store.listBackups(), telegram: store.telegramStatus(), db: db.prepare('SELECT id, created_at FROM backups ORDER BY id DESC').all() });
+        return sendJSON(res, 200, { branch: bid, files: st.listBackups(), telegram: st.telegramStatus(), db: st.db.prepare('SELECT id, created_at FROM backups ORDER BY id DESC').all() });
       }
       if (pathname === '/api/backup/download' && req.method === 'GET') {
         if (!admin) return adminOnly();
         let buf, name;
         if (parsed.query.file) {
-          const p = store.backupPath(parsed.query.file);
+          const p = st.backupPath(parsed.query.file);
           if (!p) return sendJSON(res, 404, { error: 'not_found' });
           buf = fs.readFileSync(p); name = parsed.query.file;
-        } else { buf = store.gzBlob(); name = 'erp-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json.gz'; }
+        } else { buf = st.gzBlob(); name = 'erp-' + (bid === 'main' ? '' : bid + '-') + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json.gz'; }
         res.writeHead(200, { 'Content-Type': 'application/gzip', 'Content-Length': buf.length, 'Content-Disposition': 'attachment; filename="' + name + '"', 'Cache-Control': 'no-store' });
         return res.end(buf);
       }
       if (pathname === '/api/backup/now' && req.method === 'POST') {
         if (!admin) return adminOnly();
-        const r = store.writeDaily(true);
-        return sendJSON(res, 200, { ok: true, file: r.file, files: store.listBackups() });
+        const r = st.writeDaily(true);
+        return sendJSON(res, 200, { ok: true, file: r.file, files: st.listBackups() });
       }
       if (pathname === '/api/backup/telegram' && req.method === 'POST') {
         if (!admin) return adminOnly();
-        const r = await store.sendTelegram('(إرسال يدوي)');
+        const r = await st.sendTelegram('(إرسال يدوي)');
         return sendJSON(res, r.ok ? 200 : 400, r);
       }
 
@@ -389,12 +440,14 @@ const server = http.createServer(async (req, res) => {
       /* reset (admin) */
       if (pathname === '/api/reset' && req.method === 'POST') {
         if (!admin) return adminOnly();
-        takeBackup(true);
+        takeBackup(true, st);
         const keepUsers = store.data().users;
         const blob = defaultBlob(); blob.users = keepUsers;     // never lock everyone out
-        store.full(blob);
-        store.logEvent(me, { operation: 'reset', table: 'system', recordLabel: 'مسح كل البيانات (Reset)' });
-        notifyDataChanged({ type: 'reset' });
+        if (bid !== 'main') { blob.users = []; blob.settings = {}; }   // 4.32 · a branch: only its own records go; users and company settings stay
+        st.full(blob);
+        st.logEvent(me, { operation: 'reset', table: 'system', recordLabel: 'مسح كل البيانات (Reset)' + (bid === 'main' ? '' : ' — ' + ((branches.get(bid) || {}).name || bid)) });
+        if (bid === 'main') notifyAllBranches({ type: 'reset' });
+        notifyDataChanged({ type: 'reset' }, bid);
         return sendJSON(res, 200, { ok: true });
       }
 

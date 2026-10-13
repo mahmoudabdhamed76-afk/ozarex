@@ -85,8 +85,10 @@ function notFound() {
 function handle(req, res, pathname, data) {
   const m = /^\/p\/([A-Za-z0-9]+)\/?$/.exec(pathname);
   if (!m || req.method !== 'GET') return false;
-  const d = data();
-  const c = findCenter(d, m[1]);
+  /* 4.32 · data() may give one dataset or the list of every branch's: the token is looked up in each */
+  const all = [].concat(data() || []);
+  let d = all[0] || {}, c = null;
+  for (const x of all) { const k = findCenter(x, m[1]); if (k) { d = x; c = k; break; } }
   const html = c ? page(d, c) : notFound();
   res.writeHead(c ? 200 : 404, {
     'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow',

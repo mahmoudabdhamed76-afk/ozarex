@@ -24,7 +24,9 @@ test('marker: on every page, the incremental highlighter leaves exactly what a f
     await page.evaluate(k => navigate(k), k);
     await page.waitForFunction(k => currentPage === k, k);
     await page.waitForTimeout(1400);                                     // count-ups finished, highlighter pass done
-    const a = await snap(page);
+    /* a busy machine can still be drawing: wait until the screen stops changing (max ~6 s) */
+    let a = await snap(page);
+    for (let i = 0; i < 12; i++) { await page.waitForTimeout(400); const again = await snap(page); if (again === a) break; a = again; }
     await page.evaluate(() => AXMarker.scan());                          // the full pass, as before Phase 5
     const b = await snap(page);
     if (b !== a) { const A = a.split('\n'), B = b.split('\n'); const i = A.findIndex((x, j) => x !== B[j]); console.log('[diff ' + k + ']', A.slice(i, i + 3), B.slice(i, i + 3)); }

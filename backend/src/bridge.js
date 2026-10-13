@@ -1,6 +1,9 @@
 'use strict';
 
-const { db } = require('../db');
+const { db: MAIN_DB } = require('../db');
+
+/* 4.32 · one bridge per database file: the main one (erp.db) and one for each branch */
+function makeBridge(db) {
 
 const tables = {
   users: { cols: ['id','username','password','name','role','data','created_at','updated_at'], json: ['data'] },
@@ -387,4 +390,8 @@ function getSetting(key) {
   try { return JSON.parse(r.value); } catch (_) { return r.value; }
 }
 
-module.exports = { exportBlob, importBlob, defaultBlob, getSetting, upsertRecord, deleteRecord, setSetting, setCounter, insertAudit, KNOWN_KEYS };
+return { db, exportBlob, importBlob, defaultBlob, getSetting, upsertRecord, deleteRecord, setSetting, setCounter, insertAudit, KNOWN_KEYS };
+}
+
+const main = makeBridge(MAIN_DB);
+module.exports = Object.assign({}, main, { makeBridge });

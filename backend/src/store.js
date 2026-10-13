@@ -17,15 +17,42 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const zlib = require('node:zlib');
-const { db, DATA_DIR } = require('../db');
-const bridge = require('./bridge');
+const { db: MAIN_DB, DATA_DIR } = require('../db');
+const MAIN_BRIDGE = require('./bridge');
 const integrity = require('./integrity');
 const permissions = require('./permissions');
 const audit = require('./audit');
 const AX = require(process.env.PUBLIC_DIR ? path.join(process.env.PUBLIC_DIR, 'js', 'axcore.js') : path.join(__dirname, '..', '..', 'frontend', 'public', 'js', 'axcore.js'));
 
-let MEM = null;
 const AUDIT_MAX = 5000;
+/* a change the server will not apply. status 403 on purpose: every client version (and the
+   service worker queue) treats 403 as «refused — take the server's copy back», so nothing
+   gets stuck retrying in an offline queue */
+class Refused extends Error {
+  constructor(code, msg, extra, status) { super(msg); this.code = code; this.extra = extra || {}; this.status = status || 403; }
+}
+const asRefused = e => (e instanceof integrity.IntegrityError ? new Refused(e.code, e.message, e.extra) : e);
+
+/* 4.32 · settings that belong to ONE branch (its own lists: cheques, debts, approvals, stock counts, centers'
+   links… + its month target / closing). Everything else (company name, logo, currency, rules, screen
+   preferences, the sections lock) is shared by the whole company and lives in the main database. */
+const BRANCH_ONLY = new Set(['monthlyTarget', 'countBlind', 'closedUntil']);
+function isBranchKey(k) { k = String(k || ''); return (k.charAt(0) === '_' && k !== '_auditLock') || BRANCH_ONLY.has(k); }
+
+/* 4.32 · one store per database file. opts: { id, db, bridge, main, bkDir, label(), shared() }
+   · main: erp.db — exactly as before (users, every setting, the main branch's data)
+   · a branch: its own file; in memory it also shows the company's users + shared settings
+     (read from main, never written to the branch file) */
+function makeStore(opts) {
+const db = opts.db, bridge = opts.bridge, IS_MAIN = !!opts.main, BRANCH = opts.id || 'main';
+let MEM = null;
+function overlay() {
+  if (IS_MAIN || !MEM || typeof opts.shared !== 'function') return;
+  const sh = opts.shared() || {};
+  const own = {}; Object.keys(MEM.settings || {}).forEach(k => { if (isBranchKey(k)) own[k] = MEM.settings[k]; });
+  MEM.settings = Object.assign({}, sh.settings || {}, own);
+  MEM.users = (sh.users || []).map(strip);
+}
 
 function sortAudit() {
   if (Array.isArray(MEM.auditLog)) MEM.auditLog.sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
@@ -35,6 +62,7 @@ function strip(u) { const o = Object.assign({}, u); delete o.password; return o;
 function load() {
   MEM = bridge.exportBlob();
   MEM.users = (MEM.users || []).map(strip);
+  overlay();
   sortAudit();
   /* every record needs an id for record-level saving */
   let fixed = 0;
@@ -60,19 +88,18 @@ function userByName(name) {
 function full(blob) {
   const clean = Object.assign({}, blob);
   delete clean.__version;
+  if (!IS_MAIN) {                                   // a branch file never holds users or company settings
+    clean.users = [];
+    const st = {}; Object.keys(clean.settings || {}).forEach(k => { if (isBranchKey(k)) st[k] = clean.settings[k]; });
+    clean.settings = st;
+  }
   bridge.importBlob(clean);
   MEM = bridge.exportBlob();
   MEM.users = (MEM.users || []).map(strip);
+  overlay();
   sortAudit();
 }
 
-/* a change the server will not apply. status 403 on purpose: every client version (and the
-   service worker queue) treats 403 as «refused — take the server's copy back», so nothing
-   gets stuck retrying in an offline queue */
-class Refused extends Error {
-  constructor(code, msg, extra, status) { super(msg); this.code = code; this.extra = extra || {}; this.status = status || 403; }
-}
-const asRefused = e => (e instanceof integrity.IntegrityError ? new Refused(e.code, e.message, e.extra) : e);
 
 /* ── approvals list: a non-admin may only add his own pending request
       or withdraw his own pending request ── */
@@ -160,6 +187,10 @@ function apply(u, w) {
   Object.keys(w.cols).forEach(k => { if (!bridge.KNOWN_KEYS.has(k)) { console.warn('[ops] unknown collection ignored:', k); delete w.cols[k]; } });
   const admin = u.role === 'admin';
   const s = d.settings || {};
+  if (!IS_MAIN) {
+    if (w.cols.users) throw new Refused('forbidden', 'المستخدمين بيتعدلوا من الفرع الأساسي');
+    [w.keys, w.sets].forEach(g => Object.keys(g).forEach(k => { if (!isBranchKey(k)) throw new Refused('forbidden', 'ده إعداد عام للشركة: ' + k); }));
+  }
 
   /* Phase 2 · C3 — the audit log is written by the server only. Entries a device sends (old clients) are
      ignored — only a typed «reason» is kept; deleting / editing the log is refused. */
@@ -336,7 +367,7 @@ function restore(blob, me) {
 }
 
 /* ═════ backups ═════ */
-const BK_DIR = path.join(DATA_DIR, 'backups');
+const BK_DIR = opts.bkDir || path.join(DATA_DIR, 'backups');
 const KEEP_DAYS = 30;
 let dirty = true;
 function today() { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
@@ -376,7 +407,7 @@ async function sendTelegram(note) {
   const base = (process.env.TELEGRAM_API_BASE || 'https://api.telegram.org').replace(/\/$/, '');
   const fd = new FormData();
   fd.append('chat_id', process.env.TELEGRAM_CHAT_ID);
-  fd.append('caption', '📦 نسخة احتياطية' + (((data() || {}).settings || {}).companyName ? ' — ' + data().settings.companyName : '') + '\n' + r.file + (note ? '\n' + note : ''));
+  fd.append('caption', '📦 نسخة احتياطية' + (((data() || {}).settings || {}).companyName ? ' — ' + data().settings.companyName : '') + (IS_MAIN ? '' : ' · ' + (typeof opts.label === 'function' ? opts.label() : BRANCH)) + '\n' + r.file + (note ? '\n' + note : ''));
   fd.append('document', new Blob([fs.readFileSync(p)], { type: 'application/gzip' }), r.file);
   try {
     const res = await fetch(base + '/bot' + process.env.TELEGRAM_BOT_TOKEN + '/sendDocument', { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) });
@@ -400,4 +431,8 @@ async function daily() {
 }
 function markDirty() { dirty = true; }
 
-module.exports = { load, data, publicData, dataFor, logEvent, user, userByName, full, restore, apply, Refused, listBackups, backupPath, writeDaily, gzBlob, sendTelegram, telegramStatus, daily, markDirty };
+return { id: BRANCH, main: IS_MAIN, db, bridge, load, data, publicData, dataFor, logEvent, user, userByName, full, restore, apply, Refused, listBackups, backupPath, writeDaily, gzBlob, sendTelegram, telegramStatus, daily, markDirty, overlay, isDirty: () => dirty };
+}
+
+const main = makeStore({ id: 'main', db: MAIN_DB, bridge: MAIN_BRIDGE, main: true });
+module.exports = Object.assign({}, main, { makeStore, Refused, isBranchKey });

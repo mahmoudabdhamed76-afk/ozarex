@@ -18,15 +18,24 @@ const SCHEMA   = path.join(__dirname, 'schema.sql');
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-const db = new DatabaseSync(DB_FILE);
 const schemaSql = fs.readFileSync(SCHEMA, 'utf8');
-db.exec(schemaSql);
+/* 4.32 · one opener for every database file: the main one (erp.db — the main branch, as it always was)
+   and each branch's own file (DATA_DIR/branches/<id>.db, same tables, created empty on first use) */
+function openDb(file) {
+  const d = new DatabaseSync(file);
+  d.exec(schemaSql);
+  try {
+    const cols = d.prepare('PRAGMA table_info(users)').all().map(c => c.name);
+    if (!cols.includes('data')) d.exec('ALTER TABLE users ADD COLUMN data TEXT');
+  } catch (e) { console.error('users.data migration:', e.message); }
+  const ins = d.prepare('INSERT OR IGNORE INTO counters (name, value) VALUES (?, ?)');
+  for (const [n, v] of [['invoice', 1000], ['issuance', 1000], ['purchase', 1000]]) ins.run(n, v);
+  return d;
+}
+const BRANCH_DIR = path.join(DATA_DIR, 'branches');
+const db = openDb(DB_FILE);
 
-// 4.8 · users keep extra fields (the sections each user may open, what needs approval)
-try {
-  const cols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
-  if (!cols.includes('data')) db.exec('ALTER TABLE users ADD COLUMN data TEXT');
-} catch (e) { console.error('users.data migration:', e.message); }
+// 4.8 · users keep extra fields (the sections each user may open, what needs approval) — see openDb
 
 // 4.20 · a weak password (e.g. the first admin/admin) must be changed before anything else is allowed
 // 4.20 · drop any settings row named like an object internal (could only have come from a crafted request)
@@ -57,4 +66,11 @@ const defaultCounters = [['invoice', 1000], ['issuance', 1000], ['purchase', 100
 const insCounter = db.prepare('INSERT OR IGNORE INTO counters (name, value) VALUES (?, ?)');
 for (const [n, v] of defaultCounters) insCounter.run(n, v);
 
-module.exports = { db, DB_FILE, DATA_DIR };
+/* 4.32 · the branch list lives in the main database (only this table is new there — no existing row changes) */
+db.exec(`CREATE TABLE IF NOT EXISTS branches (
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, code TEXT, active INTEGER NOT NULL DEFAULT 1,
+  sort INTEGER NOT NULL DEFAULT 0, data TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`);
+db.prepare("INSERT OR IGNORE INTO branches (id, name, code, active, sort) VALUES ('main', 'الفرع الأساسي', 'A', 1, 0)").run();
+
+module.exports = { db, DB_FILE, DATA_DIR, BRANCH_DIR, openDb };
