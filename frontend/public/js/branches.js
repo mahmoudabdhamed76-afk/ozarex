@@ -17,6 +17,9 @@
     check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
     x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
     gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+    swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3l4 4-4 4"/><path d="M21 7H8"/><path d="M7 21l-4-4 4-4"/><path d="M3 17h13"/></svg>',
+    box: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7z"/><path d="M3.3 7 12 12l8.7-5M12 22V12"/></svg>',
+    cash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 12h.01M18 12h.01"/></svg>',
     chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15v3M11 11v7M15 7v11M19 4v14"/></svg>',
     left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
     plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>'
@@ -31,20 +34,28 @@
     return fetch(API_BASE + url, { method: method, credentials: 'same-origin', cache: 'no-store', headers: Object.assign({ 'X-Branch': 'main' }, body ? { 'Content-Type': 'application/json' } : {}), body: body ? JSON.stringify(body) : undefined })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { j.__status = r.status; return j; }); });
   }
-  function switchable() { return B() && B().allowed().length > 1; }
+  function switchable() { return B() && (B().allowed().length > 1 || canTransfer()); }
+  /* 4.34 · transfers: who may send / receive (the server checks the same) */
+  function canGo(p) { try { return typeof can === 'function' && can(p); } catch (_) { return false; } }
+  function canStock() { return isAdmin() || canGo('inventory') || canGo('stock'); }
+  function canCash() { return isAdmin() || canGo('payments') || canGo('expenses'); }
+  function others() { return B() ? B().list().filter(function (b) { return b.active && b.id !== B().get(); }) : []; }
+  function canTransfer() { return !!(B() && me() && others().length && (canStock() || canCash())); }
+  var TR = { list: [], incoming: 0, tab: 'in', view: 'list', rows: [{ pid: '', qty: '' }], busy: false };
 
   /* ── the chip (always shows the open branch) ── */
   function chipHtml(kind) {
     var b = B().info(), sw = switchable() || isAdmin();
     return '<button type="button" class="axb-chip ' + kind + (b.main ? ' is-main' : '') + '" ' + (sw ? 'onclick="AXBranch.open()" aria-haspopup="dialog"' : 'tabindex="-1"') +
       ' aria-label="الفرع المفتوح: ' + esc(b.name) + '" title="الفرع المفتوح: ' + esc(b.name) + '">' +
-      '<i class="axb-ic">' + IC.shop + '</i><em class="axb-nm">' + esc(b.name) + '</em>' + (b.code ? '<i class="axb-cd">' + esc(b.code) + '</i>' : '') + (sw ? '<i class="axb-cv">' + IC.chev + '</i>' : '') + '</button>';
+      '<i class="axb-ic">' + IC.shop + '</i><em class="axb-nm">' + esc(b.name) + '</em>' + (b.code ? '<i class="axb-cd">' + esc(b.code) + '</i>' : '') + (sw ? '<i class="axb-cv">' + IC.chev + '</i>' : '') +
+      (TR.incoming ? '<i class="axb-n" title="تحويلات مستنية استلام">' + TR.incoming + '</i>' : '') + '</button>';
   }
   function mount() {
     if (!B() || !me()) { document.querySelectorAll('.axb-chip').forEach(function (e) { e.remove(); }); return; }
     var title = document.getElementById('topbar-title'), mid = document.getElementById('mh-id');
     var d = document.getElementById('axb-chip-d'), m = document.getElementById('axb-chip-m');
-    var sig = B().get() + '|' + B().info().name + '|' + B().info().code + '|' + switchable() + '|' + isAdmin();
+    var sig = B().get() + '|' + B().info().name + '|' + B().info().code + '|' + switchable() + '|' + isAdmin() + '|' + TR.incoming;
     if (title && (!d || d.getAttribute('data-sig') !== sig)) {
       if (d) d.remove();
       title.insertAdjacentHTML('afterend', chipHtml('d').replace('<button ', '<button id="axb-chip-d" data-sig="' + esc(sig) + '" '));
@@ -87,6 +98,7 @@
       ? '<button type="button" class="axb-all" onclick="AXBranch.overview()"><span class="axb-ri">' + IC.chart + '</span><span class="axb-rt"><b>جميع الفروع</b><em>مبيعات وأرباح وخزائن ومخزون كل فرع والإجمالي</em></span><i class="axb-go">' + IC.left + '</i></button>' : '';
     sheet('pick', 'اختار الفرع', all + '<p class="axb-lead">كل فرع ليه مخزنه وعملاءه وموردينه وفواتيره وخزنته. اللي هتشوفه وتسجّله بعد الاختيار بيخص الفرع ده بس.</p>' +
       '<div class="axb-list">' + rows + '</div>' +
+      (canTransfer() ? '<button type="button" class="axb-manage axb-trb" onclick="AXBranch.transfers()">' + IC.swap + ' التحويلات بين الفروع' + (TR.incoming ? ' <i class="axb-n">' + TR.incoming + '</i>' : '') + '</button>' : '') +
       (isAdmin() ? '<button type="button" class="axb-manage" onclick="AXBranch.manage()">' + IC.gear + ' إدارة الفروع</button>' : ''));
   }
   async function go(id) {
@@ -248,14 +260,117 @@
   }
   function period(p) { ov.p = p; ov.data = null; loadOv(); }
 
+  /* ── التحويلات بين الفروع (4.34 · المرحلة 4) ── */
+  async function loadTr() {
+    try {
+      var r = await fetch(API_BASE + '/api/transfers', { credentials: 'same-origin', cache: 'no-store', headers: { 'X-Branch': 'main' } });
+      if (r.ok) TR.list = (await r.json()).transfers || [];
+    } catch (_) { /* offline: keep what we had */ }
+    var cur = B() ? B().get() : 'main';
+    TR.incoming = (canStock() || canCash()) ? TR.list.filter(function (t) { return t.to === cur && t.status === 'sent' && (t.kind === 'cash' ? canCash() : canStock()); }).length : 0;
+    mount(); redrawTr();
+  }
+  function prodList() { return ((typeof DB !== 'undefined' && DB.data && DB.data.products) || []).filter(function (p) { return p && Number(p.quantity) > 0; }).sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'ar'); }); }
+  function stTag(t) { return t.status === 'sent' ? '<span class="axt-st go">في الطريق</span>' : t.status === 'received' ? '<span class="axt-st ok">اتستلم</span>' : t.status === 'cancelled' ? '<span class="axt-st no">اتلغى</span>' : '<span class="axt-st">' + esc(t.status) + '</span>'; }
+  function trRow(t) {
+    var cur = B().get(), inc = t.to === cur, mine = t.by && me() && t.by.id === me().id;
+    var what = t.kind === 'cash' ? money(t.amount) : (t.items || []).map(function (it) { return esc(it.name) + ' <b>×' + num(it.qty) + '</b>' + (it.unit ? ' ' + esc(it.unit) : ''); }).join(' · ');
+    var acts = '';
+    if (t.status === 'sent' && inc && (t.kind === 'cash' ? canCash() : canStock())) acts += '<button type="button" class="axb-btn pri" onclick="AXBranch.trAct(\'' + q(t.id) + '\',\'receive\')">' + IC.check + ' تأكيد الاستلام</button>';
+    if (t.status === 'sent' && t.from === cur && (isAdmin() || mine)) acts += '<button type="button" class="axb-btn" onclick="AXBranch.trAct(\'' + q(t.id) + '\',\'cancel\')">إلغاء التحويل</button>';
+    var when = String(t.sentAt || t.createdAt || '').slice(0, 10);
+    return '<article class="axt-r' + (t.status === 'sent' && inc ? ' hot' : '') + '"><div class="axt-h"><span class="axb-ri">' + (t.kind === 'cash' ? IC.cash : IC.box) + '</span>' +
+      '<div class="axt-t"><b>#' + t.number + ' · ' + (t.kind === 'cash' ? 'فلوس' : 'بضاعة') + '</b><em>' + esc(t.fromName || t.from) + ' ← ' + esc(t.toName || t.to) + ' · ' + esc(when) + (t.by ? ' · ' + esc(t.by.name) : '') + '</em></div>' + stTag(t) + '</div>' +
+      '<div class="axt-w">' + what + '</div>' + (t.note ? '<div class="axt-n">' + esc(t.note) + '</div>' : '') +
+      (t.status === 'received' && t.receivedBy ? '<div class="axt-n">استلم: ' + esc(t.receivedBy.name) + ' · ' + esc(String(t.receivedAt || '').slice(0, 10)) + '</div>' : '') +
+      (acts ? '<div class="axt-a">' + acts + '</div>' : '') + '</article>';
+  }
+  function trHtml() {
+    var cur = B().get(), name = B().info().name;
+    if (TR.view === 'stock' || TR.view === 'cash') return formHtml();
+    var inc = TR.list.filter(function (t) { return t.to === cur; }), out = TR.list.filter(function (t) { return t.from === cur; });
+    var pend = inc.filter(function (t) { return t.status === 'sent'; }).length;
+    var l = TR.tab === 'in' ? inc : TR.tab === 'out' ? out : TR.list;
+    var tabs = '<div class="axo-per" role="tablist">' + [['in', 'واردة لـ' + name + (pend ? ' (' + pend + ')' : '')], ['out', 'صادرة من ' + name], ['all', 'الكل']].map(function (x) {
+      return '<button type="button" role="tab" aria-selected="' + (TR.tab === x[0]) + '" class="' + (TR.tab === x[0] ? 'on' : '') + '" onclick="AXBranch.trTab(\'' + x[0] + '\')">' + esc(x[1]) + '</button>'; }).join('') + '</div>';
+    var newb = '<div class="axt-new">' + (canStock() ? '<button type="button" class="axb-btn pri" onclick="AXBranch.trNew(\'stock\')">' + IC.box + ' تحويل بضاعة</button>' : '') +
+      (canCash() ? '<button type="button" class="axb-btn pri" onclick="AXBranch.trNew(\'cash\')">' + IC.cash + ' تحويل فلوس</button>' : '') + '</div>';
+    return newb + '<p class="axb-lead">البضاعة بتتخصم من الفرع اللي باعت لما تتبعت، وبتدخل الفرع التاني لما يأكد الاستلام. التحويلات مش بتتحسب مبيعات ولا مصروفات ولا أرباح.</p>' + tabs +
+      (l.length ? '<div class="axt-list">' + l.map(trRow).join('') + '</div>' : '<div class="axo-load">' + (TR.busy ? 'بيحمّل…' : 'مفيش تحويلات هنا') + '</div>');
+  }
+  function formHtml() {
+    var dests = others(), stock = TR.view === 'stock', ps = prodList();
+    var to = '<label class="axt-f"><span>رايح لـ</span><select id="axt-to" class="axb-in">' + dests.map(function (b) { return '<option value="' + esc(b.id) + '">' + esc(b.name) + '</option>'; }).join('') + '</select></label>';
+    var body;
+    if (stock) {
+      body = '<div class="axt-items">' + TR.rows.map(function (r, i) {
+        var p = ps.find(function (x) { return x.id === r.pid; });
+        return '<div class="axt-it"><select class="axb-in" onchange="AXBranch.trRow(' + i + ',\'pid\',this.value)" aria-label="الصنف"><option value="">اختار صنف…</option>' +
+          ps.map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === r.pid ? ' selected' : '') + '>' + esc(x.name) + ' — متاح ' + num(x.quantity) + ' ' + esc(x.unit || '') + '</option>'; }).join('') + '</select>' +
+          '<input class="axb-in axb-code" type="number" inputmode="decimal" min="0" step="any" placeholder="الكمية" value="' + esc(r.qty) + '" oninput="AXBranch.trRow(' + i + ',\'qty\',this.value)" aria-label="الكمية">' +
+          (TR.rows.length > 1 ? '<button type="button" class="axb-x" onclick="AXBranch.trRow(' + i + ',\'del\')" aria-label="شيل">' + IC.x + '</button>' : '') +
+          (p && Number(r.qty) > Number(p.quantity) ? '<em class="axt-err">المتاح ' + num(p.quantity) + ' بس</em>' : '') + '</div>';
+      }).join('') + '</div><button type="button" class="axb-manage" onclick="AXBranch.trRow(-1,\'add\')">' + IC.plus + ' صنف تاني</button>';
+    } else body = '<label class="axt-f"><span>المبلغ</span><input id="axt-amt" class="axb-in" type="number" inputmode="decimal" min="0" step="any" placeholder="0"></label>';
+    return '<button type="button" class="axt-back" onclick="AXBranch.trNew(\'\')">' + IC.left + ' رجوع للتحويلات</button>' +
+      '<h4 class="axb-h">' + (stock ? 'تحويل بضاعة' : 'تحويل فلوس') + ' من ' + esc(B().info().name) + '</h4>' + to + body +
+      '<label class="axt-f"><span>ملاحظة</span><input id="axt-note" class="axb-in" maxlength="300" placeholder="اختياري"></label>' +
+      '<button type="button" class="axb-btn pri wide" id="axt-send" onclick="AXBranch.trSend()"' + (TR.busy ? ' disabled' : '') + '>إرسال</button>' +
+      '<p class="axb-note">' + (stock ? 'هتتخصم من مخزن الفرع ده دلوقتي، وتدخل الفرع التاني لما يأكد الاستلام. ممكن تلغيه قبل الاستلام وترجع.' : 'هيتخصم من خزنة الفرع ده دلوقتي، ويدخل خزنة الفرع التاني لما يأكد الاستلام.') + '</p>';
+  }
+  function redrawTr() { var el = document.getElementById('axb-sheet'); if (el && el.getAttribute('data-k') === 'tr') el.querySelector('.axb-body').innerHTML = trHtml(); }
+  function transfers() { TR.view = 'list'; TR.busy = true; var el = sheet('tr', 'التحويلات بين الفروع', trHtml()); el.classList.add('axo'); loadTr().then(function () { TR.busy = false; redrawTr(); }); }
+  function trTab(t) { TR.tab = t; redrawTr(); }
+  function trNew(kind) { TR.view = kind || 'list'; TR.rows = [{ pid: '', qty: '' }]; redrawTr(); }
+  function trRowSet(i, k, v) {
+    if (k === 'add') TR.rows.push({ pid: '', qty: '' });
+    else if (k === 'del') TR.rows.splice(i, 1);
+    else { TR.rows[i][k] = v; if (k === 'qty') { var p = prodList().find(function (x) { return x.id === TR.rows[i].pid; }); var e = document.querySelectorAll('#axb-sheet .axt-it')[i]; if (e) { var w = e.querySelector('.axt-err'); var bad = p && Number(v) > Number(p.quantity); if (bad && !w) e.insertAdjacentHTML('beforeend', '<em class="axt-err">المتاح ' + num(p.quantity) + ' بس</em>'); if (!bad && w) w.remove(); } return; } }
+    redrawTr();
+  }
+  async function post(url, body) {
+    var r = await fetch(API_BASE + url, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Branch': 'main' }, body: JSON.stringify(body || {}) });
+    var j = await r.json().catch(function () { return {}; }); j.__status = r.status; return j;
+  }
+  function afterTr(msg) {
+    say(msg);
+    try { if (window.SyncEngine) SyncEngine.pullLatest('transfer', true); } catch (_) { /* the live stream brings it too */ }
+    TR.view = 'list'; loadTr();
+  }
+  async function trSend() {
+    if (TR.busy) return;
+    var to = (document.getElementById('axt-to') || {}).value, note = (document.getElementById('axt-note') || {}).value || '';
+    var body = { rid: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10), kind: TR.view === 'cash' ? 'cash' : 'stock', from: B().get(), to: to, note: note };
+    if (!to) { say('اختار الفرع', 'error'); return; }
+    if (body.kind === 'cash') { body.amount = Number((document.getElementById('axt-amt') || {}).value); if (!(body.amount > 0)) { say('اكتب المبلغ', 'error'); return; } }
+    else { body.items = TR.rows.filter(function (r) { return r.pid && Number(r.qty) > 0; }).map(function (r) { return { productId: r.pid, qty: Number(r.qty) }; }); if (!body.items.length) { say('اختار صنف وكمية', 'error'); return; } }
+    /* what is still being saved on this device goes first (the server checks its stock) */
+    try { if (DB._saveTimer || DB._saveInflight) { clearTimeout(DB._saveTimer); await DB._flush(); } } catch (_) { /* queued */ }
+    TR.busy = true; var b = document.getElementById('axt-send'); if (b) b.disabled = true;
+    var j = await post('/api/transfers', body).catch(function () { return { __status: 0, message: 'مفيش اتصال بالسيرفر — التحويل محتاج نت' }; });
+    TR.busy = false;
+    if (j.__status !== 200) { say(j.message || 'محصلش', 'error'); if (b) b.disabled = false; return; }
+    TR.tab = 'out';                            // show the one just sent
+    afterTr('✓ اتبعت تحويل #' + j.transfer.number + ' لـ' + (j.transfer.toName || ''));
+  }
+  async function trAct(id, what) {
+    if (TR.busy) return; TR.busy = true;
+    try { if (DB._saveTimer || DB._saveInflight) { clearTimeout(DB._saveTimer); await DB._flush(); } } catch (_) { /* queued */ }
+    var j = await post('/api/transfers/' + encodeURIComponent(id) + '/' + what).catch(function () { return { __status: 0, message: 'مفيش اتصال بالسيرفر' }; });
+    TR.busy = false;
+    if (j.__status !== 200) { say(j.message || 'محصلش', 'error'); return; }
+    afterTr(what === 'receive' ? '✓ اتستلم تحويل #' + j.transfer.number + ' ودخل الفرع' : '✓ اتلغى تحويل #' + j.transfer.number + ' ورجع للفرع');
+  }
+  document.addEventListener('ax:sse', function (e) { if (e.detail && e.detail.event === 'transfers') loadTr(); });
+
   /* keep the chip in place: the header is rebuilt on every page change */
   var o = window.updateHomeFab;
   if (typeof o === 'function' && !o._axb) {
     var w = function () { var r = o.apply(this, arguments); try { mount(); } catch (e) { console.warn('[branches]', e); } return r; };
     w._axb = true; window.updateHomeFab = w;
   }
-  document.addEventListener('ax:branch', function () { try { mount(); } catch (_) { /* before the app is drawn */ } });
+  document.addEventListener('ax:branch', function () { try { mount(); } catch (_) { /* before the app is drawn */ } setTimeout(function () { if (me() && canTransfer()) loadTr(); }, 1500); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && document.getElementById('axb-sheet')) close(); });
 
-  window.AXBranch = { overview: overview, period: period, mount: mount, open: open, close: close, go: go, manage: manage, addBranch: addBranch, saveBranch: saveBranch, toggleUser: toggleUser, saveUsers: saveUsers };
+  window.AXBranch = { transfers: transfers, trTab: trTab, trNew: trNew, trRow: trRowSet, trSend: trSend, trAct: trAct, overview: overview, period: period, mount: mount, open: open, close: close, go: go, manage: manage, addBranch: addBranch, saveBranch: saveBranch, toggleUser: toggleUser, saveUsers: saveUsers };
 })();

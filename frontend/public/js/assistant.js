@@ -698,7 +698,7 @@
     return r;
   }
   function cashAns() {
-    var inn = sum(A('payments'), 'amount'), ex = sum(A('expenses'), 'amount'), sp = sum(A('supplierPayments'), 'amount'), bal = inn - ex - sp;
+    var inn = sum(A('payments'), 'amount'), ex = sum(A('expenses'), 'amount'), sp = sum(A('supplierPayments'), 'amount'), bal = inn - ex - sp + (window.AXBStats ? AXBStats.cashNet(D()) : 0);   // 4.34 · ± transfers between branches
     var t = today(), tin = sum(pays({ from: t, to: t }), 'amount'), tex = sum(A('expenses').filter(function (e) { return String(e.date || '').slice(0, 10) === t; }), 'amount') + sum(A('supplierPayments').filter(function (x) { return String(x.date || '').slice(0, 10) === t; }), 'amount');
     return { icon: 'cash', title: 'الخزنة', sub: 'نفس رقم «الخزنة» في لوحة التحكم',
       ledger: [{ l: 'رصيد الخزنة دلوقتي', v: money(bal), big: true, tone: bal < 0 ? 'bad' : 'ok' },

@@ -38,7 +38,7 @@
     var ids = {}; items.forEach(function (i) { ids[i.id] = 1; });
     var t = today(), ms = t.slice(0, 8) + '01', outToday = 0, outMonth = 0;
     A('stockMoves').forEach(function (m) {
-      if (!m || m.type !== 'out' || !ids[m.productId]) return;
+      if (!m || m.type !== 'out' || m.kind === 'transfer' || !ids[m.productId]) return;   // 4.34 · a transfer to another branch is not consumption
       var d = String(m.date || '').slice(0, 10), q = Number(m.quantity || m.qty || 0);
       if (/جرد|تسوية|adjust/i.test(String(m.reference || m.note || ''))) return;
       if (d === t) outToday += q;

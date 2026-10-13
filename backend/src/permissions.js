@@ -55,7 +55,7 @@ const PREF_KEYS = ['tickerSpeed', 'tickerEvents', 'tickerPages', 'soundEnabled',
    costs:    sees purchase costs (products.cost, items[].cost)      directory: names of colleagues */
 const SALES_READ = ['customers', 'products', 'invoices', 'issuances', 'payments'];
 const POLICY = {
-  dashboard: { read: [], keys: ['monthlyTarget'], writeKeys: ['monthlyTarget'] },
+  dashboard: { read: [], keys: ['monthlyTarget', '_cashMoves'], writeKeys: ['monthlyTarget'] },   // 4.34 · _cashMoves: transfers between branches' cash (read only — the server writes it)
   approvals: { read: [], keys: ['_approvals'], writeKeys: ['_approvals'] },
   requests: { read: [], keys: ['_requests'], writeKeys: ['_requests'] },
   customers: { read: SALES_READ, write: { customers: FULL } },

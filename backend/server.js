@@ -20,6 +20,8 @@ const { defaultBlob } = require('./src/bridge');
 const auth  = require('./src/auth');
 const store = require('./src/store');
 const branches = require('./src/branches');
+const transfers = require('./src/transfers');
+try { transfers.recover(); } catch (e) { console.error('[transfers] recover:', e.message); }
 const portal = require('./src/portal');
 const market = require('./src/market');
 try { market.init(require('./db').DATA_DIR); } catch (e) { console.warn('[market] init', e.message); }
@@ -299,6 +301,28 @@ const server = http.createServer(async (req, res) => {
         try { const br = branches.create(b); store.logEvent(me, { operation: 'add', table: 'branches', recordId: br.id, recordLabel: br.name, after: br }); notifyAllBranches({ type: 'branches' }); return sendJSON(res, 200, { ok: true, branch: br }); }
         catch (e) { if (e instanceof branches.BranchError) return sendJSON(res, e.status, { error: e.code, message: e.message }); throw e; }
       }
+      /* 4.34 · التحويلات بين الفروع (بضاعة / فلوس) — every step checked and applied here, never twice */
+      if (pathname === '/api/transfers' && req.method === 'GET') return sendJSON(res, 200, { transfers: transfers.list(me) });
+      { const tm = /^\/api\/transfers(?:\/([A-Za-z0-9_]{4,40})\/(receive|cancel))?$/.exec(pathname);
+        if (tm && req.method === 'POST') {
+          try {
+            let out;
+            if (!tm[1]) out = transfers.create(me, (await readBody(req, 0.5)) || {});
+            else out = tm[2] === 'receive' ? transfers.receive(me, tm[1]) : transfers.cancel(me, tm[1]);
+            const t = out.transfer;
+            if (!out.dup) {
+              const meta = { source: req.headers['x-client-id'] || 'unknown', by: me.id, type: 'transfer' };
+              if (tm[2] === 'receive') notifyDataChanged(meta, t.to); else notifyDataChanged(meta, t.from);
+              broadcast('transfers', { id: t.id, status: t.status, from: t.from, to: t.to });
+            }
+            return sendJSON(res, 200, { ok: true, transfer: t, dup: !!out.dup });
+          } catch (e) {
+            if (e instanceof transfers.TransferError) return sendJSON(res, e.status, { error: e.code, message: e.message });
+            if (e instanceof store.Refused) return sendJSON(res, e.status || 403, Object.assign({ error: e.code, message: e.message }, e.extra));
+            throw e;
+          }
+        } }
+
       /* 4.33 · «جميع الفروع»: every branch's numbers + the total (admin) — the same rules as the screens (js/branchstats.js) */
       if (pathname === '/api/branches/summary' && req.method === 'GET') {
         if (!admin) return adminOnly();

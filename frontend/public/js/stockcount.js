@@ -66,7 +66,7 @@
     var pm = prodMap();
     A('stockMoves').forEach(function (m) {
       var d = String(m.date || '').slice(0, 10), p = pm[m.productId]; if (!p) return;
-      if (m.type === 'out' && d >= f90 && !/^تسوية جرد/.test(String(m.reference || ''))) outV[p.id] = (outV[p.id] || 0) + Number(m.quantity || 0) * Number(p.cost || p.price || 0);
+      if (m.type === 'out' && m.kind !== 'transfer' && d >= f90 && !/^تسوية جرد/.test(String(m.reference || ''))) outV[p.id] = (outV[p.id] || 0) + Number(m.quantity || 0) * Number(p.cost || p.price || 0);
       if (d >= f7) busy[p.id] = (busy[p.id] || 0) + 1;
     });
     var prods = A('products').slice();

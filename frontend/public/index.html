@@ -9670,7 +9670,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 4.33</div>
+      <div class="version">الإصدار 4.34</div>
     </footer>
   </div>
 </div>
@@ -10573,6 +10573,7 @@ const SyncEngine = (() => {
       try {
         const msg = JSON.parse(e.data);
         if (msg.event === 'connected') { DB._serverVersion = msg.version || 0; return; }
+        if (msg.event !== 'data_changed') { try { document.dispatchEvent(new CustomEvent('ax:sse', { detail: msg })); } catch (_) {} return; }   // 4.34 · e.g. «transfers»
         if (msg.event === 'data_changed') {
           const isSelf = msg.source === _CLIENT_ID;
           if (isSelf) return;   // our own save — its HTTP reply already updated the version
@@ -11837,7 +11838,7 @@ function updateWalletBadge() {
     .filter(t => t.type === 'out' || t.type === 'withdrawal')
     .reduce((s, t) => s + (t.amount || 0), 0);
 
-  const net = paymentsTotal + bankInflows - expensesTotal - supplierPaymentsTotal - bankOutflows;
+  const net = paymentsTotal + bankInflows - expensesTotal - supplierPaymentsTotal - bankOutflows + (window.AXBStats ? AXBStats.cashNet(DB.data) : 0);   // 4.34 · ± transfers between branches
 
   const cur = (DB.data.settings && DB.data.settings.currency) || 'جنيه';
   const curShort = cur === 'جنيه' ? 'ج.م' : cur === 'ريال' ? 'ر.س' : cur === 'درهم' ? 'د.إ' : cur.slice(0, 3);
@@ -12525,7 +12526,7 @@ function renderDashboard() {
     const m = moves[0];
     const prod = DB.data.products.find(x => x.id === m.productId);
     return {
-      type: m.type === 'out' ? 'بيع' : m.type === 'in' ? 'شراء/استلام' : 'تعديل',
+      type: m.kind === 'transfer' ? (m.type === 'out' ? 'تحويل لفرع' : 'تحويل من فرع') : m.type === 'out' ? 'بيع' : m.type === 'in' ? 'شراء/استلام' : 'تعديل',
       qty: m.quantity,
       unit: prod?.unit || '',
       productName: prod?.name || ''
@@ -12657,7 +12658,8 @@ function renderDashboard() {
   const todayCollection = (DB.data.payments || []).filter(p => p.date === today).reduce((s, p) => s + (p.amount || 0), 0);
   const treasuryBalance = (DB.data.payments || []).reduce((s,p)=>s+(p.amount||0),0)
     - (DB.data.expenses || []).reduce((s,e)=>s+(e.amount||0),0)
-    - (DB.data.supplierPayments || []).reduce((s,p)=>s+(p.amount||0),0);
+    - (DB.data.supplierPayments || []).reduce((s,p)=>s+(p.amount||0),0)
+    + (window.AXBStats ? AXBStats.cashNet(DB.data) : 0);          // 4.34 · money moved between branches
 
   root.innerHTML = `
     <!-- Backup reminder banner (shows when last backup is stale) -->

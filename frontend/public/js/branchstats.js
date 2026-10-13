@@ -4,7 +4,7 @@
    · المبيعات = الصرف + الفواتير اللي مش طالعة من صرف (زي الرئيسية)
    · الربح = (المبيعات بعد الخصم من غير ضريبة − التكلفة) − المصروفات
      (زي صفحة الأرباح؛ فواتير الشراء مش مصروف — هي بضاعة)
-   · الخزنة = التحصيل − المصروفات − سداد الموردين (زي لوحة التحكم)
+   · الخزنة = التحصيل − المصروفات − سداد الموردين ± التحويلات بين الفروع (زي لوحة التحكم)
    · مديونيات العملاء = أرصدة العملاء الموجبة · مستحق للموردين = رصيد
      أول المدة + المشتريات − المدفوع (زي صفحة الموردين)
    · قيمة المخزون = الكمية × سعر التكلفة
@@ -29,6 +29,15 @@
     return [ds(new Date(y, m, 1)), T];                              // 'month' (default)
   }
 
+  /* 4.34 · money moved between branches (the branch's own list _cashMoves): + received − sent. Never sales / expenses. */
+  function cashNet(d, from, to) {
+    var l = (d && d.settings && Array.isArray(d.settings._cashMoves)) ? d.settings._cashMoves : [];
+    return l.reduce(function (s, m) {
+      if (!m) return s; var x = day(m.date);
+      if ((from && x < from) || (to && x > to)) return s;
+      return s + (m.dir === 'in' ? 1 : -1) * N(m.amount);
+    }, 0);
+  }
   function summary(d, r) {
     d = d || {}; r = r || range('month');
     var A = function (k) { return Array.isArray(d[k]) ? d[k] : []; };
@@ -63,7 +72,7 @@
 
     /* balances (as of now) */
     var sum = function (k, f) { return A(k).reduce(function (s, x) { return s + (x ? N(x[f]) : 0); }, 0); };
-    var treasury = sum('payments', 'amount') - sum('expenses', 'amount') - sum('supplierPayments', 'amount');
+    var treasury = sum('payments', 'amount') - sum('expenses', 'amount') - sum('supplierPayments', 'amount') + cashNet(d);   // 4.34 · + transfers between branches
     var receivables = A('customers').reduce(function (s, c) { return s + Math.max(0, c ? N(c.balance) : 0); }, 0);
     var bySup = {}; A('suppliers').forEach(function (s) { if (s) bySup[s.id] = N(s.openingBalance); });
     A('expenses').forEach(function (e) { if (e && e.kind === 'purchase' && Object.prototype.hasOwnProperty.call(bySup, e.supplierId)) bySup[e.supplierId] += N(e.amount); });
@@ -90,5 +99,5 @@
     (list || []).forEach(function (x) { SUM_KEYS.forEach(function (k) { t[k] += N(x[k]); }); });
     return t;
   }
-  return { summary: summary, range: range, total: total, SUM_KEYS: SUM_KEYS };
+  return { summary: summary, range: range, total: total, cashNet: cashNet, SUM_KEYS: SUM_KEYS };
 });
