@@ -34,7 +34,7 @@
   /* settings keys a non-admin may write at all (the server refuses the rest) */
   var USER_KEYS = { monthlyTarget: 1, _debtPlan: 1, countBlind: 1, _approvals: 1, _custody: 1, _debts: 1, _stockCounts: 1, _cheques: 1, _po: 1,
     tickerSpeed: 1, tickerEvents: 1, tickerPages: 1, soundEnabled: 1, reciterVolume: 1, reciterEnabled: 1, dailyBackupReminder: 1,
-    lastBackupReminderDate: 1, _prospects: 1, _portal: 1, _stmtSent: 1, _poLead: 1, _requests: 1, _calls: 1, _stmtWeek: 1 };
+    lastBackupReminderDate: 1, _prospects: 1, _portal: 1, _stmtSent: 1, _poLead: 1, _requests: 1, _calls: 1, _stmtWeek: 1, _returns: 1 };
   /* how much needs the admin — set PER USER by the admin in «المستخدمين»:
        'sensitive' (default, like 4.6) · 'edits' (any edit / delete) · 'none'
      → null means nothing needs approval (admin, or a user set to 'none') */
@@ -158,6 +158,13 @@
     (df.cols.stockMoves ? df.cols.stockMoves.added : []).forEach(function (m) {
       if (m.productId && !/^تسوية جرد/.test(String(m.note || m.reference || ''))) p[m.productId] = 1;
     });
+    /* 4.35 · a new return moves its customer's / supplier's balance and its products' stock */
+    (df.sets && df.sets._returns ? df.sets._returns.added : []).forEach(function (r) {
+      if (!r) return;
+      if (r.customerId) c[r.customerId] = 1;
+      if (r.supplierId) s[r.supplierId] = 1;
+      (Array.isArray(r.items) ? r.items : []).forEach(function (it) { if (it && it.productId && it.stock !== false) p[it.productId] = 1; });
+    });
     (df.cols.customers ? df.cols.customers.added : []).forEach(function (r) { c[r.id] = 1; });
     (df.cols.suppliers ? df.cols.suppliers.added : []).forEach(function (r) { s[r.id] = 1; });
     (df.cols.products ? df.cols.products.added : []).forEach(function (r) { p[r.id] = 1; });
@@ -200,6 +207,8 @@
           });
         if (hit) push('closed', k);
       });
+      var rs = df.sets && df.sets._returns;   // 4.35 · a return dated in a closed period
+      if (rs && rs.added.concat(rs.removed).some(function (r) { var d = dateOf(r); return d && d <= opts.closedUntil; })) push('closed', '_returns');
     }
     /* 1 · deleting */
     Object.keys(c).forEach(function (k) {
@@ -388,6 +397,12 @@
       var a = Number(p.amount) || 0;
       rows.push({ date: p.date, label: a < 0 ? 'ارتداد ' + (p.note || 'شيك') : 'تحصيل' + (p.method ? ' — ' + p.method : '') + (p.reference ? ' ' + p.reference : ''),
         debit: a < 0 ? -a : 0, credit: a > 0 ? a : 0, ts: p.createdAt || 0 });
+    });
+    /* 4.35 · a sales return: the goods that came back (له) and the cash given back (عليه) */
+    ((d.settings && Array.isArray(d.settings._returns)) ? d.settings._returns : []).forEach(function (r) {
+      if (!r || r.type !== 'sale' || r.customerId !== cid) return;
+      rows.push({ date: r.date, label: 'مرتجع مبيعات #' + r.number + (r.src && r.src.label ? ' — ' + r.src.label : ''), debit: 0, credit: Number(r.amount) || 0, ts: r.at || 0 });
+      if (Number(r.refund) > 0) rows.push({ date: r.date, label: 'رد فلوس مرتجع #' + r.number, debit: Number(r.refund) || 0, credit: 0, ts: (r.at || 0) + 1 });
     });
     rows.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)) || a.credit - b.credit || a.ts - b.ts; });
     var net = rows.reduce(function (t, r) { return t + r.debit - r.credit; }, 0), run = (Number(c.balance) || 0) - net;

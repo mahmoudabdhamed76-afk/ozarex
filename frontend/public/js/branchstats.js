@@ -1,7 +1,7 @@
 /* ════════════════════════════════════════════════════════════════════
    ERP · أرقام الفرع (4.33 · المرحلة 3) — one function, the same rules the
    screens use, so «جميع الفروع» always matches what each branch shows:
-   · المبيعات = الصرف + الفواتير اللي مش طالعة من صرف (زي الرئيسية)
+   · المبيعات = الصرف + الفواتير اللي مش طالعة من صرف (زي الرئيسية) − مرتجع المبيعات (4.35)
    · الربح = (المبيعات بعد الخصم من غير ضريبة − التكلفة) − المصروفات
      (زي صفحة الأرباح؛ فواتير الشراء مش مصروف — هي بضاعة)
    · الخزنة = التحصيل − المصروفات − سداد الموردين ± التحويلات بين الفروع (زي لوحة التحكم)
@@ -29,14 +29,31 @@
     return [ds(new Date(y, m, 1)), T];                              // 'month' (default)
   }
 
-  /* 4.34 · money moved between branches (the branch's own list _cashMoves): + received − sent. Never sales / expenses. */
+  /* 4.35 · the returns of the branch (settings._returns): type 'sale' (مرتجع مبيعات) · 'purchase' (مرتجع مشتريات).
+     A return never changes the original document — it is a new record that the totals subtract. */
+  function rets(d) { var l = (d && d.settings && Array.isArray(d.settings._returns)) ? d.settings._returns : []; return l.filter(function (r) { return r && (r.type === 'sale' || r.type === 'purchase'); }); }
+  function retSum(d, type, from, to, f) {
+    return rets(d).reduce(function (s, r) {
+      if (r.type !== type) return s; var x = day(r.date);
+      if ((from && x < from) || (to && x > to)) return s;
+      return s + (f ? f(r) : N(r.amount));
+    }, 0);
+  }
+  /* revenue (after discount, no tax) and cost of what came back — the profit rule */
+  function retNet(r) { return (r.items || []).reduce(function (s, it) { return s + N(it.net != null ? it.net : it.total); }, 0); }
+  function retCost(r, prod) { return (r.items || []).reduce(function (s, it) { var p = prod && prod[it.productId]; return s + (p ? N(p.cost) : 0) * N(it.qty); }, 0); }
+
+  /* 4.34 · money moved between branches (the branch's own list _cashMoves): + received − sent. Never sales / expenses.
+     4.35 · + money given back on returns: − refunded to a customer · + refunded by a supplier. */
   function cashNet(d, from, to) {
     var l = (d && d.settings && Array.isArray(d.settings._cashMoves)) ? d.settings._cashMoves : [];
-    return l.reduce(function (s, m) {
+    var t = l.reduce(function (s, m) {
       if (!m) return s; var x = day(m.date);
       if ((from && x < from) || (to && x > to)) return s;
       return s + (m.dir === 'in' ? 1 : -1) * N(m.amount);
     }, 0);
+    var rf = function (r) { return N(r.refund); };
+    return t - retSum(d, 'sale', from, to, rf) + retSum(d, 'purchase', from, to, rf);
   }
   function summary(d, r) {
     d = d || {}; r = r || range('month');
@@ -49,6 +66,8 @@
     var sales = 0, docs = {};
     A('issuances').forEach(function (i) { if (!i || !inR(i.date)) return; sales += N(i.total); docs['i' + (i.invoiceId || i.number || i.id)] = 1; });
     solo.forEach(function (v) { if (!inR(v.date)) return; sales += N(v.total); docs['v' + v.id] = 1; });
+    var salesReturns = retSum(d, 'sale', r[0], r[1]);               // 4.35 · مرتجع المبيعات بيتخصم
+    sales -= salesReturns;
 
     /* profit — the profit page's rule */
     var prod = {}; A('products').forEach(function (p) { if (p) prod[p.id] = p; });
@@ -65,10 +84,13 @@
       var k = sub > 0 ? Math.max(0, sub - N(v.discount)) / sub : 1;
       (v.items || []).forEach(function (it) { line(v.date, it.productId, it.qty || it.quantity, N(it.total) * k); });
     });
+    rets(d).forEach(function (x) { if (x.type !== 'sale' || !inR(x.date)) return; rev -= retNet(x); cost -= retCost(x, prod); });
 
     var expenses = 0, purchases = 0, collections = 0, nColl = 0;
     A('expenses').forEach(function (e) { if (!e || !inR(e.date)) return; if (e.kind === 'purchase') purchases += N(e.amount); else expenses += N(e.amount); });
     A('payments').forEach(function (p) { if (!p || !inR(p.date) || N(p.amount) <= 0) return; collections += N(p.amount); nColl++; });
+    var purchaseReturns = retSum(d, 'purchase', r[0], r[1]);
+    purchases -= purchaseReturns;
 
     /* balances (as of now) */
     var sum = function (k, f) { return A(k).reduce(function (s, x) { return s + (x ? N(x[f]) : 0); }, 0); };
@@ -77,6 +99,7 @@
     var bySup = {}; A('suppliers').forEach(function (s) { if (s) bySup[s.id] = N(s.openingBalance); });
     A('expenses').forEach(function (e) { if (e && e.kind === 'purchase' && Object.prototype.hasOwnProperty.call(bySup, e.supplierId)) bySup[e.supplierId] += N(e.amount); });
     A('supplierPayments').forEach(function (p) { if (p && Object.prototype.hasOwnProperty.call(bySup, p.supplierId)) bySup[p.supplierId] -= N(p.amount); });
+    rets(d).forEach(function (x) { if (x.type === 'purchase' && Object.prototype.hasOwnProperty.call(bySup, x.supplierId)) bySup[x.supplierId] -= N(x.amount) - N(x.refund); });   // 4.35
     var payables = Object.keys(bySup).reduce(function (s, k) { return s + Math.max(0, bySup[k]); }, 0);
     var stockValue = 0, low = 0;
     A('products').forEach(function (p) { if (!p) return; stockValue += Math.max(0, N(p.quantity)) * N(p.cost); if (N(p.minQuantity) > 0 && N(p.quantity) <= N(p.minQuantity)) low++; });
@@ -84,7 +107,7 @@
     var gross = rev - cost;
     return {
       from: r[0], to: r[1],
-      sales: sales, salesDocs: Object.keys(docs).length,
+      sales: sales, salesDocs: Object.keys(docs).length, salesReturns: salesReturns, purchaseReturns: purchaseReturns,
       revenue: rev, cost: cost, gross: gross, expenses: expenses, profit: gross - expenses,
       purchases: purchases, collections: collections, collectionsCount: nColl,
       treasury: treasury, receivables: receivables, payables: payables,
@@ -93,11 +116,11 @@
     };
   }
 
-  var SUM_KEYS = ['sales', 'salesDocs', 'revenue', 'cost', 'gross', 'expenses', 'profit', 'purchases', 'collections', 'collectionsCount', 'treasury', 'receivables', 'payables', 'stockValue', 'products', 'lowStock', 'customers', 'suppliers'];
+  var SUM_KEYS = ['sales', 'salesDocs', 'salesReturns', 'purchaseReturns', 'revenue', 'cost', 'gross', 'expenses', 'profit', 'purchases', 'collections', 'collectionsCount', 'treasury', 'receivables', 'payables', 'stockValue', 'products', 'lowStock', 'customers', 'suppliers'];
   function total(list) {
     var t = {}; SUM_KEYS.forEach(function (k) { t[k] = 0; });
     (list || []).forEach(function (x) { SUM_KEYS.forEach(function (k) { t[k] += N(x[k]); }); });
     return t;
   }
-  return { summary: summary, range: range, total: total, cashNet: cashNet, SUM_KEYS: SUM_KEYS };
+  return { summary: summary, range: range, total: total, cashNet: cashNet, rets: rets, retSum: retSum, retNet: retNet, retCost: retCost, SUM_KEYS: SUM_KEYS };
 });

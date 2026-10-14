@@ -215,11 +215,11 @@
     var t = d.total, list = d.branches.slice(), maxS = Math.max(1, Math.max.apply(null, list.map(function (b) { return b.sales; })));
     var when = d.period === 'all' ? 'من أول يوم' : (d.from === d.to ? dmy(d.from) : dmy(d.from) + ' ← ' + dmy(d.to));
     var k = function (lbl, v, sub, cls) { return '<div class="axo-k' + (cls ? ' ' + cls : '') + '"><span>' + lbl + '</span><b>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>'; };
-    var head = '<div class="axo-hero"><div><span>إجمالي مبيعات كل الفروع · ' + esc(when) + '</span><b>' + money(t.sales) + '</b><em>' + num(t.salesDocs) + ' عملية بيع · ' + list.length + ' فروع</em></div>' +
+    var head = '<div class="axo-hero"><div><span>إجمالي مبيعات كل الفروع · ' + esc(when) + '</span><b>' + money(t.sales) + '</b><em>' + num(t.salesDocs) + ' عملية بيع · ' + list.length + ' فروع' + (t.salesReturns > 0 ? ' · بعد مرتجع ' + money(t.salesReturns) : '') + '</em></div>' +
       '<div class="axo-hp"><span>صافي الربح</span><b class="' + (t.profit < 0 ? 'neg' : '') + '">' + money(t.profit) + '</b><em>بعد التكلفة والمصروفات</em></div></div>';
     var grid = '<div class="axo-grid">' +
       k('التحصيل', money(t.collections), num(t.collectionsCount) + ' عملية') +
-      k('المشتريات', money(t.purchases), 'فواتير الشراء') +
+      k('المشتريات', money(t.purchases), t.purchaseReturns > 0 ? 'بعد مرتجع ' + money(t.purchaseReturns) : 'فواتير الشراء') +
       k('المصروفات', money(t.expenses), 'من غير المشتريات') +
       k('الخزائن', money(t.treasury), 'الرصيد الحالي', t.treasury < 0 ? 'neg' : '') +
       k('مديونيات العملاء', money(t.receivables), num(t.customers) + ' عميل') +

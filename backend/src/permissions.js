@@ -55,16 +55,16 @@ const PREF_KEYS = ['tickerSpeed', 'tickerEvents', 'tickerPages', 'soundEnabled',
    costs:    sees purchase costs (products.cost, items[].cost)      directory: names of colleagues */
 const SALES_READ = ['customers', 'products', 'invoices', 'issuances', 'payments'];
 const POLICY = {
-  dashboard: { read: [], keys: ['monthlyTarget', '_cashMoves'], writeKeys: ['monthlyTarget'] },   // 4.34 · _cashMoves: transfers between branches' cash (read only — the server writes it)
+  dashboard: { read: [], keys: ['monthlyTarget', '_cashMoves', '_returns'], writeKeys: ['monthlyTarget'] },   // 4.35 · _returns: every screen's totals subtract the returns   // 4.34 · _cashMoves: transfers between branches' cash (read only — the server writes it)
   approvals: { read: [], keys: ['_approvals'], writeKeys: ['_approvals'] },
   requests: { read: [], keys: ['_requests'], writeKeys: ['_requests'] },
   customers: { read: SALES_READ, write: { customers: FULL } },
   issuances: {
-    read: SALES_READ.concat(['stockMoves']),
+    read: SALES_READ.concat(['stockMoves']), writeKeys: ['_returns'],
     write: { issuances: FULL, invoices: FULL, stockMoves: FULL, payments: g(1, 1, SIDE.payments), products: g(0, 0, SIDE.products), customers: g(1, 0, SIDE.customers) }
   },
   invoices: {
-    read: SALES_READ.concat(['stockMoves']),
+    read: SALES_READ.concat(['stockMoves']), writeKeys: ['_returns'],
     write: { invoices: FULL, stockMoves: FULL, payments: g(1, 1, SIDE.payments), products: g(0, 0, SIDE.products), customers: g(1, 0, SIDE.customers),
       issuances: g(0, 0, SIDE.issuances.concat(['total', 'unitPrice'])) }
   },
@@ -83,8 +83,10 @@ const POLICY = {
     read: ['suppliers', 'supplierPayments', 'expenses', 'payments', 'bankTransfers'], keys: ['_debts', '_debtPlan'], writeKeys: ['_debts', '_debtPlan'],
     write: { supplierPayments: g(1, 1), expenses: g(1, 1) }
   },
-  suppliers: { read: ['suppliers', 'supplierPayments', 'expenses', 'products'], readRows: { expenses: 'purchase' }, write: { suppliers: FULL, supplierPayments: FULL, expenses: PURCHASE_ROWS } },
-  purchases: { read: ['suppliers', 'supplierPayments', 'expenses', 'products'], readRows: { expenses: 'purchase' }, write: { suppliers: FULL, supplierPayments: FULL, expenses: PURCHASE_ROWS }, costs: true },
+  suppliers: { read: ['suppliers', 'supplierPayments', 'expenses', 'products'], readRows: { expenses: 'purchase' }, writeKeys: ['_returns'],
+    write: { suppliers: FULL, supplierPayments: FULL, expenses: PURCHASE_ROWS, products: g(0, 0, SIDE.products), stockMoves: g(1, 0) } },      // 4.35 · a purchase return takes its goods out of stock
+  purchases: { read: ['suppliers', 'supplierPayments', 'expenses', 'products'], readRows: { expenses: 'purchase' }, writeKeys: ['_returns'],
+    write: { suppliers: FULL, supplierPayments: FULL, expenses: PURCHASE_ROWS, products: g(0, 0, SIDE.products), stockMoves: g(1, 0) }, costs: true },
   inventory: { read: ['products', 'stockMoves', 'suppliers', 'issuances'], write: { products: FULL, stockMoves: FULL }, costs: true },
   stock: {
     read: ['products', 'stockMoves', 'issuances', 'customers', 'suppliers', 'expenses'], readRows: { expenses: 'purchase' }, directory: true,
@@ -177,6 +179,7 @@ function filterData(d, u) {
   Object.keys(s).forEach(k => {
     if (!settingVisible(k, p)) return;
     st[k] = OWN_ROWS[k] && Array.isArray(s[k]) ? s[k].filter(r => r && r.by && r.by.id === u.id) : s[k];
+    if (k === '_returns' && Array.isArray(s[k]) && !p.read.has('expenses')) st[k] = s[k].filter(r => r && r.type === 'sale');   // 4.35 · purchase returns carry purchase prices
   });
   out.settings = st;
   out.counters = d.counters;
@@ -215,6 +218,17 @@ function checkWrite(d, w, u) {
   Object.keys(w.sets || {}).concat(Object.keys(w.keys || {})).forEach(k => {
     if (!p.writeKeys.has(k)) deny('تغيّر الإعداد ده: ' + k, { key: k });
   });
+  /* 4.35 · returns: a sales return from the sales pages, a purchase return from the suppliers pages — never edited or deleted (admin only) */
+  const rt = (w.sets || {})._returns;
+  if (rt) {
+    if ((rt.removed || []).length || (rt.modified || []).some(x => x.f.some(f => AX.realField(f)))) deny('تعدّل أو تمسح مرتجع (للمدير بس)', { key: '_returns' });
+    const has = l => l.some(x => p.pages.includes(x));
+    (rt.added || []).forEach(r => {
+      if (!r || (r.type !== 'sale' && r.type !== 'purchase')) deny('تضيف المرتجع ده', { key: '_returns' });
+      if (r.type === 'sale' && !has(['issuances', 'invoices'])) deny('تعمل مرتجع مبيعات', { key: '_returns' });
+      if (r.type === 'purchase' && !has(['suppliers', 'purchases'])) deny('تعمل مرتجع مشتريات', { key: '_returns' });
+    });
+  }
   return p;
 }
 

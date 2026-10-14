@@ -67,6 +67,7 @@
       var docs = {}, tot = 0;
       A('issuances').forEach(function (i) { var d = String(i.date || ''); if (d < from || d > t) return; tot += N(i.total); docs['i' + (i.invoiceId || i.number || i.id)] = 1; });
       solo.forEach(function (v) { var d = String(v.date || ''); if (d < from || d > t) return; tot += N(v.total); docs['v' + v.id] = 1; });
+      if (window.AXBStats) tot -= AXBStats.retSum(D(), 'sale', from, t);   // 4.35 · مرتجع المبيعات
       return { v: tot, n: Object.keys(docs).length };
     }
     function coll(from) {

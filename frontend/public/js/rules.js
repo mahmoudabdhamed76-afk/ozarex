@@ -72,7 +72,7 @@
     function put(pid, d) { if (pid && d && (!m[pid] || d > m[pid])) m[pid] = d; }
     A('issuances').forEach(function (i) { put(i.productId, i.date); });
     A('invoices').forEach(function (v) { (v.items || []).forEach(function (it) { put(it.productId, v.date); }); });
-    A('stockMoves').forEach(function (s) { if (s.type === 'out' && s.kind !== 'transfer') put(s.productId, s.date); });   // 4.34 · a transfer is not a sale
+    A('stockMoves').forEach(function (s) { if (s.type === 'out' && s.kind !== 'transfer' && s.kind !== 'return') put(s.productId, s.date); });   // 4.34 · a transfer is not a sale
     return m;
   }
   function firstInMap() {

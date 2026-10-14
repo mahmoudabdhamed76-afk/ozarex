@@ -24,7 +24,7 @@
   function esc(s) { return (typeof escapeHtml === 'function') ? escapeHtml(s) : String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
   function lds(d) { return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
   function parseD(s) { var p = String(s).slice(0, 10).split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
-  function isAdj(m) { return m.kind === 'transfer' || /^(تسوية جرد|عهدة|رد عهدة)/.test(String(m.reference || m.note || '')); }   // stocktake corrections / transfers between branches are not consumption
+  function isAdj(m) { return m.kind === 'transfer' || m.kind === 'return' || /^(تسوية جرد|عهدة|رد عهدة)/.test(String(m.reference || m.note || '')); }   // stocktake corrections / transfers between branches are not consumption
   function today0() { var d = new Date(); d.setHours(0, 0, 0, 0); return d; }
   function addDays(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
   function daysSince(s) { return Math.round((today0() - parseD(s)) / 864e5); }

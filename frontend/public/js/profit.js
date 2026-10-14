@@ -32,10 +32,10 @@
   function lines() {
     var prod = {}; A('products').forEach(function (p) { prod[p.id] = p; });
     var out = [];
-    function push(date, cid, pid, name, qty, rev) {
+    function push(date, cid, pid, name, qty, rev, ret) {
       var p = prod[pid], unitCost = p ? Number(p.cost) || 0 : 0;
       out.push({ date: String(date || '').slice(0, 10), cid: cid, pid: pid || ('n:' + name), name: (p && p.name) || name || 'صنف', qty: Number(qty) || 0, rev: Number(rev) || 0,
-        cost: unitCost * (Number(qty) || 0), noCost: !unitCost });
+        cost: unitCost * (Number(qty) || 0), noCost: !unitCost, ret: !!ret });
     }
     A('issuances').forEach(function (i) {
       if (Array.isArray(i.items) && i.items.length && !i.productId) {
@@ -48,15 +48,20 @@
       var k = sub > 0 ? Math.max(0, sub - (Number(v.discount) || 0)) / sub : 1;
       (v.items || []).forEach(function (it) { push(v.date, v.customerId, it.productId, it.productName || it.name, it.qty || it.quantity, (Number(it.total) || 0) * k); });
     });
+    /* 4.35 · a sales return: the same lines with a minus (its revenue after discount, its cost at today's cost) */
+    if (window.AXBStats) AXBStats.rets(D()).forEach(function (r) {
+      if (r.type !== 'sale') return;
+      (r.items || []).forEach(function (it) { push(r.date, r.customerId, it.productId, it.name, -(Number(it.qty) || 0), -(Number(it.net != null ? it.net : it.total) || 0), true); });
+    });
     return out;
   }
   function group(ls, key) {
     var m = {};
     ls.forEach(function (l) {
       var k = l[key], g = m[k] || (m[k] = { key: k, rev: 0, cost: 0, qty: 0, n: 0, noCost: 0, below: 0, name: l.name });
-      g.rev += l.rev; g.cost += l.cost; g.qty += l.qty; g.n++;
+      g.rev += l.rev; g.cost += l.cost; g.qty += l.qty; if (!l.ret) g.n++;
       if (l.noCost) g.noCost++;
-      if (!l.noCost && l.rev < l.cost - 0.01) g.below++;
+      if (!l.noCost && !l.ret && l.rev < l.cost - 0.01) g.below++;
     });
     return Object.keys(m).map(function (k) { var g = m[k]; g.profit = g.rev - g.cost; g.margin = g.rev ? g.profit / g.rev * 100 : 0; return g; });
   }

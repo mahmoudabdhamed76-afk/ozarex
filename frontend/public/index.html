@@ -9670,7 +9670,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 4.34</div>
+      <div class="version">الإصدار 4.35</div>
     </footer>
   </div>
 </div>
@@ -12384,7 +12384,10 @@ function renderDashboard() {
   // Standalone invoices NOT linked to issuances (avoid double counting)
   const monthStandaloneSales = DB.data.invoices.filter(i => i.date >= monthStart && !i.sourceIssuanceId).reduce((s,i)=>s+i.total, 0);
   // إيرادات الشهر = كل الفلوس التي دخلت من البيع (صرف الورق + الفواتير المنفصلة)
-  const monthRevenue = monthIssTotal + monthStandaloneSales;
+  const monthRet = window.AXBStats ? AXBStats.retSum(DB.data, 'sale', monthStart, today) : 0;   // 4.35 · مرتجع المبيعات
+  const retProd = Object.fromEntries((DB.data.products || []).map(p => [p.id, p]));
+  const monthRetCost = window.AXBStats ? AXBStats.rets(DB.data).filter(r => r.type === 'sale' && r.date >= monthStart && r.date <= today).reduce((s, r) => s + AXBStats.retCost(r, retProd), 0) : 0;
+  const monthRevenue = monthIssTotal + monthStandaloneSales - monthRet;
   // صافي الربح = الإيرادات - كل المصروفات (مصاريف يدوية + تكلفة الورق المباع = COGS)
   // COGS = تكلفة الورق المصروف فعلياً (سعر التكلفة من المخزن)
   let monthCOGS = 0;
@@ -12393,12 +12396,12 @@ function renderDashboard() {
     if (p) monthCOGS += (p.cost||0) * iss.quantity;
   });
   const monthExpenses = DB.data.expenses.filter(e => e.kind !== 'purchase' && e.date >= monthStart).reduce((s,e)=>s+e.amount, 0);
-  const netProfit = monthRevenue - monthCOGS - monthExpenses;
+  const netProfit = monthRevenue - (monthCOGS - monthRetCost) - monthExpenses;
 
   // Today's sales (issuances only - those are the actual sales transactions)
   const todayIssTotal = (DB.data.issuances||[]).filter(i => i.date === today).reduce((s,i)=>s+i.total, 0);
   const todayStandalone = DB.data.invoices.filter(i => i.date === today && !i.sourceIssuanceId).reduce((s,i)=>s+i.total, 0);
-  const todaySales = todayIssTotal + todayStandalone;
+  const todaySales = todayIssTotal + todayStandalone - (window.AXBStats ? AXBStats.retSum(DB.data, 'sale', today, today) : 0);
 
   const totalDebts = DB.data.customers.reduce((s,c)=>s+(c.balance||0), 0);
   const overdueCount = DB.data.customers.filter(c => c.balance > 0).length;
@@ -12526,7 +12529,7 @@ function renderDashboard() {
     const m = moves[0];
     const prod = DB.data.products.find(x => x.id === m.productId);
     return {
-      type: m.kind === 'transfer' ? (m.type === 'out' ? 'تحويل لفرع' : 'تحويل من فرع') : m.type === 'out' ? 'بيع' : m.type === 'in' ? 'شراء/استلام' : 'تعديل',
+      type: m.kind === 'transfer' ? (m.type === 'out' ? 'تحويل لفرع' : 'تحويل من فرع') : m.kind === 'return' ? (m.type === 'out' ? 'مرتجع مشتريات' : 'مرتجع مبيعات') : m.type === 'out' ? 'بيع' : m.type === 'in' ? 'شراء/استلام' : 'تعديل',
       qty: m.quantity,
       unit: prod?.unit || '',
       productName: prod?.name || ''
@@ -15243,6 +15246,11 @@ function viewCustomerStatement(id) {
   invs.forEach(i => txs.push({ date: i.date, type:'فاتورة', ref:'#'+i.number, debit: i.total, credit: 0, ts: i.createdAt, link: i.id }));
   isss.forEach(i => txs.push({ date: i.date, type:'صرف ورق', ref:'#'+i.number+' - '+(i.productName||''), debit: i.total, credit: 0, ts: i.createdAt }));
   pays.forEach(p => txs.push({ date: p.date, type:'تحصيل', ref: p.method, debit: 0, credit: p.amount, ts: p.createdAt }));
+  /* 4.35 · sales returns: the goods that came back (له) · cash given back (عليه) */
+  (window.AXBStats ? AXBStats.rets(DB.data) : []).filter(r => r.type === 'sale' && r.customerId === id).forEach(r => {
+    txs.push({ date: r.date, type:'مرتجع مبيعات', ref:'#'+r.number+' - '+((r.src && r.src.label) || ''), debit: 0, credit: Number(r.amount) || 0, ts: r.at || 0 });
+    if (Number(r.refund) > 0) txs.push({ date: r.date, type:'رد فلوس مرتجع', ref:'#'+r.number, debit: Number(r.refund) || 0, credit: 0, ts: (r.at || 0) + 1 });
+  });
   txs.sort((a,b)=>a.ts-b.ts);
 
   const totalDebit = txs.reduce((s,t)=>s+t.debit, 0);
@@ -24565,12 +24573,16 @@ function supplierMetrics(supplierId) {
   const totalPaid = payments.reduce((s,p)=> s + (p.amount||0), 0);
   const sup = DB.data.suppliers.find(x => x.id === supplierId);
   const openingBalance = sup ? (sup.openingBalance || 0) : 0;
-  // balance = (we owe them) = openingBalance + totalPurchases - totalPaid
-  const balance = openingBalance + totalPurchases - totalPaid;
+  // 4.35 · purchase returns: the goods we sent back lower what we owe; cash the supplier gave back raises it again
+  const rets = (window.AXBStats ? AXBStats.rets(DB.data) : []).filter(r => r.type === 'purchase' && r.supplierId === supplierId);
+  const totalReturns = rets.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const totalRefunds = rets.reduce((s, r) => s + (Number(r.refund) || 0), 0);
+  // balance = (we owe them) = openingBalance + totalPurchases - totalReturns + totalRefunds - totalPaid
+  const balance = openingBalance + totalPurchases - totalReturns + totalRefunds - totalPaid;
   const lastPurchase = purchases.sort((a,b)=>b.createdAt-a.createdAt)[0];
   const lastPayment = payments.sort((a,b)=>b.createdAt-a.createdAt)[0];
   return {
-    totalPurchases, totalPaid, balance, openingBalance,
+    totalPurchases, totalPaid, balance, openingBalance, totalReturns, totalRefunds, returnsCount: rets.length,
     purchasesCount: purchases.length,
     paymentsCount: payments.length,
     lastPurchaseDate: lastPurchase ? lastPurchase.date : null,
@@ -26569,5 +26581,6 @@ function exportSuppliersCSV() {
 <script src="js/glassnav.js"></script>
 <script src="js/branchstats.js"></script>
 <script src="js/branches.js"></script>
+<script src="js/returns.js"></script>
 </body>
 </html>

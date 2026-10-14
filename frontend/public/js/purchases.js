@@ -28,11 +28,22 @@
   function canGo(p) { try { return typeof can !== 'function' || can(p); } catch (e) { return true; } }
 
   function purchases() { return A('expenses').filter(function (e) { return e.kind === 'purchase'; }); }
+  /* 4.35 · purchase returns: what came back off each invoice · the cash suppliers gave back */
+  function retOf() {
+    var by = {}, cash = {};
+    (window.AXBStats ? AXBStats.rets(D()) : []).forEach(function (r) {
+      if (r.type !== 'purchase') return;
+      if (r.src && r.src.id) by[r.src.id] = (by[r.src.id] || 0) + (Number(r.amount) || 0);
+      cash[r.supplierId || '_'] = (cash[r.supplierId || '_'] || 0) + (Number(r.refund) || 0);
+    });
+    return { by: by, cash: cash };
+  }
+  function net(p, R) { return Math.max(0, (Number(p.amount) || 0) - ((R || retOf()).by[p.id] || 0)); }
 
   /* paid per purchase — same arithmetic as supplierMetrics(): opening balance first, then oldest invoice first */
   function paidMap() {
     var map = {}, auto = {}, bySup = {};
-    var all = purchases();
+    var all = purchases(), R = retOf();
     all.forEach(function (p) { if (p.autoPaymentId) auto[p.autoPaymentId] = p.id; });
     all.forEach(function (p) { (bySup[p.supplierId || '_'] = bySup[p.supplierId || '_'] || []).push(p); });
     var pool = {};
@@ -42,27 +53,27 @@
     });
     Object.keys(bySup).forEach(function (sid) {
       var sup = A('suppliers').find(function (s) { return s.id === sid; });
-      var left = (pool[sid] || 0) - Math.max(0, sup ? Number(sup.openingBalance) || 0 : 0);
+      var left = (pool[sid] || 0) - (R.cash[sid] || 0) - Math.max(0, sup ? Number(sup.openingBalance) || 0 : 0);
       bySup[sid].slice().sort(function (a, b) { return (a.date || '').localeCompare(b.date || '') || (a.createdAt || 0) - (b.createdAt || 0); })
         .forEach(function (p) {
-          var amt = Number(p.amount) || 0;
+          var amt = net(p, R);
           if (p.paymentMethod && p.paymentMethod !== 'credit') { map[p.id] = amt; return; }
           var take = Math.max(0, Math.min(left, amt)); map[p.id] = take; left -= take;
         });
     });
     return map;
   }
-  function stateOf(p, paid) {
-    var amt = Number(p.amount) || 0, rem = Math.max(0, amt - paid);
+  function stateOf(p, paid, amt0) {
+    var amt = amt0 != null ? amt0 : net(p), rem = Math.max(0, amt - paid);
     if (rem <= 0.009) return { k: 'paid', l: 'مدفوعة' };
     if (p.dueDate && p.dueDate < today()) return { k: 'late', l: 'متأخرة' };
     if (paid > 0.009) return { k: 'part', l: 'مدفوعة جزئياً' };
     return { k: 'open', l: 'آجل' };
   }
   function rows() {
-    var pm = paidMap(), list = purchases().map(function (p) {
-      var paid = pm[p.id] || 0, amt = Number(p.amount) || 0;
-      return { p: p, paid: paid, rem: Math.max(0, amt - paid), amt: amt, st: stateOf(p, paid) };
+    var pm = paidMap(), R = retOf(), list = purchases().map(function (p) {
+      var paid = pm[p.id] || 0, amt = net(p, R);
+      return { p: p, paid: paid, rem: Math.max(0, amt - paid), amt: amt, ret: R.by[p.id] || 0, st: stateOf(p, paid, amt) };
     });
     if (ui.from) list = list.filter(function (r) { return (r.p.date || '') >= ui.from; });
     if (ui.to) list = list.filter(function (r) { return (r.p.date || '') <= ui.to; });
@@ -155,11 +166,12 @@
 
   function view(pid) {
     var r = rows().find(function (x) { return x.p.id === pid; }) || null;
-    if (!r) { var pm = paidMap(), p0 = purchases().find(function (x) { return x.id === pid; }); if (!p0) return; var pa = pm[p0.id] || 0; r = { p: p0, paid: pa, amt: Number(p0.amount) || 0, rem: Math.max(0, (Number(p0.amount) || 0) - pa), st: stateOf(p0, pa) }; }
+    if (!r) { var pm = paidMap(), p0 = purchases().find(function (x) { return x.id === pid; }); if (!p0) return; var pa = pm[p0.id] || 0, am = net(p0); r = { p: p0, paid: pa, amt: am, ret: retOf().by[p0.id] || 0, rem: Math.max(0, am - pa), st: stateOf(p0, pa, am) }; }
     var p = r.p, items = p.items || [];
     var method = (typeof PURCHASE_PAYMENT_METHODS !== 'undefined' ? (PURCHASE_PAYMENT_METHODS.find(function (m) { return m.v === p.paymentMethod; }) || {}).l : '') || p.paymentMethod || '';
     var body = '<div class="pi-view">' +
       '<div class="pi-vh"><div><b>' + esc(p.supplierName || '-') + '</b><span>#' + esc(p.number || '-') + ' · ' + esc(p.date || '') + (p.reference ? ' · فاتورة المورد ' + esc(p.reference) : '') + '</span></div><span class="pi-st s-' + r.st.k + '">' + r.st.l + '</span></div>' +
+      (r.ret ? '<div class="axr-note">اترجع منها <b>' + money(r.ret) + '</b> — الإجمالي بعد المرتجع</div>' : '') +
       '<div class="pi-vk"><div><em>الإجمالي</em><b>' + money(r.amt) + '</b></div><div><em>المدفوع</em><b class="t-ok">' + money(r.paid) + '</b></div><div><em>المتبقي</em><b class="' + (r.rem > 0.009 ? 't-bad' : '') + '">' + money(r.rem) + '</b></div></div>' +
       '<div class="pi-vm"><span>طريقة الدفع: <b>' + esc(method) + '</b></span>' + (p.dueDate ? '<span>الاستحقاق: <b>' + esc(p.dueDate) + '</b></span>' : '') + (p.description ? '<span>' + esc(p.description) + '</span>' : '') + '</div>' +
       (items.length ? '<table class="data-table pi-vt"><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>' +
@@ -172,6 +184,7 @@
       (r.rem > 0.009 && p.supplierId && typeof openSupplierPaymentForm === 'function' ? '<button class="btn btn-secondary" onclick="closeModal();openSupplierPaymentForm(\'\',\'' + p.supplierId + '\')">سداد للمورد</button>' : '') +
       (typeof deletePurchase === 'function' ? '<button class="btn btn-ghost" style="color:var(--danger)" onclick="closeModal();deletePurchase(\'' + p.id + '\')">حذف</button>' : '') +
       (typeof openPurchaseForm === 'function' ? '<button class="btn btn-primary" onclick="closeModal();openPurchaseForm(\'' + p.id + '\')">تعديل</button>' : '');
+    if (window.AXRet && AXRet.canPurchase()) foot += '<button class="btn btn-secondary axr-btn" onclick="AXRet.openPurchase(\'' + p.id + '\')">↩ مرتجع</button>';
     openModal('فاتورة شراء #' + esc(p.number || ''), body, foot, 'large');
   }
 
