@@ -252,7 +252,7 @@ test('4.29 phone: pressing a tab grows the glass lens; dragging moves it; releas
 });
 
 /* ── 4.30 · welcome screen ── */
-test('4.30 welcome screen: brand on red shows once per launch, covers the app, then lifts away', async ({ page, context, server }) => {
+test('4.30 welcome screen: brand on rose-red (4.36: letters in motion) shows once per launch, covers the app, then lifts away', async ({ page, context, server }) => {
   const errors = watchErrors(page);
   const l = await login(server.base, 'admin', ADMIN_PASSWORD);
   await context.addCookies([{ name: 'emx_sid', value: l.token, domain: new URL(server.base).hostname, path: '/', httpOnly: true, sameSite: 'Lax' }]);
@@ -264,7 +264,10 @@ test('4.30 welcome screen: brand on red shows once per launch, covers the app, t
   await expect(sp).toBeVisible();
   await expect(sp.locator('.axs-name')).toHaveText('OZAREX');
   await expect(sp.locator('.axs-sub')).toContainText('تجربة مختلفة');
-  expect(await sp.evaluate(e => getComputedStyle(e).backgroundColor)).toBe('rgb(225, 83, 99)');
+  expect(await sp.evaluate(e => getComputedStyle(e).backgroundColor)).toBe('rgb(208, 58, 90)');      // 4.36 · the rose-red of the reference
+  expect(await sp.evaluate(e => getComputedStyle(e).backgroundImage)).toContain('radial-gradient');
+  expect(await sp.locator('.axs-name span').count()).toBe(6);                  // OZAREX in motion: one moving letter each
+  expect(await sp.locator('.axs-name span').first().evaluate(e => getComputedStyle(e).animationName)).toContain('axsL');
   const box = await sp.boundingBox(); const vp = page.viewportSize();
   expect(box.width).toBeGreaterThanOrEqual(vp.width - 1); expect(box.height).toBeGreaterThanOrEqual(vp.height - 1);
   await page.clock.resume();                                                   // now let it run its course
