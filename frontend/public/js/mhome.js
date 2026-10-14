@@ -44,6 +44,7 @@
     shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>',
     home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1.5 1.5 0 0 1-1.5 1.5H15v-6H9v6H4.5A1.5 1.5 0 0 1 3 20z"/></svg>',
     sell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M12 10v6M9 13h6"/></svg>',
+    profit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-7"/><path d="M15 7h5v5"/></svg>',
     doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>',
     users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>',
     mine: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="10" r="3"/><path d="M7 19a5 5 0 0 1 10 0"/></svg>',
@@ -83,7 +84,7 @@
   var TILES = [
     ['issuances', 'صرف الورق'], ['invoices', 'المبيعات'], ['purchases', 'المشتريات'], ['payments', 'التحصيل'],
     ['customers', 'العملاء'], ['forecast', 'مواعيد السحب'], ['inventory', 'المخازن'], ['stock', 'مخزوني وجرد'],
-    ['suppliers', 'الموردين'], ['expenses', 'المصروفات'], ['reports', 'التقارير'], ['profit', 'الأرباح'],
+    ['suppliers', 'الموردين'], ['expenses', 'المصروفات'], ['reports', 'التقارير'], ['profit', 'أرباحي'],
     ['cheques', 'الشيكات'], ['monthly', 'تقرير الشهر'], ['aging', 'أعمار الديون'], ['requests', 'الطلبات'], ['aiassistant', 'المساعد الذكي']
   ];
   function tileSub(k, m) {
@@ -198,7 +199,7 @@
   }
   function buildNav() {
     var bn = document.getElementById('bottom-nav'), u = me(); if (!bn || !u) return;
-    var sig = [u.id, canGo('invoices'), canGo('customers'), canGo('issuances'), canGo('inventory'), canGo('stock'), 'v3'].join('|');
+    var sig = [u.id, canGo('invoices'), canGo('profit'), canGo('customers'), canGo('issuances'), canGo('inventory'), canGo('stock'), 'v4'].join('|');
     if (bn.getAttribute('data-mh') === sig && !bn.querySelector('.bn-create')) return;
     var item = function (page, label, icon, click, extra) {
       return '<button type="button" class="bn-item' + (extra || '') + '"' + (page ? ' data-page="' + page + '"' : '') + ' onclick="' + click + '" aria-label="' + label + '">' + icon + '<span>' + label + '</span></button>';
@@ -209,7 +210,9 @@
       (canGo('inventory') ? item('inventory', 'المخزن', IC.box, "navigate('inventory')", ' bn-stock')
         : canGo('stock') ? item('stock', 'المخزن', IC.box, "navigate('stock')", ' bn-stock')
         : item(canGo('issuances') ? 'issuances' : '', 'بيع', IC.sell, 'AXM.sell()', ' bn-sell')) +
-      (canGo('invoices') ? item('invoices', 'الفواتير', IC.doc, "navigate('invoices')") : '') +
+      /* 4.37 · «أرباحي» instead of «الفواتير» (the invoices stay in «المزيد»); without the profit page the invoices stay here */
+      (canGo('profit') ? item('profit', 'أرباحي', IC.profit, "navigate('profit')", ' bn-profit')
+        : canGo('invoices') ? item('invoices', 'الفواتير', IC.doc, "navigate('invoices')") : '') +
       (canGo('customers') ? item('customers', 'عملاء', IC.users, "navigate('customers')") : '') +
       item('', 'المزيد', IC.more, 'AXM.more()', ' bn-more');
     bn.setAttribute('data-mh', sig);

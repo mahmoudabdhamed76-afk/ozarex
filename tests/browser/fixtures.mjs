@@ -10,7 +10,7 @@ export const PAGES = {
   dashboard: 'لوحة التحكم', customers: 'العملاء والمراكز', issuances: 'صرف الورق للمراكز', forecast: 'مواعيد السحب المتوقعة',
   invoices: 'الفواتير', payments: 'التحصيل والمديونيات', sales: 'المبيعات', aging: 'أعمار الديون', transfers: 'التحويلات البنكية', cheques: 'الشيكات',
   debts: 'سداد المديونية', suppliers: 'الموردين', purchases: 'فواتير المشتريات', inventory: 'إدارة المخازن', stock: 'مخزوني وجرد',
-  expenses: 'المصروفات', reports: 'التقارير', monthly: 'تقرير الشهر والتقفيل', profit: 'الأرباح', aiassistant: 'المساعد الذكي',
+  expenses: 'المصروفات', reports: 'التقارير', monthly: 'تقرير الشهر والتقفيل', profit: 'أرباحي', aiassistant: 'المساعد الذكي',
   approvals: 'طلبات الموافقة', requests: 'الطلبات والمقترحات', users: 'إدارة المستخدمين', audit: 'سجل التعديلات الذكي',
   security: 'الأمان والنسخ الاحتياطي', settings: 'الإعدادات'
 };

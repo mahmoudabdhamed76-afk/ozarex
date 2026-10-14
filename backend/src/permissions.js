@@ -96,7 +96,7 @@ const POLICY = {
   expenses: { read: ['expenses', 'suppliers', 'employees', 'salaryRuns'], write: { expenses: FULL, employees: FULL, salaryRuns: FULL } },
   reports: { read: ['customers', 'products', 'invoices', 'issuances', 'payments', 'expenses', 'stockMoves', 'suppliers', 'supplierPayments', 'bankTransfers'], costs: true },
   monthly: { read: ['customers', 'products', 'invoices', 'issuances', 'payments', 'expenses', 'supplierPayments', 'bankTransfers'], keys: ['_closings', '_stmtWeek'], writeKeys: ['_stmtWeek'] },
-  profit: { read: ['customers', 'products', 'invoices', 'issuances', 'expenses'], costs: true },
+  profit: { read: ['customers', 'products', 'invoices', 'issuances', 'expenses', 'payments'], costs: true },   // 4.37 · payments: «الربح مش هو الفلوس» (collections beside the profit)
   aiassistant: { read: SALES_READ.concat(['stockMoves']), keys: ['_prospects'], writeKeys: ['_prospects'] }
 };
 /* every signed-in user: the shared notes + the UI preferences */
