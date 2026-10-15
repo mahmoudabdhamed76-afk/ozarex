@@ -276,10 +276,10 @@
         '<div class="fx-form"><label><span>رقم الواتساب بتاعك</span><input class="form-control" id="dg-phone" inputmode="tel" dir="ltr" placeholder="01xxxxxxxxx" value="' + esc(c.phone) + '"></label>' +
         '<label><span>كود التفعيل (apikey)</span><input class="form-control" id="dg-key" dir="ltr" placeholder="' + (c.hasKey ? 'متسجل — اكتب كود جديد لو اتغير' : '123456') + '" value=""></label></div>' +
         '<details class="fx-how"' + (c.hasKey ? '' : ' open') + '><summary>إزاي أجيب كود التفعيل؟ (مرة واحدة — دقيقة)</summary><ol>' +
-          '<li>سجّل الرقم ده في موبايلك: <b dir="ltr">+34 644 43 38 04</b> (CallMeBot)</li>' +
+          '<li>سجّل الرقم ده في موبايلك: <b dir="ltr">+34 623 78 64 49</b> (CallMeBot)</li>' +
           '<li>ابعتله على الواتساب الرسالة دي بالظبط: <b dir="ltr">I allow callmebot to send me messages</b></li>' +
           '<li>هيرد عليك برسالة فيها <b>apikey</b> — اكتبه هنا واحفظ.</li>' +
-          '<li>لو ما ردّش خلال دقيقتين استنى 24 ساعة وجرّب تاني. لو الرقم اتغير هتلاقيه في <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">صفحة CallMeBot</a>.</li></ol>' +
+          '<li>لو ما ردّش خلال دقيقتين استنى 24 ساعة وجرّب تاني. لو الرقم اتغير هتلاقيه في <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">صفحة CallMeBot</a> (الرقم القديم +34 644 43 38 04 اتقفل).</li></ol>' +
           '<p class="pfx-note">الخدمة مجانية وبتبعت لرقمك إنت بس. لو وقفت في يوم، الملخص بيوصل كإشعار وبيتحفظ هنا في «الملخصات».</p></details>' +
         '<h4 class="fx-h4">⚡ تنبيه فوري</h4>' + sw('dg-short', c.alertShort, 'عجز في أي تقفيل يومية') + sw('dg-ap', c.alertApproval, 'مصروف مستني موافقتك') + sw('dg-tr', c.alertTransfer, 'تحويل بين الفروع', 'إشعار بس') +
         sw('dg-profit', c.profit, 'الربح في الملخص') +
