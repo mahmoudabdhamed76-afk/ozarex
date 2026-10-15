@@ -34,7 +34,7 @@
   /* settings keys a non-admin may write at all (the server refuses the rest) */
   var USER_KEYS = { monthlyTarget: 1, _debtPlan: 1, countBlind: 1, _approvals: 1, _custody: 1, _debts: 1, _stockCounts: 1, _cheques: 1, _po: 1,
     tickerSpeed: 1, tickerEvents: 1, tickerPages: 1, soundEnabled: 1, reciterVolume: 1, reciterEnabled: 1, dailyBackupReminder: 1,
-    lastBackupReminderDate: 1, _prospects: 1, _portal: 1, _stmtSent: 1, _poLead: 1, _requests: 1, _calls: 1, _stmtWeek: 1, _returns: 1 };
+    lastBackupReminderDate: 1, _prospects: 1, _portal: 1, _stmtSent: 1, _poLead: 1, _requests: 1, _calls: 1, _stmtWeek: 1, _returns: 1, _cashCounts: 1 };
   /* how much needs the admin — set PER USER by the admin in «المستخدمين»:
        'sensitive' (default, like 4.6) · 'edits' (any edit / delete) · 'none'
      → null means nothing needs approval (admin, or a user set to 'none') */
@@ -186,6 +186,14 @@
   function isDraftCount(k, x) { return k === '_stockCounts' && (x.rb || {}).status === 'draft' && (x.ra || {}).status === 'draft'; }
   function dateOf(r) { return r && typeof r.date === 'string' ? r.date.slice(0, 10) : ''; }
 
+  /* 4.38 · the money rules of a branch, from its settings: limits + the day of the last cash count */
+  function cashOpts(st) {
+    var c = (st && st._cashCfg) || {};
+    if (!c.on) return null;
+    var last = '';
+    (Array.isArray(st._cashCounts) ? st._cashCounts : []).forEach(function (k) { var d = k && typeof k.date === 'string' ? k.date.slice(0, 10) : ''; if (d > last) last = d; });
+    return { on: true, approve: Number(c.approve) || 0, receipt: Number(c.receipt) || 0, lastClose: last };
+  }
   function classify(df, level, opts) {
     opts = opts || {};
     var c = df.cols, why = [], seen = {};
@@ -209,6 +217,19 @@
       });
       var rs = df.sets && df.sets._returns;   // 4.35 · a return dated in a closed period
       if (rs && rs.added.concat(rs.removed).some(function (r) { var d = dateOf(r); return d && d <= opts.closedUntil; })) push('closed', '_returns');
+    }
+    /* 0b · 4.38 «الفلوس» — the money rules the admin switched on (_cashCfg): an expense above the approval
+       limit, an expense above the receipt limit without a receipt (one paid from a cash custody is settled
+       there), an expense dated on/before the last daily close of the cash box. Kept even when approvals are off. */
+    var cc = opts.cash;
+    if (cc && cc.on && c.expenses) {
+      c.expenses.added.forEach(function (r) {
+        if (!r || r.kind === 'purchase') return;
+        var a = Number(r.amount) || 0;
+        if (cc.approve > 0 && a >= cc.approve) push('cash', 'exp_big', { amount: a, limit: cc.approve });
+        if (cc.receipt > 0 && a >= cc.receipt && !r.custodyId && !(r.attachment && r.attachment.data)) push('cash', 'exp_receipt', { amount: a, limit: cc.receipt });
+        if (cc.lastClose && dateOf(r) && dateOf(r) <= cc.lastClose) push('cash', 'exp_late', { date: dateOf(r), lastClose: cc.lastClose });
+      });
     }
     /* 1 · deleting */
     Object.keys(c).forEach(function (k) {
@@ -414,7 +435,7 @@
 
   return {
     daysBetween: daysBetween, salesDocs: salesDocs, aging: aging, statement: statement,
-    FIN: FIN, GUARD_RM: GUARD_RM, BAL: BAL, IGN: IGN, ACC: ACC, SIDE_FIN: SIDE_FIN, EDIT_KEYS: EDIT_KEYS, USER_KEYS: USER_KEYS,
+    cashOpts: cashOpts, FIN: FIN, GUARD_RM: GUARD_RM, BAL: BAL, IGN: IGN, ACC: ACC, SIDE_FIN: SIDE_FIN, EDIT_KEYS: EDIT_KEYS, USER_KEYS: USER_KEYS,
     ADMIN_ONLY_PAGES: ADMIN_ONLY_PAGES, DEFAULT_LEVEL: DEFAULT_LEVEL, levelOf: levelOf,
     blank: blank, isNum: isNum, same: same, clone: clone, str: str, rnd: rnd, realField: realField, keyOf: keyOf, idx: idx,
     isIdArr: isIdArr, has: has, fieldsChanged: fieldsChanged, colDiff: colDiff, snapshot: snapshot, diff: diff,

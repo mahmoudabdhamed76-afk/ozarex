@@ -9690,7 +9690,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 4.37</div>
+      <div class="version">الإصدار 4.38</div>
     </footer>
   </div>
 </div>
@@ -18487,10 +18487,20 @@ function openExpenseForm(id) {
           <input class="form-control" type="number" name="amount" id="exp-amount" value="${e.amount}" step="0.01" min="0.01" required>
         </div>
       </div>
-      <div class="form-group">
-        <label>التاريخ *</label>
-        <input class="form-control" type="date" name="date" value="${e.date}" required>
+      <div class="form-row">
+        <div class="form-group">
+          <label>التاريخ *</label>
+          <input class="form-control" type="date" name="date" value="${e.date}" required>
+        </div>
+        <div class="form-group">
+          <label>اتدفع منين</label>
+          <select class="form-control" name="paymentMethod" id="exp-method">
+            <option value="cash" ${(e.paymentMethod||'cash')==='cash'?'selected':''}>الخزنة (كاش)</option>
+            <option value="transfer" ${e.paymentMethod==='transfer'?'selected':''}>البنك / تحويل</option>
+          </select>
+        </div>
       </div>
+      ${expReceiptBox(e)}
 
       <!-- SALARY MODE: hidden by default, shown when category=مرتبات -->
       <div id="salary-table-section" style="display:none">
@@ -18521,6 +18531,40 @@ function openExpenseForm(id) {
 
   // Trigger category change to show/hide salary table on initial load
   onExpenseCategoryChange();
+}
+
+/* 4.38 · the receipt of an expense (a photo or a PDF) — required above the limit the admin set in «الفلوس» */
+function expCfg() { const c = (DB.data.settings && DB.data.settings._cashCfg) || {}; return c.on ? c : null; }
+function expReceiptBox(e) {
+  window._expAtt = e.attachment && e.attachment.data ? e.attachment : null;
+  const c = expCfg(), lim = c && Number(c.receipt) > 0 ? Number(c.receipt) : 0;
+  return `<div class="form-group fx-rcpt" id="exp-rcpt">
+      <label>صورة الإيصال ${lim ? `<small class="fx-req">إجبارية فوق ${fmtCurrency(lim)}</small>` : '<small>(اختياري)</small>'}</label>
+      <label class="fx-drop" for="exp-rcpt-in"><span id="exp-rcpt-l">${window._expAtt ? '✓ ' + escapeHtml(window._expAtt.name || 'الإيصال') : '📷 صوّر الإيصال أو اختار صورة / PDF'}</span>
+        <input type="file" id="exp-rcpt-in" accept="image/*,application/pdf" capture="environment" onchange="expPickReceipt(this)" hidden></label>
+      ${window._expAtt && /^data:image/.test(window._expAtt.data) ? `<img class="fx-rimg" src="${window._expAtt.data}" alt="الإيصال">` : ''}
+    </div>`;
+}
+function expPickReceipt(inp) {
+  const f = inp.files && inp.files[0]; if (!f) return;
+  const done = att => { window._expAtt = att; const l = document.getElementById('exp-rcpt-l'); if (l) l.textContent = '✓ ' + att.name; const box = document.getElementById('exp-rcpt'); if (box) { box.querySelector('.fx-rimg')?.remove(); if (/^data:image/.test(att.data)) box.insertAdjacentHTML('beforeend', `<img class="fx-rimg" src="${att.data}" alt="الإيصال">`); } };
+  if (f.type === 'application/pdf') {
+    if (f.size > 1.5 * 1024 * 1024) { toast('الـ PDF أكبر من 1.5 ميجا — صوّره صورة', 'error'); return; }
+    const r = new FileReader(); r.onload = () => done({ name: f.name, type: f.type, data: r.result }); r.readAsDataURL(f); return;
+  }
+  const r = new FileReader();
+  r.onload = () => {   /* shrink the photo (≤ 1280 px, JPEG) so the data stays small */
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1280 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      done({ name: f.name || 'receipt.jpg', type: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.72) });
+    };
+    img.onerror = () => toast('الصورة دي مش مقروءة', 'error');
+    img.src = r.result;
+  };
+  r.readAsDataURL(f);
 }
 
 /* Show salary table when category is "مرتبات", hide amount input */
@@ -18971,6 +19015,10 @@ function saveExpense(id) {
   delete d._salaryDataJson;
 
   if (!d.amount || d.amount <= 0) { toast('أدخل مبلغاً صحيحاً', 'error'); return; }
+  /* 4.38 · the receipt */
+  if (window._expAtt) d.attachment = window._expAtt;
+  { const c = expCfg(), lim = c ? Number(c.receipt) || 0 : 0;
+    if (lim > 0 && d.amount >= lim && !(d.attachment && d.attachment.data) && !(currentUser && currentUser.role === 'admin')) { toast('صوّر الإيصال الأول — إجباري لأي مصروف من ' + fmtCurrency(lim), 'error'); return; } }
   let before = null;
   let record;
   if (id) {
@@ -18985,6 +19033,7 @@ function saveExpense(id) {
   }
   // Cleanup staging
   delete window._salaryStaging;
+  delete window._expAtt;
   DB.save();
   logAudit({
     operation: id ? 'edit' : 'add', table: 'expenses',
@@ -26602,5 +26651,7 @@ function exportSuppliersCSV() {
 <script src="js/branchstats.js"></script>
 <script src="js/branches.js"></script>
 <script src="js/returns.js"></script>
+<script src="js/cashbook.js"></script>
+<script src="js/fulusi.js"></script>
 </body>
 </html>

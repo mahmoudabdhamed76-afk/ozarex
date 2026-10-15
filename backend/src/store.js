@@ -227,10 +227,19 @@ function apply(u, w) {
     checkRequests(u, w.sets._requests);
     const df = AX.enrich(d, w);
     const level = AX.levelOf(s, u);   // per user (set by the admin in «المستخدمين»)
-    let why = AX.classify(df, level || 'sensitive', { closedUntil: s.closedUntil || '' });
-    if (why && (s.approvalsOff || !level)) why = why.filter(x => x.t === 'closed');
+    let why = AX.classify(df, level || 'sensitive', { closedUntil: s.closedUntil || '', cash: AX.cashOpts(s) });
+    if (why && (s.approvalsOff || !level)) why = why.filter(x => x.t === 'closed' || x.t === 'cash');   // 4.38 · the money rules stay on
     if (why && why.length) throw new Refused('needs_approval', 'التعديل ده محتاج موافقة المدير', { why });
   }
+
+  /* 4.38 · «الفلوس»: who recorded each money record, and when the server got it (a date typed in the past stays visible) */
+  ['payments', 'expenses', 'supplierPayments', 'bankTransfers'].forEach(k => {
+    ((w.cols[k] || {}).added || []).forEach(r => {
+      if (!r || typeof r !== 'object') return;
+      if (!r.by) r.by = { id: u.id, name: u.name || u.username || '' };
+      if (!r.srvAt) r.srvAt = Date.now();
+    });
+  });
 
   /* what will be written */
   const touched = {};   // blobKey → Set(ids)

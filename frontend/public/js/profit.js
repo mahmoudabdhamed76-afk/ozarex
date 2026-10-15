@@ -14,7 +14,7 @@
 ════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
-  var ui = { p: 'month', from: '', to: '', tab: 'products', all: false };
+  var ui = { p: 'month', from: '', to: '', tab: 'products', all: false, view: 'profit' };
   var MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
   var C = { cost: '#4C79D4', exp: '#14A094', net: '#E5232F' };    // validated (dark + light, CVD-safe adjacent pairs)
 
@@ -258,8 +258,18 @@
       (prevV != null ? '<small>قبلها: ' + (opt.fmt ? opt.fmt(prevV) : money(prevV)) + '</small>' : '') + '</div>';
   }
 
+  /* 4.38 · two views: «الربح» (this page) · «الفلوس» (js/fulusi.js) */
+  function views() {
+    return '<div class="pfx-views ax-hl-off" role="tablist">' + [['profit', 'الربح'], ['cash', 'الفلوس']].map(function (o) {
+      return '<button type="button" role="tab" aria-selected="' + (ui.view === o[0]) + '" class="' + (ui.view === o[0] ? 'on' : '') + '" onclick="AXProfit.view(\'' + o[0] + '\')">' + o[1] + '</button>'; }).join('') + '</div>';
+  }
   function render() {
     var host = document.getElementById('pfx-root'); if (!host) return;
+    if (ui.view === 'cash' && window.AXFulus) {
+      host.innerHTML = '<header class="pfx-head ax-hl-off"><div><h2>أرباحي</h2><p>الفلوس دخلت منين وراحت فين، والخزنة فيها كام بالظبط، وتقدر تسحب كام</p></div></header>' + views() + '<div id="fx-root" class="fx"></div>';
+      AXFulus.render(document.getElementById('fx-root'));
+      return;
+    }
     var rg = range(ui.p), R = compute(D(), rg.from, rg.to, rg.prev[0], rg.prev[1]), c = R.cur, p = R.prev, M = monthly(D(), rg.to);
     var periods = [['month', 'الشهر ده'], ['last', 'الشهر اللي فات'], ['3m', 'آخر 3 شهور'], ['year', 'السنة دي'], ['custom', 'فترة']];
     var sum = summary(R, rg), tips = advice(R, M);
@@ -276,7 +286,7 @@
     };
 
     host.innerHTML =
-      '<header class="pfx-head ax-hl-off"><div><h2>أرباحي</h2><p>الربح الحقيقي من البيع، ليه اتغير، وإزاي يزيد — من أرقامك الفعلية</p></div></header>' +
+      '<header class="pfx-head ax-hl-off"><div><h2>أرباحي</h2><p>الربح الحقيقي من البيع، ليه اتغير، وإزاي يزيد — من أرقامك الفعلية</p></div></header>' + views() +
       '<div class="pfx-filters ax-hl-off"><div class="pfx-seg" role="group" aria-label="الفترة">' + periods.map(function (o) {
         return '<button type="button" class="' + (ui.p === o[0] ? 'on' : '') + '" onclick="AXProfit.period(\'' + o[0] + '\')">' + o[1] + '</button>'; }).join('') + '</div>' +
         (ui.p === 'custom' ? '<div class="pfx-dates"><label><span>من</span><input class="form-control" type="date" value="' + rg.from + '" onchange="AXProfit.custom(this.value,null)"></label><label><span>إلى</span><input class="form-control" type="date" value="' + rg.to + '" onchange="AXProfit.custom(null,this.value)"></label></div>' : '') +
@@ -434,6 +444,7 @@
   };
   window.AXProfit = {
     render: window.renderProfit, lines: function () { return lines(D()); }, compute: compute, range: range, monthly: monthly,
+    view: function (v) { ui.view = v === 'cash' ? 'cash' : 'profit'; render(); },
     period: function (p) { ui.p = p; ui.all = false; render(); }, tab: function (t) { ui.tab = t; ui.all = false; render(); },
     all: function () { ui.all = !ui.all; render(); },
     custom: function (f, t) { if (f) ui.from = f; if (t) ui.to = t; render(); }

@@ -134,7 +134,8 @@
   /* the admin sets, per user in «المستخدمين», what needs approval (js/axcore.js levelOf) */
   function freshUser() { var u = user(); if (!u) return null; return A('users').find(function (x) { return x.id === u.id; }) || u; }
   function levelFor() { return X.levelOf(S(), freshUser()); }
-  function classify(df) { return X.classify(df, levelFor() || 'sensitive', { closedUntil: S().closedUntil || '' }); }
+  function opts() { return { closedUntil: S().closedUntil || '', cash: X.cashOpts ? X.cashOpts(S()) : null }; }   // 4.38 · + the money rules
+  function classify(df) { return X.classify(df, levelFor() || 'sensitive', opts()); }
 
   /* ════════ 3 · human words for a change ════════ */
   function shortLab(k, r) {
@@ -263,6 +264,11 @@
       var sc = df.sets._stockCounts && df.sets._stockCounts.modified.find(function (x) { return x.a.status === 'done'; });
       var q = cd.modified.filter(function (x) { return x.f.indexOf('quantity') >= 0; });
       title = sc ? 'اعتماد ' + shortLab('_stockCounts', sc.rb) + ' (' + q.length + ' صنف)' : q.length === 1 ? 'تعديل كمية ' + shortLab('products', q[0].rb) : 'تعديل كميات ' + q.length + ' أصناف';
+    } else if (w.t === 'cash') {                                           // 4.38 · «الفلوس»
+      var ex = (df.cols.expenses ? df.cols.expenses.added : []).find(function (r) { return r && r.kind !== 'purchase'; }) || {};
+      var why0 = w.k === 'exp_big' ? 'فوق حد الموافقة' : w.k === 'exp_receipt' ? 'من غير إيصال' : 'بتاريخ يوم اتقفل';
+      title = 'مصروف ' + (ex.category || '') + ' ' + num(ex.amount) + ' — ' + why0;
+      kind = 'edit';
     } else if (w.t === 'debt') {
       kind = 'debt';
       title = cd.removed.length ? 'حذف ' + shortLab('_debts', cd.removed[0]) : 'تعديل ' + shortLab('_debts', (cd.modified[0] || {}).rb);
@@ -347,9 +353,9 @@
   function guardMode() {
     var r = role();
     if (!r || applying || window.__axNoGuard) return null;
-    var closed = !!S().closedUntil;
+    var closed = !!S().closedUntil, cash = !!(X.cashOpts && X.cashOpts(S()));
     if (r === 'admin') return closed ? 'admin-closed' : null;
-    if (S().approvalsOff || !levelFor()) return closed ? 'closed-only' : null;
+    if (S().approvalsOff || !levelFor()) return closed || cash ? 'closed-only' : null;
     return 'full';
   }
   function guardOn() { return !!guardMode(); }
@@ -357,7 +363,7 @@
     var m = guardMode();
     if (m === 'full') return classify(df);
     if (!m) return null;
-    var w = (X.classify(df, 'sensitive', { closedUntil: S().closedUntil || '' }) || []).filter(function (x) { return x.t === 'closed'; });
+    var w = (X.classify(df, 'sensitive', opts()) || []).filter(function (x) { return x.t === 'closed' || (x.t === 'cash' && m === 'closed-only'); });
     return w.length ? w : null;
   }
   function quiet() { return !!(held && Date.now() < held.until); }

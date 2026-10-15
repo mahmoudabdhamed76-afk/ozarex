@@ -55,7 +55,7 @@ const PREF_KEYS = ['tickerSpeed', 'tickerEvents', 'tickerPages', 'soundEnabled',
    costs:    sees purchase costs (products.cost, items[].cost)      directory: names of colleagues */
 const SALES_READ = ['customers', 'products', 'invoices', 'issuances', 'payments'];
 const POLICY = {
-  dashboard: { read: [], keys: ['monthlyTarget', '_cashMoves', '_returns'], writeKeys: ['monthlyTarget'] },   // 4.35 · _returns: every screen's totals subtract the returns   // 4.34 · _cashMoves: transfers between branches' cash (read only — the server writes it)
+  dashboard: { read: [], keys: ['monthlyTarget', '_cashMoves', '_returns', '_cashCfg'], writeKeys: ['monthlyTarget'] },   // 4.35 · _returns: every screen's totals subtract the returns   // 4.34 · _cashMoves: transfers between branches' cash (read only — the server writes it)
   approvals: { read: [], keys: ['_approvals'], writeKeys: ['_approvals'] },
   requests: { read: [], keys: ['_requests'], writeKeys: ['_requests'] },
   customers: { read: SALES_READ, write: { customers: FULL } },
@@ -69,7 +69,7 @@ const POLICY = {
       issuances: g(0, 0, SIDE.issuances.concat(['total', 'unitPrice'])) }
   },
   payments: {
-    read: ['customers', 'invoices', 'issuances', 'payments', 'bankTransfers'], keys: ['_stmtWeek'], writeKeys: ['_stmtWeek'],
+    read: ['customers', 'invoices', 'issuances', 'payments', 'bankTransfers'], keys: ['_stmtWeek', '_cashCounts'], writeKeys: ['_stmtWeek', '_cashCounts'],   // 4.38 · تقفيل اليومية
     write: { payments: FULL, customers: g(0, 0, SIDE.customers), invoices: g(0, 0, SIDE.invoices), issuances: g(0, 0, SIDE.issuances) }
   },
   aging: { read: ['customers', 'invoices', 'issuances', 'payments'], keys: ['_portal', '_stmtSent'], writeKeys: ['_portal', '_stmtSent'] },
@@ -93,10 +93,11 @@ const POLICY = {
     keys: ['_stockCounts', '_custody', '_po', '_poLead', 'countBlind'], writeKeys: ['_stockCounts', '_custody', '_po', '_poLead', 'countBlind'],
     write: { products: FULL, stockMoves: FULL, expenses: g(1, 1) }, costs: true
   },
-  expenses: { read: ['expenses', 'suppliers', 'employees', 'salaryRuns'], write: { expenses: FULL, employees: FULL, salaryRuns: FULL } },
+  expenses: { read: ['expenses', 'suppliers', 'employees', 'salaryRuns'], keys: ['_cashCounts'], writeKeys: ['_cashCounts'], write: { expenses: FULL, employees: FULL, salaryRuns: FULL } },
   reports: { read: ['customers', 'products', 'invoices', 'issuances', 'payments', 'expenses', 'stockMoves', 'suppliers', 'supplierPayments', 'bankTransfers'], costs: true },
   monthly: { read: ['customers', 'products', 'invoices', 'issuances', 'payments', 'expenses', 'supplierPayments', 'bankTransfers'], keys: ['_closings', '_stmtWeek'], writeKeys: ['_stmtWeek'] },
-  profit: { read: ['customers', 'products', 'invoices', 'issuances', 'expenses', 'payments'], costs: true },   // 4.37 · payments: «الربح مش هو الفلوس» (collections beside the profit)
+  profit: { read: ['customers', 'products', 'invoices', 'issuances', 'expenses', 'payments', 'supplierPayments', 'bankTransfers'], costs: true,
+    keys: ['_cashCounts', '_ownerDraws', '_custody', '_debts'] },   // 4.38 · «الفلوس» (read only — the admin records draws and the settings)   // 4.37 · payments: «الربح مش هو الفلوس» (collections beside the profit)
   aiassistant: { read: SALES_READ.concat(['stockMoves']), keys: ['_prospects'], writeKeys: ['_prospects'] }
 };
 /* every signed-in user: the shared notes + the UI preferences */
@@ -218,6 +219,9 @@ function checkWrite(d, w, u) {
   Object.keys(w.sets || {}).concat(Object.keys(w.keys || {})).forEach(k => {
     if (!p.writeKeys.has(k)) deny('تغيّر الإعداد ده: ' + k, { key: k });
   });
+  /* 4.38 · a daily cash count is never changed or removed by a user (a new count the same day supersedes it) */
+  const cc = (w.sets || {})._cashCounts;
+  if (cc && ((cc.removed || []).length || (cc.modified || []).some(x => x.f.some(f => AX.realField(f))))) deny('تعدّل أو تمسح تقفيل يومية (للمدير بس)', { key: '_cashCounts' });
   /* 4.35 · returns: a sales return from the sales pages, a purchase return from the suppliers pages — never edited or deleted (admin only) */
   const rt = (w.sets || {})._returns;
   if (rt) {
