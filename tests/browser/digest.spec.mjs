@@ -11,7 +11,9 @@ test('the admin sets the daily summary from «الفلوس» and reads past summ
   await page.locator('.fx-dg').click();
   await expect(page.locator('.fx-dgf')).toBeVisible();
   await expect(page.locator('.fx-dgf [data-axp]')).toBeVisible();                 // the push switch for this device
-  await expect(page.locator('.fx-how')).toContainText('I allow callmebot to send me messages');
+  await expect(page.locator('.fx-dgf')).toContainText('I allow callmebot to send me messages');
+  await expect(page.locator('.fx-dgf')).toContainText('@BotFather');                 // Telegram: make a bot, paste its code
+  await expect(page.locator('#dg-tgtok')).toBeVisible();
   await page.locator('label.fx-sw:has(#dg-on)').click();
   await page.fill('#dg-time', '21:30');
   await page.fill('#dg-phone', '01012345678');

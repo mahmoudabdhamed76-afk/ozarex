@@ -11,7 +11,9 @@ import { startServer } from '../helpers/server.mjs';
 import { req, adminLogin, ops, col, createUser } from '../helpers/api.mjs';
 
 let s, admin, acct, fake, fakePort;
-const pushes = [], whats = [];
+const pushes = [], whats = [], tgs = [];
+const TG_TOKEN = '123456789:AAHfakeTokenForTheTests_abcdefghijkl';
+let tgStarted = false;
 const CA = 'b_cairo00001';
 const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64u = x => Buffer.from(String(x).replace(/-/g, '+').replace(/_/g, '/'), 'base64');
@@ -53,12 +55,22 @@ before(async () => {
     const chunks = []; q.on('data', c => chunks.push(c)); q.on('end', () => {
       if (q.url.startsWith('/push/')) pushes.push({ headers: q.headers, body: Buffer.concat(chunks) });
       else if (q.url.startsWith('/wa')) { const u = new URL(q.url, 'http://x'); whats.push({ phone: u.searchParams.get('phone'), apikey: u.searchParams.get('apikey'), text: u.searchParams.get('text') }); }
+      else if (q.url.startsWith('/tg/bot')) {                                       // a fake Telegram Bot API
+        const m = /^\/tg\/bot([^/]+)\/(\w+)$/.exec(q.url), body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {};
+        const good = m && m[1] === TG_TOKEN;
+        r.writeHead(good ? 200 : 401, { 'Content-Type': 'application/json' });
+        if (!good) return r.end(JSON.stringify({ ok: false, error_code: 401, description: 'Unauthorized' }));
+        if (m[2] === 'getMe') return r.end(JSON.stringify({ ok: true, result: { id: 1, is_bot: true, username: 'ozarex_test_bot' } }));
+        if (m[2] === 'getUpdates') return r.end(JSON.stringify({ ok: true, result: tgStarted ? [{ update_id: 1, message: { message_id: 1, text: '/start ozarex', chat: { id: 555, type: 'private', first_name: 'محمود' } } }] : [] }));
+        if (m[2] === 'sendMessage') { tgs.push(body); return r.end(JSON.stringify({ ok: true, result: { message_id: 9 } })); }
+        return r.end(JSON.stringify({ ok: false, description: 'no' }));
+      }
       r.writeHead(201); r.end('Message queued');
     });
   });
   await new Promise(r => fake.listen(0, '127.0.0.1', r));
   fakePort = fake.address().port;
-  s = await startServer({ env: { PUSH_ALLOW_HTTP: '1', CALLMEBOT_URL: 'http://127.0.0.1:' + fakePort + '/wa', DIGEST_TICK_MS: '400' } });
+  s = await startServer({ env: { PUSH_ALLOW_HTTP: '1', CALLMEBOT_URL: 'http://127.0.0.1:' + fakePort + '/wa', TELEGRAM_API_BASE: 'http://127.0.0.1:' + fakePort + '/tg', DIGEST_TICK_MS: '400' } });
   admin = (await adminLogin(s.base)).token;
   acct = await createUser(s.base, admin, { id: 'u_acct', username: 'acct', password: 'Acct-Test-Pass-1', name: 'محاسبة', role: 'accountant' });
   const T = today();
@@ -120,6 +132,28 @@ test('the daily summary: every branch, the right numbers, sent on WhatsApp and a
   assert.match(m.body, /ما قفلش: فرع منوف، فرع القاهرة/);
 });
 
+test('Telegram: the bot token is checked, the owner\'s chat is found from his first message, the summary arrives there', async () => {
+  let r = await req(s.base, 'POST', '/api/digest/telegram', { token: acct, body: { token: TG_TOKEN } });
+  assert.equal(r.status, 403);
+  r = await req(s.base, 'POST', '/api/digest/telegram', { token: admin, body: { token: 'not-a-token' } });
+  assert.equal(r.status, 400);
+  r = await req(s.base, 'POST', '/api/digest/telegram', { token: admin, body: { token: '123456789:AAHwrongTokenWrongTokenWrong_xyzxyzxyz' } });
+  assert.equal(r.status, 400, 'Telegram refused it');
+  r = await req(s.base, 'POST', '/api/digest/telegram', { token: admin, body: { token: TG_TOKEN } });
+  assert.equal(r.status, 200, r.text);
+  assert.equal(r.json.bot, 'ozarex_test_bot'); assert.equal(r.json.linked, false, 'nobody wrote to the bot yet');
+  tgStarted = true;
+  r = await req(s.base, 'POST', '/api/digest/telegram', { token: admin, body: {} });   // «اربط» again: the saved token is used
+  assert.equal(r.json.linked, true); assert.equal(r.json.chatName, 'محمود');
+  assert.equal(r.json.config.tgToken.includes('fakeToken'), false, 'the token never comes back');
+  tgs.length = 0;
+  const d = await req(s.base, 'POST', '/api/digest/send', { token: admin, body: { test: true } });
+  assert.equal(d.json.sent.tg.ok, true);
+  assert.ok(await until(() => tgs.length >= 1));
+  assert.equal(tgs[0].chat_id, '555'); assert.equal(tgs[0].parse_mode, 'HTML');
+  assert.match(tgs[0].text, /<b>📊 ملخص/); assert.match(tgs[0].text, /فرع منوف/);
+});
+
 test('instant alert: a daily close that comes out short reaches the admin at once', async () => {
   await req(s.base, 'PUT', '/api/digest', { token: admin, body: { on: true, alertShort: true } });
   whats.length = 0; pushes.length = 0;
@@ -132,6 +166,7 @@ test('instant alert: a daily close that comes out short reaches the admin at onc
   assert.match(m.body, /المعدود 800 والمفروض 950/);
   assert.equal(m.urgent, true);
   assert.match(whats[0].text, /عجز 150/);
+  assert.ok(await until(() => tgs.some(t => /عجز 150/.test(t.text))), 'and on Telegram');
 });
 
 test('sent by itself once a day at the chosen hour, and kept in the history', async () => {

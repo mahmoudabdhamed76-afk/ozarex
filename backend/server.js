@@ -333,6 +333,15 @@ const server = http.createServer(async (req, res) => {
         const r = await digest.run(digestCtx(), { test: b.test !== false, to: [me.id] });
         return sendJSON(res, 200, { ok: true, text: r.text, sent: r.sent, day: r.day });
       }
+      if (pathname === '/api/digest/telegram' && req.method === 'POST') {
+        if (!admin) return adminOnly();
+        const b = (await readBody(req, 0.02)) || {};
+        try {
+          const r = await digest.linkTelegram(b.token);
+          store.logEvent(me, { operation: 'edit', table: 'settings', recordId: 'digest', recordLabel: 'ربط تليجرام', after: { bot: r.bot, linked: r.linked } });
+          return sendJSON(res, 200, Object.assign({ ok: true, config: digest.publicConfig() }, r));
+        } catch (e) { return sendJSON(res, 400, { error: e.code || 'telegram', message: e.message }); }
+      }
       if (pathname === '/api/digest/history' && req.method === 'GET') {
         if (!admin) return adminOnly();
         return sendJSON(res, 200, { history: digest.history(parsed.query.limit) });

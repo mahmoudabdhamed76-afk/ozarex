@@ -272,10 +272,11 @@
         sw('dg-on', c.on, 'الملخص اليومي شغّال') +
         '<div class="fx-form"><label><span>الساعة (بتوقيت القاهرة)</span><input class="form-control" id="dg-time" type="time" value="' + esc(c.time) + '"></label></div>' +
         '<h4 class="fx-h4">🔔 إشعار على الموبايل</h4>' + (window.AXPush ? AXPush.strip() : '') + sw('dg-push', c.push, 'ابعت الملخص والتنبيهات كإشعار') +
+        '<h4 class="fx-h4">✈️ تليجرام</h4>' + tgBlock(c) +
         '<h4 class="fx-h4">💬 واتساب</h4>' + sw('dg-wa', c.wa, 'ابعت على الواتساب كمان') +
         '<div class="fx-form"><label><span>رقم الواتساب بتاعك</span><input class="form-control" id="dg-phone" inputmode="tel" dir="ltr" placeholder="01xxxxxxxxx" value="' + esc(c.phone) + '"></label>' +
         '<label><span>كود التفعيل (apikey)</span><input class="form-control" id="dg-key" dir="ltr" placeholder="' + (c.hasKey ? 'متسجل — اكتب كود جديد لو اتغير' : '123456') + '" value=""></label></div>' +
-        '<details class="fx-how"' + (c.hasKey ? '' : ' open') + '><summary>إزاي أجيب كود التفعيل؟ (مرة واحدة — دقيقة)</summary><ol>' +
+        '<details class="fx-how"><summary>إزاي أجيب كود التفعيل؟ (مرة واحدة — دقيقة)</summary><ol>' +
           '<li>سجّل الرقم ده في موبايلك: <b dir="ltr">+34 623 78 64 49</b> (CallMeBot)</li>' +
           '<li>ابعتله على الواتساب الرسالة دي بالظبط: <b dir="ltr">I allow callmebot to send me messages</b></li>' +
           '<li>هيرد عليك برسالة فيها <b>apikey</b> — اكتبه هنا واحفظ.</li>' +
@@ -288,21 +289,45 @@
       if (window.AXPush) AXPush.check();
     }).catch(function (e) { openModal('📲 الملخص اليومي', '<div class="pfx-empty">' + esc(e.message) + '</div>', '<button class="btn btn-ghost" onclick="closeModal()">إغلاق</button>'); });
   }
+  function tgBlock(c) {
+    var link = c.tgBot ? 'https://t.me/' + encodeURIComponent(c.tgBot) + '?start=ozarex' : '';
+    if (c.hasTg && c.tgChat) return sw('dg-tg', c.tg, 'ابعت على تليجرام') +
+      '<div class="fx-tgok"><span>✓ مربوط' + (c.tgChatName ? ' بـ <b>' + esc(c.tgChatName) + '</b>' : '') + ' عن طريق <b dir="ltr">@' + esc(c.tgBot) + '</b></span><button type="button" class="fx-mini ghost" onclick="AXFulus.unlinkTg()">افصل</button></div>';
+    if (c.hasTg) return '<div class="fx-how open"><b>البوت <span dir="ltr">@' + esc(c.tgBot) + '</span> جاهز — فاضل خطوة:</b><ol>' +
+      '<li><a href="' + link + '" target="_blank" rel="noopener">افتح البوت في تليجرام</a> ودوس <b>Start</b> (أو ابعتله أي كلمة).</li><li>ارجع هنا ودوس <b>«اربط»</b>.</li></ol>' +
+      '<div class="fx-tgrow"><button type="button" class="fx-mini" onclick="AXFulus.linkTg()">اربط</button><button type="button" class="fx-mini ghost" onclick="AXFulus.unlinkTg()">بوت تاني</button></div></div>';
+    return '<details class="fx-how" open><summary>اعمل بوت تليجرام (مرة واحدة — دقيقتين)</summary><ol>' +
+      '<li>افتح تليجرام وابحث عن <b dir="ltr">@BotFather</b> (عليه علامة زرقا ✓) ودوس <b>Start</b>.</li>' +
+      '<li>ابعتله <b dir="ltr">/newbot</b>، واكتب أي اسم (مثلاً Ozarex منوف)، وبعدين اسم ينتهي بـ <b dir="ltr">bot</b> (مثلاً <span dir="ltr">ozarex_mahmoud_bot</span>).</li>' +
+      '<li>هيبعتلك <b>كود</b> شكله <span dir="ltr">123456789:AAH…</span> — انسخه كله وحطه هنا.</li>' +
+      '<li>افتح البوت الجديد (اللينك في رسالة BotFather) ودوس <b>Start</b>، وارجع دوس «اربط».</li></ol>' +
+      '<div class="fx-tgrow"><input class="form-control" id="dg-tgtok" dir="ltr" placeholder="123456789:AAH..." autocomplete="off"><button type="button" class="fx-mini" onclick="AXFulus.linkTg()">اربط</button></div></details>';
+  }
+  function linkTg() {
+    var inp = document.getElementById('dg-tgtok'), tok = inp ? inp.value.trim() : '';
+    saveDigest(true).catch(function () {}).then(function () { return api('/api/digest/telegram', 'POST', { token: tok }); }).then(function (r) {
+      T(r.linked ? 'تليجرام اتربط ✓ — بعتنالك رسالة تجربة' : 'البوت @' + r.bot + ' جاهز — افتحه ودوس Start وارجع دوس «اربط»', r.linked ? 'success' : 'info');
+      if (r.linked) api('/api/digest/send', 'POST', { test: true }).catch(function () {});
+      digest();
+    }).catch(function (e) { T(e.message, 'error'); });
+  }
+  function unlinkTg() { api('/api/digest', 'PUT', { tgUnlink: true }).then(function () { digest(); }).catch(function (e) { T(e.message, 'error'); }); }
   function sentTxt(s) {
     s = s || {}; var a = [];
+    if (s.tg) a.push(s.tg.skipped ? 'تليجرام: مش مربوط' : s.tg.ok ? 'تليجرام ✓' : 'تليجرام ✗');
     if (s.wa) a.push(s.wa.skipped ? 'واتساب: مش متظبط' : s.wa.ok ? 'واتساب ✓' : 'واتساب ✗');
     if (s.push) a.push(s.push.devices ? 'إشعار ✓ (' + s.push.ok + '/' + s.push.devices + ')' : 'إشعار: مفيش جهاز مفعّل');
     return a.join(' · ');
   }
   function digestBody() {
     var v = function (i) { var e = document.getElementById(i); return e ? e.value : ''; }, c = function (i) { var e = document.getElementById(i); return !!(e && e.checked); };
-    var b = { on: c('dg-on'), time: v('dg-time') || '22:00', push: c('dg-push'), wa: c('dg-wa'), phone: v('dg-phone'), alertShort: c('dg-short'), alertApproval: c('dg-ap'), alertTransfer: c('dg-tr'), profit: c('dg-profit') };
+    var b = { on: c('dg-on'), time: v('dg-time') || '22:00', push: c('dg-push'), wa: c('dg-wa'), tg: document.getElementById('dg-tg') ? c('dg-tg') : true, phone: v('dg-phone'), alertShort: c('dg-short'), alertApproval: c('dg-ap'), alertTransfer: c('dg-tr'), profit: c('dg-profit') };
     if (v('dg-key').trim()) b.apikey = v('dg-key').trim();
     return b;
   }
   function saveDigest(silent) {
     var b = digestBody();
-    if (b.wa && b.on && !/^(\+|0)\d{9,14}$/.test(String(b.phone).replace(/\s/g, ''))) { T('اكتب رقم الواتساب صح (مثلاً 01012345678)', 'error'); return Promise.reject(new Error('phone')); }
+    if (b.wa && b.on && b.phone && !/^(\+|0)\d{9,14}$/.test(String(b.phone).replace(/\s/g, ''))) { T('اكتب رقم الواتساب صح (مثلاً 01012345678)', 'error'); return Promise.reject(new Error('phone')); }
     return api('/api/digest', 'PUT', b).then(function (r) { if (!silent) { T(r.config.on ? 'الملخص اليومي هيوصلك الساعة ' + r.config.time + ' ✓' : 'اتحفظ'); closeModal(); } return r; })
       .catch(function (e) { if (e.message !== 'phone') T(e.message, 'error'); throw e; });
   }
@@ -411,7 +436,7 @@
   setTimeout(watch, 0);
 
   window.AXFulus = {
-    render: render, run: run, compute: compute, settings: settings, digest: digest, saveDigest: function () { saveDigest().catch(function () {}); }, testDigest: testDigest, digests: digests, saveCfg: saveCfg, draw: draw, saveDraw: saveDraw,
+    render: render, run: run, compute: compute, settings: settings, digest: digest, saveDigest: function () { saveDigest().catch(function () {}); }, testDigest: testDigest, digests: digests, linkTg: linkTg, unlinkTg: unlinkTg, saveCfg: saveCfg, draw: draw, saveDraw: saveDraw,
     close: close, sum: sum, saveClose: saveClose, print: print, share: share,
     month: function (v) { if (v) { ui.month = v; render(); } },
     shift: function (n) { var p = (ui.month || today().slice(0, 7)).split('-'); var x = new Date(+p[0], +p[1] - 1 + n, 1); var ym = ds(x).slice(0, 7); if (ym > today().slice(0, 7)) return; ui.month = ym; render(); },

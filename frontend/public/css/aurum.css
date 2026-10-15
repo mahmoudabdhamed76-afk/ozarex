@@ -5738,3 +5738,9 @@ html[data-theme="light"] .fx-w > b.pos, html[data-theme="light"] .fx-wt b.pos { 
 .fx-hist summary span { font: 800 14px var(--ax-font); }
 .fx-hist summary small { font-size: 11.5px; color: var(--ax-faint); }
 .fx-hist pre { white-space: pre-wrap; font: 500 13px/1.8 var(--ax-font); margin: 8px 0 0; }
+.fx-tgok { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(42, 171, 238, .12); border: 1px solid rgba(42, 171, 238, .45); font-size: 13.5px; }
+.fx-tgrow { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.fx-tgrow input { flex: 1 1 auto; min-width: 0; height: 40px; }
+.fx-how.open > b { display: block; color: #2AABEE; }
+.fx-how a { font-weight: 800; }
+.fx-how [dir="ltr"], .fx-tgok [dir="ltr"] { unicode-bidi: isolate; display: inline-block; }

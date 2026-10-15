@@ -24,16 +24,17 @@ const BS = require(path.join(PUB, 'js', 'branchstats.js'));
 db.exec(`CREATE TABLE IF NOT EXISTS daily_digests (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, kind TEXT NOT NULL, title TEXT, text TEXT NOT NULL, data TEXT, sent TEXT, created_at TEXT NOT NULL)`);
 
 const TZ = () => process.env.TZ_APP || process.env.TZ || 'Africa/Cairo';
-const DEF = { on: false, time: '22:00', phone: '', apikey: '', wa: true, push: true, profit: true, alertShort: true, alertApproval: true, alertTransfer: true };
+const DEF = { on: false, time: '22:00', phone: '', apikey: '', wa: true, push: true, tg: true, tgToken: '', tgChat: '', tgChatName: '', tgBot: '', profit: true, alertShort: true, alertApproval: true, alertTransfer: true };
 function config() { return Object.assign({}, DEF, webpush.meta('digest') || {}); }
-function publicConfig() { const c = config(); return Object.assign({}, c, { apikey: c.apikey ? '••••' + String(c.apikey).slice(-2) : '', hasKey: !!c.apikey }); }
+function publicConfig() { const c = config(); return Object.assign({}, c, { apikey: c.apikey ? '••••' + String(c.apikey).slice(-2) : '', hasKey: !!c.apikey, tgToken: c.tgToken ? '••••' + String(c.tgToken).slice(-4) : '', hasTg: !!c.tgToken, tgChat: c.tgChat ? 'linked' : '' }); }
 function setConfig(b) {
   const c = config(), out = Object.assign({}, c);
   if (b.on !== undefined) out.on = !!b.on;
   if (/^([01]\d|2[0-3]):[0-5]\d$/.test(String(b.time || ''))) out.time = b.time;
   if (b.phone !== undefined) out.phone = String(b.phone || '').replace(/[^\d+]/g, '').slice(0, 16);
   if (b.apikey !== undefined && !/^••••/.test(String(b.apikey))) out.apikey = String(b.apikey || '').replace(/[^\w-]/g, '').slice(0, 40);
-  ['wa', 'push', 'profit', 'alertShort', 'alertApproval', 'alertTransfer'].forEach(k => { if (b[k] !== undefined) out[k] = !!b[k]; });
+  if (b.tgUnlink) { out.tgToken = ''; out.tgChat = ''; out.tgChatName = ''; out.tgBot = ''; }
+  ['wa', 'push', 'tg', 'profit', 'alertShort', 'alertApproval', 'alertTransfer'].forEach(k => { if (b[k] !== undefined) out[k] = !!b[k]; });
   webpush.meta('digest', out);
   return publicConfig();
 }
@@ -112,6 +113,46 @@ function build(branchList, day, cfg) {
 }
 
 /* ── delivery ── */
+/* ── Telegram: the owner's own bot (@BotFather) — the chat is found from the first message he sends it ── */
+const TGB = () => (process.env.TELEGRAM_API_BASE || 'https://api.telegram.org').replace(/\/$/, '');
+async function tgCall(token, method, body) {
+  const r = await fetch(TGB() + '/bot' + token + '/' + method, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}), signal: AbortSignal.timeout(20000) });
+  const j = await r.json().catch(() => ({}));
+  if (!j.ok) { const e = new Error(j.description || ('HTTP ' + r.status)); e.code = j.error_code || r.status; throw e; }
+  return j.result;
+}
+/* the admin pastes the bot token (and has sent the bot any message) → check the token, find his chat, keep both */
+async function linkTelegram(token) {
+  const c = config();
+  token = token && !/^••••/.test(String(token)) ? String(token).trim() : c.tgToken;
+  if (!/^\d{5,12}:[\w-]{30,50}$/.test(String(token || ''))) throw Object.assign(new Error('الكود ده مش كود بوت تليجرام — انسخه زي ما هو من @BotFather'), { code: 'bad_token' });
+  let me;
+  try { me = await tgCall(token, 'getMe'); } catch (e) { throw Object.assign(new Error('تليجرام رفض الكود ده — اتأكد إنك نسخته كله'), { code: 'bad_token' }); }
+  const out = Object.assign({}, c, { tgToken: token, tgBot: me.username || '', tg: true });
+  try {
+    const ups = await tgCall(token, 'getUpdates', { limit: 100, timeout: 0, allowed_updates: ['message'] });
+    const msgs = (ups || []).map(u => u.message || u.edited_message).filter(m => m && m.chat && m.chat.type === 'private');
+    const last = msgs[msgs.length - 1];
+    if (last) { out.tgChat = String(last.chat.id); out.tgChatName = [last.chat.first_name, last.chat.last_name].filter(Boolean).join(' ') || last.chat.username || ''; }
+  } catch (_) { /* no messages yet */ }
+  webpush.meta('digest', out);
+  return { bot: out.tgBot, linked: !!out.tgChat, chatName: out.tgChatName };
+}
+const htmlEsc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+async function telegram(cfg, text) {
+  if (!cfg.tgToken || !cfg.tgChat) return { ok: false, skipped: true, why: !cfg.tgToken ? 'مفيش بوت' : 'لسه ما اتربطش' };
+  const html = htmlEsc(text).replace(/\*([^*\n]+)\*/g, '<b>$1</b>');
+  const chunks = []; let cur = '';
+  html.split('\n').forEach(l => { if ((cur + l).length > 3800 && cur) { chunks.push(cur); cur = ''; } cur += l + '\n'; });
+  if (cur.trim()) chunks.push(cur);
+  const res = [];
+  for (const c of chunks) {
+    try { await tgCall(cfg.tgToken, 'sendMessage', { chat_id: cfg.tgChat, text: c.trim(), parse_mode: 'HTML', disable_web_page_preview: true }); res.push({ ok: true }); }
+    catch (e) { res.push({ ok: false, error: e.message }); }
+  }
+  return { ok: res.every(x => x.ok), parts: res.length, results: res };
+}
+
 async function whatsapp(cfg, text) {
   const phone = intl(cfg.phone);
   if (!phone || !cfg.apikey) return { ok: false, skipped: true, why: 'مفيش رقم أو كود تفعيل' };
@@ -148,7 +189,9 @@ async function run(ctx, opts) {
   const cfg = config(), day = opts.day || local().day;
   const D = build(ctx.branches, day, cfg);
   const sent = {};
-  if (cfg.wa || opts.test) sent.wa = await whatsapp(cfg, opts.test ? '🧪 *رسالة تجربة من Ozarex*\n\n' + D.text : D.text);
+  const body = opts.test ? '🧪 *رسالة تجربة من Ozarex*\n\n' + D.text : D.text;
+  if (cfg.wa && (cfg.apikey || !opts.test)) sent.wa = await whatsapp(cfg, body);
+  if (cfg.tg && (cfg.tgToken || !opts.test)) sent.tg = await telegram(cfg, body);
   if (cfg.push || opts.test) sent.push = await webpush.send(opts.to || admins(ctx.mainData), { title: (opts.test ? '🧪 ' : '') + D.pushTitle, body: D.pushBody, url: './?go=fulus', tag: 'digest-' + day, urgent: D.short.length > 0 });
   if (!opts.test) save(day, 'digest', D.pushTitle, D.text, { short: D.short, missing: D.missing, pending: D.pending }, sent);
   return Object.assign({ sent }, D);
@@ -163,7 +206,8 @@ async function alert(ctx, kind, title, body, opts) {
   if (kind === 'transfer' && !cfg.alertTransfer) return null;
   const sent = {};
   if (cfg.push) sent.push = await webpush.send(admins(ctx.mainData), { title, body, url: (opts && opts.url) || './?go=fulus', tag: kind + '-' + Date.now(), urgent: kind === 'short' });
-  if (cfg.wa && kind !== 'transfer') sent.wa = await whatsapp(cfg, '*' + title + '*\n' + body);
+  if (cfg.wa && cfg.apikey && kind !== 'transfer') sent.wa = await whatsapp(cfg, '*' + title + '*\n' + body);
+  if (cfg.tg && cfg.tgToken) sent.tg = await telegram(cfg, '*' + title + '*\n' + body);
   save(local().day, kind, title, title + '\n' + body, {}, sent);
   return sent;
 }
@@ -208,4 +252,4 @@ function start(getCtx) {
   setTimeout(tick, Math.min(5e3, every));
 }
 
-module.exports = { config, publicConfig, setConfig, build, run, alert, onOps, history, start, local, intl, branchDay };
+module.exports = { config, publicConfig, setConfig, build, run, alert, onOps, history, start, local, intl, branchDay, linkTelegram };
