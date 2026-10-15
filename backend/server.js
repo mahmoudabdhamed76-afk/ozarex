@@ -23,6 +23,14 @@ const branches = require('./src/branches');
 const transfers = require('./src/transfers');
 try { transfers.recover(); } catch (e) { console.error('[transfers] recover:', e.message); }
 const portal = require('./src/portal');
+const webpush = require('./src/webpush');
+const digest = require('./src/digest');
+/* 4.39 · the daily summary + instant alerts read every active branch */
+const digestCtx = () => ({
+  branches: branches.list().filter(b => b.active || b.main).map(b => { const bs = branches.storeOf(b.id); return { id: b.id, name: b.name, data: bs ? bs.data() : {} }; }),
+  mainData: store.data()
+});
+digest.start(digestCtx);
 const market = require('./src/market');
 try { market.init(require('./db').DATA_DIR); } catch (e) { console.warn('[market] init', e.message); }
 
@@ -291,6 +299,45 @@ const server = http.createServer(async (req, res) => {
         if (!branches.canUse(me, bid)) return sendJSON(res, 403, { error: 'branch_forbidden', message: 'مالكش صلاحية على الفرع ده' });
       }
 
+      /* 4.39 · push notifications on this device (any signed-in user) */
+      if (pathname === '/api/push/key' && req.method === 'GET') return sendJSON(res, 200, { key: webpush.publicKey(), devices: webpush.countFor(me.id) });
+      if (pathname === '/api/push/subscribe' && req.method === 'POST') {
+        const b = (await readBody(req, 0.02)) || {};
+        try { webpush.subscribe(me, b.subscription, req.headers['user-agent']); } catch (e) { return sendJSON(res, 400, { error: 'bad_request', message: 'الاشتراك ده مش صالح' }); }
+        return sendJSON(res, 200, { ok: true, devices: webpush.countFor(me.id) });
+      }
+      if (pathname === '/api/push/unsubscribe' && req.method === 'POST') {
+        const b = (await readBody(req, 0.02)) || {};
+        webpush.unsubscribe(b.endpoint);
+        return sendJSON(res, 200, { ok: true, devices: webpush.countFor(me.id) });
+      }
+      if (pathname === '/api/push/test' && req.method === 'POST') {
+        const r = await webpush.send([me.id], { title: '🔔 الإشعارات شغّالة', body: 'هيوصلك هنا الملخص اليومي وأي عجز أو مصروف مستني موافقتك', url: './?go=fulus', tag: 'test' });
+        return sendJSON(res, 200, { ok: r.ok > 0, devices: r.devices, sent: r.ok });
+      }
+      /* 4.39 · الملخص اليومي (admin) */
+      if (pathname === '/api/digest' && req.method === 'GET') {
+        if (!admin) return adminOnly();
+        return sendJSON(res, 200, { config: digest.publicConfig(), devices: webpush.countFor(me.id), now: digest.local(), history: digest.history(40) });
+      }
+      if (pathname === '/api/digest' && req.method === 'PUT') {
+        if (!admin) return adminOnly();
+        const b = (await readBody(req, 0.02)) || {};
+        const c = digest.setConfig(b);
+        store.logEvent(me, { operation: 'edit', table: 'settings', recordId: 'digest', recordLabel: 'الملخص اليومي', after: Object.assign({}, c, { apikey: c.hasKey ? '•••' : '' }) });
+        return sendJSON(res, 200, { ok: true, config: c });
+      }
+      if (pathname === '/api/digest/send' && req.method === 'POST') {
+        if (!admin) return adminOnly();
+        const b = (await readBody(req, 0.02)) || {};
+        const r = await digest.run(digestCtx(), { test: b.test !== false, to: [me.id] });
+        return sendJSON(res, 200, { ok: true, text: r.text, sent: r.sent, day: r.day });
+      }
+      if (pathname === '/api/digest/history' && req.method === 'GET') {
+        if (!admin) return adminOnly();
+        return sendJSON(res, 200, { history: digest.history(parsed.query.limit) });
+      }
+
       /* 4.32 · the branches */
       if (pathname === '/api/branches' && req.method === 'GET') {
         return sendJSON(res, 200, { branches: branches.visible(me), allowed: branches.idsFor(me) });
@@ -312,6 +359,7 @@ const server = http.createServer(async (req, res) => {
             const t = out.transfer;
             if (!out.dup) {
               const meta = { source: req.headers['x-client-id'] || 'unknown', by: me.id, type: 'transfer' };
+              if (!tm[1]) digest.alert(digestCtx(), 'transfer', '🚚 تحويل ' + (t.kind === 'cash' ? 'فلوس ' + Number(t.amount || 0).toLocaleString('en-US') : 'بضاعة (' + (t.items || []).length + ' صنف)') + ' لـ ' + (t.toName || ''), 'من ' + (t.fromName || '') + ' — بعته ' + (me.name || me.username) + ' ومستني تأكيد الاستلام').catch(() => {});
               if (tm[2] === 'receive') notifyDataChanged(meta, t.to); else notifyDataChanged(meta, t.from);
               broadcast('transfers', { id: t.id, status: t.status, from: t.from, to: t.to });
             }
@@ -363,6 +411,8 @@ const server = http.createServer(async (req, res) => {
         if (!b || typeof b !== 'object' || !b.ops || typeof b.ops !== 'object') return sendJSON(res, 400, { error: 'bad_request' });
         if (opSeen(b.opId)) return sendJSON(res, 200, { ok: true, dup: true, version: verOf(bid) });
         const prev = verOf(bid);
+        /* 4.39 · the approvals waiting before this change (an expense that starts waiting now → alert) */
+        const apBefore = b.ops.sets && b.ops.sets._approvals ? { settings: { _approvals: (((st.data() || {}).settings || {})._approvals || []).map(r => ({ id: r && r.id, status: r && r.status })) } } : null;
         let out, sharedTouched = false;
         try {
           if (bid === 'main') { out = store.apply(me, b.ops); sharedTouched = !(out && out.noop) && branches.touchesShared(b.ops); }
@@ -381,6 +431,7 @@ const server = http.createServer(async (req, res) => {
         if (sharedTouched) notifyAllBranches({ source: req.headers['x-client-id'] || b.cid || 'unknown', by: me.id });
         if (out && out.noop && !sharedTouched) return sendJSON(res, 200, { ok: true, version: verOf(bid), prev, noop: true });   // e.g. only audit entries from an old client
         notifyDataChanged({ source: req.headers['x-client-id'] || b.cid || 'unknown', by: me.id }, bid);
+        if (b.ops.sets && (b.ops.sets._cashCounts || b.ops.sets._approvals)) { const br = branches.get(bid) || {}; digest.onOps(digestCtx(), { id: bid, name: br.name || '', data: st.data() }, apBefore, b.ops, me); }
         /* «renumbered»: numbers the server changed to keep them unique (extra field — old clients ignore it
            and still get the new number, because the version jump makes them pull the latest data) */
         return sendJSON(res, 200, Object.assign({ ok: true, version: verOf(bid), prev }, out && out.renumbered && out.renumbered.length ? { renumbered: out.renumbered } : {}));

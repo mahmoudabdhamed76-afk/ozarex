@@ -1,8 +1,8 @@
 'use strict';
 
-const CACHE      = 'erp-v3.0';   // bump on every release that changes a cached file (4.38)
+const CACHE      = 'erp-v3.1';   // bump on every release that changes a cached file (4.39)
 // relative to the SW scope, so it also works when the app lives under APP_PATH
-const APP_SHELL  = ['./', './index.html', './manifest.json', './css/aurum.css', './js/aurum.js', './js/glowchart.js', './js/stockhub.js', './js/stockcount.js', './js/debts.js', './js/business.js', './js/custody.js', './js/axcore.js', './js/rules.js', './js/forecast.js', './js/purchases.js', './js/xlsx.js', './js/credit.js', './js/monthly.js', './js/notify.js', './js/approvals.js', './js/security.js', './js/aging.js', './js/cheques.js', './js/profit.js', './js/purchase.js', './js/requests.js', './js/isscards.js', './js/users.js', './js/assistant.js', './js/papermeter.js', './js/ticker.js', './js/pulsescene.js', './js/mhome.js', './js/marker.js', './js/picker.js', './js/auditx.js', './js/fxtape.js', './js/forcepw.js', './js/centerstmt.js', './js/navsmart.js', './js/deskmore.js', './js/aibot.js', './js/settingsx.js', './js/sales.js', './js/glassnav.js', './js/branchstats.js', './js/branches.js', './js/returns.js', './js/cashbook.js', './js/fulusi.js', './vendor/gsap.min.js',
+const APP_SHELL  = ['./', './index.html', './manifest.json', './css/aurum.css', './js/aurum.js', './js/glowchart.js', './js/stockhub.js', './js/stockcount.js', './js/debts.js', './js/business.js', './js/custody.js', './js/axcore.js', './js/rules.js', './js/forecast.js', './js/purchases.js', './js/xlsx.js', './js/credit.js', './js/monthly.js', './js/notify.js', './js/approvals.js', './js/security.js', './js/aging.js', './js/cheques.js', './js/profit.js', './js/purchase.js', './js/requests.js', './js/isscards.js', './js/users.js', './js/assistant.js', './js/papermeter.js', './js/ticker.js', './js/pulsescene.js', './js/mhome.js', './js/marker.js', './js/picker.js', './js/auditx.js', './js/fxtape.js', './js/forcepw.js', './js/centerstmt.js', './js/navsmart.js', './js/deskmore.js', './js/aibot.js', './js/settingsx.js', './js/sales.js', './js/glassnav.js', './js/branchstats.js', './js/branches.js', './js/returns.js', './js/cashbook.js', './js/fulusi.js', './js/pushx.js', './vendor/gsap.min.js',
                     './fonts/fonts.css', './vendor/chart.umd.js', './vendor/modern-screenshot.js',
                     './icons/logo-square.png'];
 const DB_NAME    = 'erp-offline';
@@ -182,3 +182,24 @@ async function flushQueue() {
     return { flushed: sent, error: e.message };
   } finally { _flushing = false; }
 }
+
+/* ── 4.39 · push notifications: the daily summary, a shortage on a daily close, an expense waiting for the admin ── */
+self.addEventListener('push', e => {
+  let m;
+  try { m = e.data ? e.data.json() : {}; } catch (_) { m = { title: 'Ozarex', body: e.data ? e.data.text() : '' }; }
+  const title = m.title || 'Ozarex';
+  e.waitUntil(self.registration.showNotification(title, {
+    body: m.body || '', icon: './icons/icon-192.png', badge: './icons/favicon-32.png', tag: m.tag || undefined, renotify: !!m.tag,
+    dir: 'rtl', lang: 'ar', vibrate: [120, 60, 120], requireInteraction: !!m.urgent, data: { url: m.url || './' }
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const target = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    const c = list.find(w => w.url.startsWith(self.registration.scope));
+    if (c) { c.postMessage({ type: 'ax-go', url: target }); return c.focus(); }
+    return self.clients.openWindow(target);
+  }));
+});
+

@@ -67,7 +67,7 @@
       '<label class="fx-month"><input type="month" value="' + ui.month + '" max="' + today().slice(0, 7) + '" onchange="AXFulus.month(this.value)"><b>' + m.label + '</b></label>' +
       '<button type="button" class="fx-nav" onclick="AXFulus.shift(1)" aria-label="الشهر اللي بعده"' + (ui.month >= today().slice(0, 7) ? ' disabled' : '') + '>‹</button>' +
       (bn ? '<span class="fx-br">' + esc(bn) + '</span>' : '') +
-      (admin() ? '<button type="button" class="fx-gear" onclick="AXFulus.settings()" aria-label="إعدادات الفلوس">⚙</button>' : '') + '</div>' +
+      (admin() ? '<button type="button" class="fx-dg" onclick="AXFulus.digest()">📲 الملخص اليومي</button><button type="button" class="fx-gear" onclick="AXFulus.settings()" aria-label="إعدادات الفلوس">⚙</button>' : '') + '</div>' +
       '<button type="button" class="fx-run' + (ui.busy ? ' busy' : '') + '" id="fx-run" onclick="AXFulus.run()"><span>' + (ui.busy ? 'بيحلل كل حركة فلوس…' : (ui.ran ? '↻ احسب تاني' : '⚡ احسب الشهر')) + '</span></button>';
     var setup = '';
     if (!cfg.on) {
@@ -255,6 +255,77 @@
     closeModal(); T('اتسجل ' + money(a) + ' ✓'); render();
   }
 
+  /* ════════ «الملخص اليومي» — WhatsApp + push (server: backend/src/digest.js) ════════ */
+  function api(path, method, body) {
+    var b = typeof API_BASE !== 'undefined' ? API_BASE : '';
+    return fetch(b + path, { method: method || 'GET', credentials: 'same-origin', cache: 'no-store', headers: Object.assign({ 'X-Branch': 'main' }, body ? { 'Content-Type': 'application/json' } : {}), body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || 'تعذر الاتصال بالسيرفر'); return j; }); });
+  }
+  function sw(id, on, label, sub) { return '<label class="fx-sw"><span>' + label + (sub ? '<small>' + sub + '</small>' : '') + '</span><input type="checkbox" id="' + id + '"' + (on ? ' checked' : '') + '><i></i></label>'; }
+  function digest() {
+    if (!admin()) return;
+    openModal('📲 الملخص اليومي', '<div class="pfx-empty">بيحمّل…</div>', '');
+    api('/api/digest').then(function (r) {
+      var c = r.config, last = (r.history || []).filter(function (h) { return h.kind === 'digest'; })[0];
+      openModal('📲 الملخص اليومي', '<div class="fx-dgf ax-hl-off">' +
+        '<p class="pfx-note" style="margin-top:0">كل يوم في الساعة اللي تختارها يوصلك ملخص كل الفروع: اتحصّل كام، اتصرف كام وفي إيه، التقفيل والعجز، المصاريف المستنية موافقتك، والربح. وأي عجز أو مصروف مستني موافقتك يوصلك على طول.</p>' +
+        sw('dg-on', c.on, 'الملخص اليومي شغّال') +
+        '<div class="fx-form"><label><span>الساعة (بتوقيت القاهرة)</span><input class="form-control" id="dg-time" type="time" value="' + esc(c.time) + '"></label></div>' +
+        '<h4 class="fx-h4">🔔 إشعار على الموبايل</h4>' + (window.AXPush ? AXPush.strip() : '') + sw('dg-push', c.push, 'ابعت الملخص والتنبيهات كإشعار') +
+        '<h4 class="fx-h4">💬 واتساب</h4>' + sw('dg-wa', c.wa, 'ابعت على الواتساب كمان') +
+        '<div class="fx-form"><label><span>رقم الواتساب بتاعك</span><input class="form-control" id="dg-phone" inputmode="tel" dir="ltr" placeholder="01xxxxxxxxx" value="' + esc(c.phone) + '"></label>' +
+        '<label><span>كود التفعيل (apikey)</span><input class="form-control" id="dg-key" dir="ltr" placeholder="' + (c.hasKey ? 'متسجل — اكتب كود جديد لو اتغير' : '123456') + '" value=""></label></div>' +
+        '<details class="fx-how"' + (c.hasKey ? '' : ' open') + '><summary>إزاي أجيب كود التفعيل؟ (مرة واحدة — دقيقة)</summary><ol>' +
+          '<li>سجّل الرقم ده في موبايلك: <b dir="ltr">+34 644 43 38 04</b> (CallMeBot)</li>' +
+          '<li>ابعتله على الواتساب الرسالة دي بالظبط: <b dir="ltr">I allow callmebot to send me messages</b></li>' +
+          '<li>هيرد عليك برسالة فيها <b>apikey</b> — اكتبه هنا واحفظ.</li>' +
+          '<li>لو ما ردّش خلال دقيقتين استنى 24 ساعة وجرّب تاني. لو الرقم اتغير هتلاقيه في <a href="https://www.callmebot.com/blog/free-api-whatsapp-messages/" target="_blank" rel="noopener">صفحة CallMeBot</a>.</li></ol>' +
+          '<p class="pfx-note">الخدمة مجانية وبتبعت لرقمك إنت بس. لو وقفت في يوم، الملخص بيوصل كإشعار وبيتحفظ هنا في «الملخصات».</p></details>' +
+        '<h4 class="fx-h4">⚡ تنبيه فوري</h4>' + sw('dg-short', c.alertShort, 'عجز في أي تقفيل يومية') + sw('dg-ap', c.alertApproval, 'مصروف مستني موافقتك') + sw('dg-tr', c.alertTransfer, 'تحويل بين الفروع', 'إشعار بس') +
+        sw('dg-profit', c.profit, 'الربح في الملخص') +
+        '<p class="pfx-note" id="dg-res">' + (last ? 'آخر ملخص: ' + esc(last.day) + ' ' + sentTxt(last.sent) : 'لسه ما اتبعتش ملخص') + '</p></div>',
+        '<button class="btn btn-primary" onclick="AXFulus.saveDigest()">حفظ</button><button class="btn btn-success" onclick="AXFulus.testDigest()">ابعتلي تجربة دلوقتي</button><button class="btn btn-ghost" onclick="AXFulus.digests()">الملخصات</button>');
+      if (window.AXPush) AXPush.check();
+    }).catch(function (e) { openModal('📲 الملخص اليومي', '<div class="pfx-empty">' + esc(e.message) + '</div>', '<button class="btn btn-ghost" onclick="closeModal()">إغلاق</button>'); });
+  }
+  function sentTxt(s) {
+    s = s || {}; var a = [];
+    if (s.wa) a.push(s.wa.skipped ? 'واتساب: مش متظبط' : s.wa.ok ? 'واتساب ✓' : 'واتساب ✗');
+    if (s.push) a.push(s.push.devices ? 'إشعار ✓ (' + s.push.ok + '/' + s.push.devices + ')' : 'إشعار: مفيش جهاز مفعّل');
+    return a.join(' · ');
+  }
+  function digestBody() {
+    var v = function (i) { var e = document.getElementById(i); return e ? e.value : ''; }, c = function (i) { var e = document.getElementById(i); return !!(e && e.checked); };
+    var b = { on: c('dg-on'), time: v('dg-time') || '22:00', push: c('dg-push'), wa: c('dg-wa'), phone: v('dg-phone'), alertShort: c('dg-short'), alertApproval: c('dg-ap'), alertTransfer: c('dg-tr'), profit: c('dg-profit') };
+    if (v('dg-key').trim()) b.apikey = v('dg-key').trim();
+    return b;
+  }
+  function saveDigest(silent) {
+    var b = digestBody();
+    if (b.wa && b.on && !/^(\+|0)\d{9,14}$/.test(String(b.phone).replace(/\s/g, ''))) { T('اكتب رقم الواتساب صح (مثلاً 01012345678)', 'error'); return Promise.reject(new Error('phone')); }
+    return api('/api/digest', 'PUT', b).then(function (r) { if (!silent) { T(r.config.on ? 'الملخص اليومي هيوصلك الساعة ' + r.config.time + ' ✓' : 'اتحفظ'); closeModal(); } return r; })
+      .catch(function (e) { if (e.message !== 'phone') T(e.message, 'error'); throw e; });
+  }
+  function testDigest() {
+    var res = document.getElementById('dg-res'); if (res) res.textContent = 'بيبعت…';
+    saveDigest(true).then(function () { return api('/api/digest/send', 'POST', { test: true }); }).then(function (r) {
+      if (res) res.innerHTML = 'اتبعتت التجربة: ' + esc(sentTxt(r.sent));
+      T('اتبعتت رسالة التجربة — ' + sentTxt(r.sent));
+    }).catch(function (e) { if (res) res.textContent = e.message; });
+  }
+  function digests() {
+    if (!admin()) return;
+    api('/api/digest/history').then(function (r) {
+      var h = r.history || [];
+      var KIND = { digest: '📊', short: '🔴', approval: '⏳', transfer: '🚚' };
+      openModal('📚 الملخصات والتنبيهات', '<div class="fx-hist ax-hl-off">' + (h.length ? h.map(function (x, i) {
+        return '<details' + (i === 0 ? ' open' : '') + '><summary><span>' + (KIND[x.kind] || '•') + ' ' + esc(x.title || x.day) + '</span><small>' + esc(new Date(x.at).toLocaleString('ar-EG', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })) + ' · ' + esc(sentTxt(x.sent)) + '</small></summary>' +
+          '<pre>' + esc(String(x.text || '').replace(/\*/g, '')) + '</pre></details>';
+      }).join('') : '<div class="pfx-empty">لسه مفيش ملخصات — أول ملخص هيتبعت في الساعة اللي اخترتها</div>') + '</div>',
+        '<button class="btn btn-ghost" onclick="closeModal()">إغلاق</button>');
+    }).catch(function (e) { T(e.message, 'error'); });
+  }
+
   /* ════════ «تقفيل اليومية» — a blind count ════════ */
   function close() {
     if (!canClose()) { T('مالكش صلاحية تقفّل اليومية', 'error'); return; }
@@ -340,7 +411,7 @@
   setTimeout(watch, 0);
 
   window.AXFulus = {
-    render: render, run: run, compute: compute, settings: settings, saveCfg: saveCfg, draw: draw, saveDraw: saveDraw,
+    render: render, run: run, compute: compute, settings: settings, digest: digest, saveDigest: function () { saveDigest().catch(function () {}); }, testDigest: testDigest, digests: digests, saveCfg: saveCfg, draw: draw, saveDraw: saveDraw,
     close: close, sum: sum, saveClose: saveClose, print: print, share: share,
     month: function (v) { if (v) { ui.month = v; render(); } },
     shift: function (n) { var p = (ui.month || today().slice(0, 7)).split('-'); var x = new Date(+p[0], +p[1] - 1 + n, 1); var ym = ds(x).slice(0, 7); if (ym > today().slice(0, 7)) return; ui.month = ym; render(); },

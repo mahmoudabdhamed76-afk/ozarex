@@ -316,7 +316,7 @@
       body += '<section class="axn-g g-' + g[0] + '"><h5>' + g[1] + ' <i>' + l.length + '</i></h5>' + l.map(itemHtml).join('') + '</section>';
     });
     if (!list.length) body = '<div class="axn-empty">' + I.check + '<b>' + (ui.snoozed ? 'مفيش حاجة متأجلة' : 'كله تمام') + '</b><span>' + (ui.snoozed ? '' : 'مفيش تنبيهات هنا دلوقتي — الحمد لله') + '</span></div>';
-    box.innerHTML = (ui.snoozed ? '' : sum) + tabs + '<div class="axn-list">' + body + '</div>';
+    box.innerHTML = (window.AXPush && !ui.snoozed ? AXPush.strip() : '') + (ui.snoozed ? '' : sum) + tabs + '<div class="axn-list">' + body + '</div>';   // 4.39 · push on this device
     var foot = document.getElementById('axn-foot');
     if (foot) foot.innerHTML =
       '<button type="button" class="axn-fb" onclick="AXN.toggleSnoozed()">' + (ui.snoozed ? 'رجوع للإشعارات' : 'المتأجّل' + (snoozedN ? ' (' + snoozedN + ')' : '')) + '</button>' +
