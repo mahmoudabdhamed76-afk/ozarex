@@ -105,6 +105,15 @@ function create(opts) {
   db.exec('CREATE INDEX IF NOT EXISTS idx_ad_events_ad ON ad_events(ad_id, type)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_ad_events_user ON ad_events(user_id, ad_id, type, at)');
   db.exec('CREATE TABLE IF NOT EXISTS ads_meta (key TEXT PRIMARY KEY, value TEXT)');
+  /* 4.42 · one row per showing: the page gives every showing its own id (imp) and the database refuses a
+     second view / click / close for the same showing, so a double tap, a retry or a replay never counts twice */
+  try { db.exec('ALTER TABLE ad_events ADD COLUMN imp TEXT'); } catch (e) { /* already there */ }
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_ad_events_imp ON ad_events(ad_id, user_id, type, imp) WHERE imp IS NOT NULL');
+  const VIEW_GAP = Math.max(0, Number(opts.viewGapMs != null ? opts.viewGapMs : (process.env.ADS_VIEW_GAP_MS || 30000)));   // two views of one ad by one person this close = one view
+  const ACT_WINDOW = 24 * 3600e3;                                                                // a click / close needs a real view before it
+  /* names for the report: the app's own users table when it has one */
+  const hasUsers = (() => { try { db.prepare('SELECT id, username, name, role FROM users LIMIT 1').all(); return true; } catch (e) { return false; } })();
+  const userMap = () => { const m = {}; if (hasUsers) for (const u of db.prepare('SELECT id, username, name, role FROM users').all()) m[u.id] = u; return m; };
 
   const now = () => new Date().toISOString();
   const row2ad = (r) => { let d = {}; try { d = JSON.parse(r.data); } catch (e) {} return Object.assign(clean(d), { id: r.id, status: r.status, createdAt: r.created_at, updatedAt: r.updated_at }); };
@@ -174,6 +183,52 @@ function create(opts) {
     return false;
   }
 
+  /* 4.42 · the only way an event is written. Returns true, or why it was not counted:
+     · the ad must be live and meant for this person right now (not a draft / paused / expired / someone else's)
+     · a view: not again within VIEW_GAP of the last one (two tabs, a page re-draw, a refresh) and never past «max shows»
+     · a click / close: only after a real view of that ad by the same person in the last 24 h
+     · the same showing (imp) is counted once per type — the database's unique index enforces it */
+  function countEvent(row, me, type, imp, today) {
+    const ad = row2ad(row);
+    if (row.status !== 'active') return 'not_active';
+    if (!eligible(ad, me, today)) return 'not_for_you';
+    const t = Date.now();
+    const lastView = db.prepare("SELECT MAX(at) AS m, COUNT(*) AS n FROM ad_events WHERE ad_id = ? AND user_id = ? AND type = 'view'").get(row.id, me.id);
+    if (type === 'view') {
+      if (lastView.m && t - lastView.m < VIEW_GAP) return 'duplicate';
+      if (ad.maxShows && lastView.n >= ad.maxShows) return 'max_shows';
+    } else {
+      if (!lastView.m || t - lastView.m > ACT_WINDOW) return 'no_view';
+      if (imp && !db.prepare("SELECT 1 FROM ad_events WHERE ad_id = ? AND user_id = ? AND type = 'view' AND imp = ?").get(row.id, me.id, imp)) return 'no_view';
+    }
+    if (flood(me.id + '|' + row.id + '|' + type)) return 'duplicate';
+    const r = db.prepare('INSERT OR IGNORE INTO ad_events (ad_id, user_id, type, at, imp) VALUES (?, ?, ?, ?, ?)').run(row.id, me.id, type, t, imp);
+    return r.changes ? true : 'duplicate';
+  }
+
+  /* 4.42 · who saw an ad: one line per person + totals + the people it is meant for who have not seen it yet */
+  function viewers(row) {
+    const ad = row2ad(row), users = userMap();
+    const people = db.prepare(`SELECT user_id,
+        SUM(type = 'view') AS views, SUM(type = 'click') AS clicks, SUM(type = 'cta2') AS cta2, SUM(type = 'close') AS closes,
+        MIN(CASE WHEN type = 'view' THEN at END) AS first, MAX(CASE WHEN type = 'view' THEN at END) AS last
+      FROM ad_events WHERE ad_id = ? GROUP BY user_id`).all(row.id)
+      .filter(r => r.views > 0)
+      .map(r => { const u = users[r.user_id]; return { userId: r.user_id, name: u ? u.name : '', username: u ? u.username : '', role: u ? u.role : '', gone: hasUsers && !u,
+        views: r.views, clicks: r.clicks, cta2: r.cta2, closes: r.closes, first: r.first, last: r.last }; })
+      .sort((a, b) => b.views - a.views || b.last - a.last);
+    const totals = { views: 0, unique: people.length, clicks: 0, cta2: 0, closes: 0, last: 0, first: 0 };
+    people.forEach(p => { totals.views += p.views; totals.clicks += p.clicks; totals.cta2 += p.cta2; totals.closes += p.closes; totals.last = Math.max(totals.last, p.last || 0); totals.first = totals.first ? Math.min(totals.first, p.first) : p.first; });
+    totals.avg = totals.unique ? Math.round(totals.views / totals.unique * 10) / 10 : 0;
+    totals.ctr = totals.views ? Math.round(totals.clicks / totals.views * 1000) / 10 : 0;
+    const seen = new Set(people.map(p => p.userId)), a = ad.audience || {};
+    const notSeen = Object.values(users).filter(u => !seen.has(u.id) && (a.mode === 'users' ? a.users.indexOf(u.id) >= 0 : a.mode === 'roles' ? a.roles.indexOf(u.role) >= 0 : true))
+      .map(u => ({ userId: u.id, name: u.name, username: u.username, role: u.role }));
+    const recent = db.prepare('SELECT user_id, type, at FROM ad_events WHERE ad_id = ? ORDER BY at DESC, id DESC LIMIT 40').all(row.id)
+      .map(r => { const u = users[r.user_id]; return { userId: r.user_id, name: u ? u.name : '', username: u ? u.username : '', type: r.type, at: r.at }; });
+    return { ad: { id: row.id, name: ad.name, title: ad.title, icon: ad.icon, status: row.status, audience: a, accent: ad.theme.accent }, totals, people, notSeen, recent, now: Date.now() };
+  }
+
   async function handle(req, res, pathname, me) {
     const admin = me && me.role === 'admin';
     const deny = () => sendJSON(res, 403, { error: 'forbidden', message: 'إدارة الإعلانات للمدير بس' });
@@ -195,9 +250,11 @@ function create(opts) {
     if (id === 'event' && req.method === 'POST') {
       const b = (await readBody(req, 0.01)) || {};
       const type = pick(b.type, EVENTS, ''), adId = str(b.id, 40);
-      if (!type || !adId || !getRow(adId)) return sendJSON(res, 400, { error: 'bad_request' });
-      if (!flood(me.id + '|' + adId + '|' + type)) db.prepare('INSERT INTO ad_events (ad_id, user_id, type, at) VALUES (?, ?, ?, ?)').run(adId, me.id, type, Date.now());
-      return sendJSON(res, 200, { ok: true });
+      const row = adId ? getRow(adId) : null;
+      if (!type || !row) return sendJSON(res, 400, { error: 'bad_request' });
+      const imp = /^[\w-]{8,40}$/.test(String(b.imp || '')) ? String(b.imp) : null;
+      const r = countEvent(row, me, type, imp, today);
+      return sendJSON(res, 200, { ok: true, counted: r === true, why: r === true ? undefined : r });
     }
 
     /* ── admin only below ── */
@@ -247,6 +304,7 @@ function create(opts) {
       const nid = insert(copy, 'draft', me.id);
       return sendJSON(res, 200, { ok: true, ad: row2ad(getRow(nid)) });
     }
+    if (action === 'viewers' && req.method === 'GET') return sendJSON(res, 200, viewers(row));
     if (action === 'reset-stats' && req.method === 'POST') {
       db.prepare('DELETE FROM ad_events WHERE ad_id = ?').run(row.id);
       return sendJSON(res, 200, { ok: true });
@@ -260,7 +318,7 @@ function create(opts) {
     return sendJSON(res, 404, { error: 'not_found' });
   }
 
-  return { handle, clean, waNumber, link };
+  return { handle, clean, waNumber, link, countEvent, viewers };
 }
 
 module.exports = { create, clean, waNumber, link, cairoDay };

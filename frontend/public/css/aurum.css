@@ -5858,3 +5858,46 @@ html[data-theme="light"] .fx-w > b.pos, html[data-theme="light"] .fx-wt b.pos { 
 .axad-form .only-daily { display: none; }
 .axad-form.f-daily .only-daily { display: grid; }
 .axad-replay { margin-top: 6px; }
+
+/* §76 · 4.42 «مين شاف الإعلان» — one line per person */
+.axad-whob i { font-style: normal; margin-inline-start: 4px; padding: 0 7px; border-radius: 99px; background: rgba(255,255,255,.1); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.axvw { display: flex; flex-direction: column; gap: 14px; }
+.axvw-hd { display: flex; align-items: center; gap: 12px; }
+.axvw-hd > div { display: flex; flex-direction: column; min-width: 0; }
+.axvw-hd b { font-size: 16px; overflow-wrap: anywhere; } .axvw-hd small { color: var(--ax-muted, #9E9E9E); font-size: 12.5px; overflow-wrap: anywhere; }
+.axvw-ic { width: 48px; height: 48px; flex: none; display: grid; place-items: center; font-size: 24px; border-radius: 14px; background: color-mix(in srgb, var(--c) 20%, transparent); }
+.axvw-kpis .axad-kpi small { font-size: 11.5px; color: var(--ax-muted, #9E9E9E); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.axvw-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+.axvw-bar input { flex: 1 1 220px; } .axvw-bar select { flex: 0 0 170px; }
+.axvw-tbl { display: flex; flex-direction: column; border: 1px solid var(--ax-line, #232323); border-radius: 16px; overflow: hidden; }
+.axvw-tr { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) 70px minmax(0, 1.3fr) minmax(0, 1.2fr); gap: 10px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--ax-line, #232323); font-size: 13.5px; }
+.axvw-tr:first-child { border-top: 0; }
+.axvw-th { background: var(--ax-surface-2, #1A1A1A); font-size: 12px; font-weight: 800; color: var(--ax-muted, #9E9E9E); }
+.axvw-tr > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.axvw-tr small { font-size: 11.5px; color: var(--ax-muted, #9E9E9E); font-variant-numeric: tabular-nums; }
+.axvw-u { display: grid !important; grid-template-columns: 34px minmax(0, 1fr); column-gap: 10px; }
+.axvw-u i { grid-row: span 2; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-weight: 800; background: color-mix(in srgb, var(--c) 22%, transparent); }
+.axvw-u b, .axvw-u small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.axvw-n { flex-direction: row !important; align-items: center; gap: 8px !important; }
+.axvw-n b { font: 800 17px var(--ax-display, system-ui); font-variant-numeric: tabular-nums; min-width: 28px; }
+.axvw-n em { flex: 1; height: 6px; border-radius: 99px; background: var(--ax-surface-2, #1A1A1A); overflow: hidden; }
+.axvw-n em i { display: block; height: 100%; border-radius: inherit; background: var(--c); }
+.axvw-sec { border: 1px solid var(--ax-line, #232323); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.axvw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.axvw-chips span { padding: 4px 10px; border-radius: 99px; background: var(--ax-surface-2, #1A1A1A); font-size: 12.5px; }
+.axvw-chips small { color: var(--ax-muted, #9E9E9E); font-size: 11px; }
+.axvw-log summary { cursor: pointer; list-style: none; } .axvw-log summary::-webkit-details-marker { display: none; }
+.axvw-log summary::after { content: ' ▾'; color: var(--ax-muted, #9E9E9E); } .axvw-log[open] summary::after { content: ' ▴'; }
+.axvw-log ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow: auto; }
+.axvw-log li { display: flex; align-items: baseline; gap: 6px; font-size: 13px; flex-wrap: wrap; }
+.axvw-log li i { font-style: normal; width: 20px; text-align: center; } .axvw-log li small { margin-inline-start: auto; color: var(--ax-muted, #9E9E9E); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+@media (max-width: 768px) {
+  .axvw-th { display: none; }
+  .axvw-tr { grid-template-columns: minmax(0, .7fr) minmax(0, 1.2fr) minmax(0, 1.2fr); row-gap: 8px; column-gap: 8px; padding: 12px; }
+  .axvw-u { grid-column: 1 / -1; }
+  .axvw-tr > span[data-l]::before { content: attr(data-l); font-size: 11px; color: var(--ax-muted, #9E9E9E); font-weight: 700; }
+  .axvw-n { grid-column: 1 / -1; } .axvw-n::before { content: none !important; }
+  .axvw-n b::after { content: ' مشاهدة'; font: 600 12px var(--ax-font, system-ui); color: var(--ax-muted, #9E9E9E); }
+  .axvw-tr > span[data-l] small { font-size: 10.5px; }
+  .axvw-bar select { flex: 1 1 100%; }
+}

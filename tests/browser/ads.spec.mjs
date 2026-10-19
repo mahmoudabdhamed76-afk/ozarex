@@ -50,6 +50,22 @@ test('the admin publishes an ad from «الإعدادات ← الإعلانات
     const r = await req(server.base, 'GET', '/api/ads', { token: await adminTok(server) });
     const a = r.json.ads.find(x => x.title === title); return a ? a.stats.view + ':' + a.stats.close : '';
   }).toBe('1:1');
+
+  /* 4.42 · «👥 مين شافه»: the admin is listed once with 1 view, a last-view time, and the CSV download */
+  await page.evaluate(() => AXAds.reload());
+  const row = page.locator('.axad-row', { hasText: title }).first();
+  await row.locator('.axad-whob').click();
+  await expect(page.locator('#axvw-root .axvw-tbl')).toBeVisible();
+  const line = page.locator('#axvw-root .axvw-tr:not(.axvw-th)');
+  await expect(line).toHaveCount(1);
+  await expect(line.locator('.axvw-u small')).toContainText('@admin');
+  await expect(line.locator('.axvw-n b')).toHaveText('1');
+  await expect(line).toContainText('دلوقتي');
+  await expect(page.locator('#axvw-root .axvw-kpis .axad-kpi').first()).toContainText('1');
+  const dl = page.waitForEvent('download');
+  await page.locator('.modal-footer .btn-primary').click();
+  expect((await dl).suggestedFilename()).toMatch(/^ad-views-ad_[0-9a-f]+-\d{8}\.csv$/);
+  await page.evaluate(() => closeModal());
   await pauseAll(server);
   expect(errors).toEqual([]);
 });

@@ -24,13 +24,14 @@ window.dispatchEvent(new CustomEvent('ax:ads-changed'));
 
 ## المسارات
 - `GET /api/ads/feed` — أي مستخدم: الإعلانات النشطة المناسبة له (التاريخ، الجمهور، أقصى عدد مرات) + سجله
-- `POST /api/ads/event {id, type: view|click|cta2|close}` — أي مستخدم
+- `POST /api/ads/event {id, type: view|click|cta2|close, imp}` — أي مستخدم. `imp` رقم الظهور؛ السيرفر بيرد `counted` ومبيحسبش المكرر ولا الكاذب (نفس الظهور، مشاهدة تانية في أقل من 30 ثانية `ADS_VIEW_GAP_MS`، إعلان مش شغال أو مش ليه، ضغطة من غير مشاهدة)
 - للمدير بس (والسيرفر بيرفض غيره بـ 403):
   - `GET /api/ads` — كل الإعلانات + الإحصائيات
   - `POST /api/ads`
   - `PUT /api/ads/:id`
   - `POST /api/ads/:id/status`
   - `POST /api/ads/:id/duplicate`
+  - `GET /api/ads/:id/viewers` — مين شافه: سطر لكل مستخدم (المشاهدات، الضغطات، الإغلاق، أول وآخر مشاهدة) + الإجمالي والمشاهدين المختلفين + اللي لسه ماشافوهوش + آخر الحركات
   - `POST /api/ads/:id/reset-stats`
   - `DELETE /api/ads/:id`
   - `POST /api/ads/settings {defaultWa}`

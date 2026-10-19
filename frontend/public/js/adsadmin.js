@@ -84,6 +84,7 @@
       '<div class="axad-acts">' +
         (a.status === 'archived' ? '' : '<label class="axad-sw" title="' + (on ? 'إيقاف' : 'تشغيل') + '"><input type="checkbox" ' + (on ? 'checked' : '') + ' onchange="AXAds.toggle(\'' + esc(a.id) + '\', this.checked)"><i></i></label>') +
         '<button type="button" class="btn btn-sm btn-secondary" onclick="AXAds.edit(\'' + esc(a.id) + '\')">✏️ تعديل</button>' +
+        '<button type="button" class="btn btn-sm btn-secondary axad-whob" onclick="AXAds.viewers(\'' + esc(a.id) + '\')">👥 مين شافه <i>' + num(s.reach) + '</i></button>' +
         '<button type="button" class="btn btn-sm btn-secondary" onclick="AXAds.look(\'' + esc(a.id) + '\')">👁 معاينة</button>' +
         '<button type="button" class="btn btn-sm btn-secondary" onclick="AXAds.dup(\'' + esc(a.id) + '\')">⧉ نسخة</button>' +
         (a.status === 'archived'
@@ -242,9 +243,78 @@
      .catch(function (e) { T(e.message, 'error'); });
   }
 
+
+  /* ════════ 4.42 · مين شاف الإعلان — one line per person ════════ */
+  var RN = { admin: 'مدير', accountant: 'محاسب', sales: 'مبيعات' };
+  var EV = { view: ['👁', 'شاف'], click: ['💬', 'ضغط واتساب / الزرار'], cta2: ['🔗', 'ضغط الزرار التاني'], close: ['✕', 'قفله'] };
+  var vw = { id: null, data: null, q: '', sort: 'views' };
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function dt(ms) { if (!ms) return '—'; var d = new Date(ms), h = d.getHours(), ap = h < 12 ? 'ص' : 'م'; h = h % 12 || 12; return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' · ' + h + ':' + pad(d.getMinutes()) + ' ' + ap; }
+  function ago(ms, now) {
+    if (!ms) return ''; var m = Math.max(0, Math.round(((now || Date.now()) - ms) / 60000));
+    if (m < 1) return 'دلوقتي'; if (m < 60) return 'من ' + m + ' دقيقة'; var h = Math.round(m / 60); if (h < 24) return 'من ' + h + ' ساعة';
+    var d = Math.round(h / 24); return d === 1 ? 'امبارح' : 'من ' + d + ' يوم';
+  }
+  function who(p) { return p.name || p.username || (p.gone ? 'مستخدم اتمسح' : p.userId); }
+  function vwBody() {
+    var D = vw.data; if (!D) return '<div class="axad-load">بيحمّل…</div>';
+    var T = D.totals, max = D.people.reduce(function (m, p) { return Math.max(m, p.views); }, 1);
+    var q = vw.q.trim().toLowerCase();
+    var list = D.people.filter(function (p) { return !q || (who(p) + ' ' + (p.username || '')).toLowerCase().indexOf(q) >= 0; })
+      .slice().sort(function (a, b) { return vw.sort === 'last' ? (b.last - a.last) : vw.sort === 'name' ? who(a).localeCompare(who(b), 'ar') : (b.views - a.views || b.last - a.last); });
+    var k = function (l, v, sub) { return '<div class="axad-kpi"><span>' + esc(l) + '</span><b>' + esc(v) + '</b>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</div>'; };
+    var h = '<div class="axvw" style="--c:' + esc(D.ad.accent || '#25D366') + '">' +
+      '<div class="axvw-hd"><span class="axvw-ic">' + esc(D.ad.icon || '📢') + '</span><div><b>' + esc(D.ad.name || D.ad.title) + '</b><small>' + esc(D.ad.title) + '</small></div></div>' +
+      '<div class="axad-kpis axvw-kpis">' +
+        k('مشاهدين مختلفين', num(T.unique), D.notSeen.length ? 'لسه ' + num(D.notSeen.length) + ' مشافوهوش' : (T.unique ? 'كل اللي يخصهم شافوه' : '')) +
+        k('إجمالي المشاهدات', num(T.views), T.unique ? 'متوسط ' + T.avg + ' لكل شخص' : '') +
+        k('ضغطات', num(T.clicks), T.views ? T.ctr + '% من المشاهدات' : '') +
+        k('مرات الإغلاق', num(T.closes)) +
+        k('آخر مشاهدة', T.last ? ago(T.last, D.now) : '—', T.last ? dt(T.last) : '') + '</div>' +
+      '<div class="axvw-bar"><input class="form-control" id="axvw-q" type="search" placeholder="🔍 دوّر باسم المستخدم" value="' + esc(vw.q) + '" oninput="AXAds.vwFind(this.value)">' +
+        '<select class="form-control" onchange="AXAds.vwSort(this.value)">' + opt('views', 'الأكتر مشاهدة', vw.sort) + opt('last', 'آخر مشاهدة', vw.sort) + opt('name', 'بالاسم', vw.sort) + '</select></div>';
+    if (!D.people.length) h += '<div class="axad-empty">محدش شاف الإعلان ده لسه.' + (D.ad.status !== 'active' ? ' (الإعلان مش شغال دلوقتي)' : '') + '</div>';
+    else if (!list.length) h += '<div class="axad-empty">مفيش مستخدم بالاسم ده.</div>';
+    else h += '<div class="axvw-tbl" role="table"><div class="axvw-tr axvw-th" role="row"><span>المستخدم</span><span>مرات المشاهدة</span><span>ضغط</span><span>آخر مشاهدة</span><span>أول مشاهدة</span></div>' +
+      list.map(function (p) {
+        return '<div class="axvw-tr" role="row"><span class="axvw-u"><i>' + esc(who(p).slice(0, 1)) + '</i><b>' + esc(who(p)) + '</b><small>' + (p.username ? '@' + esc(p.username) : '') + (p.role ? ' · ' + esc(RN[p.role] || p.role) : '') + '</small></span>' +
+          '<span class="axvw-n" data-l="مرات المشاهدة"><b>' + num(p.views) + '</b><em><i style="width:' + Math.max(6, Math.round(p.views / max * 100)) + '%"></i></em></span>' +
+          '<span data-l="ضغط">' + (p.clicks || p.cta2 ? num(p.clicks + p.cta2) : '—') + '</span>' +
+          '<span data-l="آخر مشاهدة"><b>' + esc(ago(p.last, D.now)) + '</b><small>' + esc(dt(p.last)) + '</small></span>' +
+          '<span data-l="أول مشاهدة"><small>' + esc(dt(p.first)) + '</small></span></div>';
+      }).join('') + '</div>';
+    if (D.notSeen.length) h += '<div class="axvw-sec"><b>⏳ لسه مشافوهوش (' + num(D.notSeen.length) + ')</b><div class="axvw-chips">' + D.notSeen.map(function (u) { return '<span>' + esc(u.name || u.username) + (u.role ? ' <small>' + esc(RN[u.role] || u.role) + '</small>' : '') + '</span>'; }).join('') + '</div></div>';
+    if (D.recent.length) h += '<details class="axvw-sec axvw-log"><summary><b>🕘 آخر الحركات</b></summary><ul>' + D.recent.map(function (r) { var e = EV[r.type] || ['•', r.type]; return '<li><i>' + e[0] + '</i><b>' + esc(r.name || r.username || r.userId) + '</b> ' + esc(e[1]) + '<small>' + esc(dt(r.at)) + '</small></li>'; }).join('') + '</ul></details>';
+    h += '<p class="axad-hint">المشاهدة بتتحسب لوحدها أول ما الإعلان يظهر للشخص. نفس الظهور مش بيتحسب مرتين، ولو نفس الشخص شافه تاني في أقل من 30 ثانية (تابين مفتوحين أو تحديث للصفحة) بتتحسب مرة واحدة. المعاينة بتاعتك مش بتتحسب، والضغطة مش بتتحسب غير بعد مشاهدة حقيقية.</p></div>';
+    return h;
+  }
+  function vwPaint() { var b = document.getElementById('axvw-root'); if (!b) return; var a = document.activeElement, focused = a && a.id === 'axvw-q', pos = focused ? a.selectionStart : 0; b.innerHTML = vwBody(); if (focused) { var i = document.getElementById('axvw-q'); if (i) { i.focus(); try { i.setSelectionRange(pos, pos); } catch (e) {} } } }
+  function vwLoad() { return api('GET', '/' + encodeURIComponent(vw.id) + '/viewers').then(function (j) { vw.data = j; vwPaint(); }).catch(function (e) { var b = document.getElementById('axvw-root'); if (b) b.innerHTML = '<div class="axad-empty">' + esc(e.message) + '</div>'; }); }
+  function viewers(id) {
+    if (!isAdmin()) return;
+    vw = { id: id, data: null, q: '', sort: 'views' };
+    var foot = '<button class="btn btn-primary" onclick="AXAds.vwCsv()">⬇️ تنزيل Excel (CSV)</button><button class="btn btn-secondary" onclick="AXAds.vwReload()">↻ تحديث</button><button class="btn btn-secondary" onclick="closeModal()">قفل</button>';
+    openModal('👥 مين شاف الإعلان', '<div id="axvw-root"><div class="axad-load">بيحمّل…</div></div>', foot, 'large');
+    var m = document.getElementById('modal'); if (m) m.classList.add('axad-modal');
+    vwLoad();
+  }
+  function csv() {
+    var D = vw.data; if (!D) return;
+    var q = function (v) { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var rows = [['المستخدم', 'اسم الدخول', 'الصلاحية', 'مرات المشاهدة', 'ضغطات', 'مرات الإغلاق', 'أول مشاهدة', 'آخر مشاهدة']];
+    D.people.forEach(function (p) { rows.push([who(p), p.username, RN[p.role] || p.role, p.views, p.clicks + p.cta2, p.closes, dt(p.first), dt(p.last)]); });
+    D.notSeen.forEach(function (u) { rows.push([u.name || u.username, u.username, RN[u.role] || u.role, 0, 0, 0, '', '']); });
+    rows.push([]); rows.push(['إجمالي المشاهدات', D.totals.views]); rows.push(['مشاهدين مختلفين', D.totals.unique]);
+    var blob = new Blob(['﻿' + rows.map(function (r) { return r.map(q).join(','); }).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); var d0 = new Date(); a.download = 'ad-views-' + String(D.ad.id || 'ad').replace(/[^\w-]/g, '') + '-' + d0.getFullYear() + pad(d0.getMonth() + 1) + pad(d0.getDate()) + '.csv';
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  }
+
   /* ════════ actions ════════ */
   window.AXAds = {
     reload: reload, edit: edit, save: save,
+    viewers: viewers, vwReload: vwLoad, vwCsv: csv,
+    vwFind: function (v) { vw.q = v || ''; vwPaint(); }, vwSort: function (v) { vw.sort = v; vwPaint(); },
     pv: function (now) { if (now) { paint(); return; } if (!pvTimer) pvTimer = setTimeout(paint, 90); },
     filter: function (k) { state.filter = k; draw(); },
     device: function (d) { device = d; var fr = document.getElementById('axad-frame'); if (fr) fr.className = 'axad-frame ' + d; document.querySelectorAll('.axad-dev button').forEach(function (b) { b.classList.toggle('on', b.dataset.d === d); }); paint(); },

@@ -37,7 +37,9 @@
 
   /* ════════ talking to the server ════════ */
   function post(path, body) { try { return fetch(O.api + path, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).catch(function () {}); } catch (e) {} }
-  function track(ad, type, pv) { if (pv || !ad || !ad.id) return; post('/api/ads/event', { id: ad.id, type: type }); }
+  /* every showing gets its own id: the server counts one view / click / close per showing, and only after a real view */
+  function impId() { try { if (window.crypto && crypto.getRandomValues) { var b = new Uint8Array(12); crypto.getRandomValues(b); return Array.prototype.map.call(b, function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''); } } catch (e) {} return (Date.now().toString(36) + Math.random().toString(36).slice(2, 12)).slice(0, 24); }
+  function track(ad, type, pv) { if (pv || !ad || !ad.id) return; if (type === 'view') ad._imp = impId(); post('/api/ads/event', ad._imp ? { id: ad.id, type: type, imp: ad._imp } : { id: ad.id, type: type }); }
   function load(force) {
     if (loading || !O.user()) return;
     if (!force && Date.now() - lastLoad < 20000) { decide(); return; }
