@@ -9505,6 +9505,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
 </style>
 <link rel="stylesheet" href="css/aurum.css">
+<link rel="stylesheet" href="css/ads.css">
 </head>
 <body>
 <div id="ax-splash" role="presentation" aria-hidden="true">
@@ -9690,7 +9691,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 4.40</div>
+      <div class="version">الإصدار 4.41</div>
     </footer>
   </div>
 </div>
@@ -10593,6 +10594,7 @@ const SyncEngine = (() => {
       try {
         const msg = JSON.parse(e.data);
         if (msg.event === 'connected') { DB._serverVersion = msg.version || 0; return; }
+        if (msg.event === 'ads_changed') { try { window.dispatchEvent(new CustomEvent('ax:ads-changed')); } catch (_) {} return; }   // 4.41
         if (msg.event !== 'data_changed') { try { document.dispatchEvent(new CustomEvent('ax:sse', { detail: msg })); } catch (_) {} return; }   // 4.34 · e.g. «transfers»
         if (msg.event === 'data_changed') {
           const isSelf = msg.source === _CLIENT_ID;
@@ -26645,6 +26647,8 @@ function exportSuppliersCSV() {
 <script src="js/navsmart.js"></script>
 <script src="js/deskmore.js"></script>
 <script src="js/aibot.js"></script>
+<script src="js/adscore.js"></script>
+<script src="js/adsadmin.js"></script>
 <script src="js/settingsx.js"></script>
 <script src="js/sales.js"></script>
 <script src="js/glassnav.js"></script>

@@ -16,6 +16,7 @@ const path = require('node:path');
 const url  = require('node:url');
 
 const { db, DB_FILE } = require('./db');
+const adsMod = require('./src/ads');
 const { defaultBlob } = require('./src/bridge');
 const auth  = require('./src/auth');
 const store = require('./src/store');
@@ -89,6 +90,8 @@ function notifyAllBranches(meta = {}) {
   store.markDirty();
   broadcast('data_changed', { changedAt: new Date().toISOString(), ...meta });
 }
+/* 4.41 · Smart Ads Manager (its own tables in the main database + /api/ads routes; every branch sees the same ads) */
+const ads = adsMod.create({ db, readBody: (...a) => readBody(...a), sendJSON: (...a) => sendJSON(...a), broadcast });
 setInterval(() => {
   const now = Date.now(), dead = [];
   for (const [id, client] of _clients) { try { client.res.write(`: ping ${now}\n\n`); } catch (_) { dead.push(id); } }
@@ -298,6 +301,9 @@ const server = http.createServer(async (req, res) => {
         if (!st || !branches.get(bid)) return sendJSON(res, 404, { error: 'branch_not_found', message: 'الفرع ده مش موجود' });
         if (!branches.canUse(me, bid)) return sendJSON(res, 403, { error: 'branch_forbidden', message: 'مالكش صلاحية على الفرع ده' });
       }
+
+      /* 4.41 · ads: everyone reads their feed + records views/clicks; only admins manage */
+      if (pathname === '/api/ads' || pathname.startsWith('/api/ads/')) return await ads.handle(req, res, pathname, me);
 
       /* 4.39 · push notifications on this device (any signed-in user) */
       if (pathname === '/api/push/key' && req.method === 'GET') return sendJSON(res, 200, { key: webpush.publicKey(), devices: webpush.countFor(me.id) });

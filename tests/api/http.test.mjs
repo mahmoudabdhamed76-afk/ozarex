@@ -16,7 +16,7 @@ after(() => s.stop());
 /* raw request — fetch() would normalise "../" before sending */
 function raw(path) {
   return new Promise((resolve, reject) => {
-    http.get({ host: '127.0.0.1', port: s.port, path }, r => { let b = ''; r.on('data', d => { b += d; }); r.on('end', () => resolve({ status: r.statusCode, body: b, headers: r.headers })); }).on('error', reject);
+    http.get({ host: '127.0.0.1', port: s.port, path }, r => { const b = []; r.on('data', d => { b.push(d); }); r.on('end', () => resolve({ status: r.statusCode, body: Buffer.concat(b).toString('utf8'), headers: r.headers })); })   /* decode once: an Arabic letter can be split across two chunks */.on('error', reject);
   });
 }
 
