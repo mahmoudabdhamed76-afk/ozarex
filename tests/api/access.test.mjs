@@ -2,7 +2,7 @@
    GET /api/data and what /api/ops lets him change, called straight at the API. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { startServer, ROOT } from '../helpers/server.mjs';
 import { req, adminLogin, send, ops, col, data, createUser, seedOps, SALES, CLERK } from '../helpers/api.mjs';
@@ -41,9 +41,16 @@ after(() => s.stop());
 
 const why = r => (r.json && r.json.error) + ' ' + (r.json && r.json.message);
 
+/* the browser app's own code: index.html + the files moved out of its inline script in Phase 7 (js/core, js/utils) */
+function appSource() {
+  const pub = path.join(ROOT, 'frontend', 'public');
+  const moved = ['core', 'utils'].flatMap(d => { const dir = path.join(pub, 'js', d); return existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.js')).map(f => readFileSync(path.join(dir, f), 'utf8')) : []; });
+  return [readFileSync(path.join(pub, 'index.html'), 'utf8')].concat(moved).join('\n');
+}
+
 /* ═══ the matrix itself ═══ */
 test('matrix: role pages and admin-only pages are the same as the browser (index.html)', () => {
-  const html = readFileSync(path.join(ROOT, 'frontend', 'public', 'index.html'), 'utf8');
+  const html = appSource();
   const block = html.slice(html.indexOf('const PERMISSIONS = {'), html.indexOf('};', html.indexOf('const PERMISSIONS = {')));
   for (const role of ['admin', 'accountant', 'sales']) {
     const m = block.match(new RegExp(role + ": \\[([^\\]]*)\\]"));
@@ -55,7 +62,7 @@ test('matrix: role pages and admin-only pages are the same as the browser (index
 });
 
 test('matrix: every page in the menu has a policy, every policy names real collections', () => {
-  const html = readFileSync(path.join(ROOT, 'frontend', 'public', 'index.html'), 'utf8');
+  const html = appSource();
   const nav = [...html.slice(html.indexOf('const NAV_ITEMS'), html.indexOf('const SECTIONS')).matchAll(/key: '([a-z]+)'/g)].map(m => m[1]);
   /* 4.27: «المبيعات» is a view of the issuance records — the browser maps it to «صرف الورق» (same right, same data),
      so the server policy that covers it is the issuances one */
