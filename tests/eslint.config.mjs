@@ -25,5 +25,5 @@ export default [
   /* the browser modules are classic <script>s sharing globals across 37 files — no-undef can't judge them one file at a time */
   { files: ['frontend/public/**/*.js'], rules: { 'no-undef': 'off' } },
   { files: ['**/*.mjs'], languageOptions: { sourceType: 'module' } },
-  { files: ['tests/browser/**/*.mjs', 'tests/bench/page-profile.mjs', 'tests/bench/layout-probe.mjs'], languageOptions: { globals: APP_GLOBALS }, rules: { 'no-empty-pattern': 'off' } }
+  { files: ['tests/browser/**/*.mjs', 'tests/bench/page-profile.mjs', 'tests/bench/layout-probe.mjs', 'tests/bench/p7-startup.mjs'], languageOptions: { globals: APP_GLOBALS }, rules: { 'no-empty-pattern': 'off' } }
 ];
