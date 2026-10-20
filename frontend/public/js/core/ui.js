@@ -1,4 +1,4 @@
-/* js/core/ui.js — UI shell: theme, toast / modal / confirm, sounds, ripple, count-up, Ctrl+K quick nav, shortcuts help, notification centre
+/* js/core/ui.js — UI shell: theme, sound / reciter / backup-reminder toggles, tones, celebrate, count-up, Ctrl+K quick nav, shortcuts help, toast, notify, modal / confirm
    Phase 7: moved verbatim from the inline app script of index.html (no code changes). A classic script:
    it must load at exactly this point of index.html — see docs/FRONTEND-LOAD-ORDER.md. */
 /* =========================================================

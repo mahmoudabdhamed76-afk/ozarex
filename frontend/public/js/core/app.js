@@ -1,4 +1,4 @@
-/* js/core/app.js — small app-shell pieces: topbar refresh, home button, password eye on login, seedData (first empty database)
+/* js/core/app.js — app-shell pieces: topbar refresh, home button, password eye on login, bootstrapFromServer (first load from the server), seedData
    Phase 7: moved verbatim from the inline app script of index.html (no code changes). A classic script:
    it must load at exactly this point of index.html — see docs/FRONTEND-LOAD-ORDER.md. */
 /* ── topbar manual refresh (runs silently in background) ── */

@@ -7,7 +7,7 @@
     "test": "node run-all.mjs",
     "test:api": "node --test --test-concurrency=4 \"api/*.test.mjs\"",
     "test:browser": "playwright test",
-    "lint": "node lint/check-syntax.mjs && node lint/run-eslint.mjs",
+    "lint": "node lint/check-syntax.mjs && node lint/check-load-order.mjs && node lint/run-eslint.mjs",
     "fixture": "node fixtures/gen-large-dataset.mjs"
   },
   "devDependencies": {
