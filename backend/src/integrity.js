@@ -28,7 +28,10 @@ const FIELD_AR = { name: 'الاسم', username: 'اسم المستخدم', date
 /* numbered documents: collection → counter name (+ which records are numbered) */
 const NUMBERED = [
   { col: 'invoices', counter: 'invoice', is: () => true },
-  { col: 'issuances', counter: 'issuance', is: () => true },
+  /* one sale with several paper types is several issuance records that share ONE number (the form gives every
+     line of the cart the same number). Lines of the same sale = same number, same center, same day — they are
+     not a clash with each other; only a different sale with that number is. */
+  { col: 'issuances', counter: 'issuance', is: () => true, group: r => (r && r.customerId != null ? String(r.customerId) : '') + '|' + (r && r.date ? String(r.date) : '') },
   { col: 'expenses', counter: 'purchase', is: r => !!r && r.kind === 'purchase' }
 ];
 
@@ -124,10 +127,12 @@ function assignNumbers(d, w) {
     const cd = (w.cols || {})[spec.col]; if (!cd) return;
     if (!(cd.added || []).some(r => spec.is(r) && numOf(r.number) !== null) && !(cd.modified || []).some(x => x.f.indexOf('number') >= 0)) return;
     const removed = new Set((cd.removed || []).map(String));
-    const taken = new Map();                                                 // number → id
+    const grp = r => (spec.group ? spec.group(r) : null);
+    const movedSale = new Map();                                             // 'old number#sale' → the new number it got
+    const taken = new Map();                                                 // number → { id, g: the sale it belongs to }
     (Array.isArray(d[spec.col]) ? d[spec.col] : []).forEach(r => {
       if (!spec.is(r) || removed.has('i:' + r.id)) return;
-      const n = numOf(r.number); if (n !== null && !taken.has(n)) taken.set(n, String(r.id));
+      const n = numOf(r.number); if (n !== null && !taken.has(n)) taken.set(n, { id: String(r.id), g: grp(r) });
     });
     let maxTaken = 0; for (const n of taken.keys()) if (n > maxTaken) maxTaken = n;
     const touchesNumber = (cd.modified || []).some(x => x.f.indexOf('number') >= 0);
@@ -137,22 +142,25 @@ function assignNumbers(d, w) {
       while (taken.has(n)) n++;
       return n;
     };
-    const claim = (id, value, setter) => {
+    const claim = (id, value, setter, g) => {
       const n = numOf(value); if (n === null) return;
       const owner = taken.get(n);
-      if (owner !== undefined && owner !== String(id)) {
-        const to = next();
+      const sameSale = owner !== undefined && g != null && owner.g === g;      // another line of the same sale
+      if (owner !== undefined && owner.id !== String(id) && !sameSale) {
+        const moved = g != null ? movedSale.get(n + '#' + g) : undefined;     // its sister line already got a new number: same one
+        const to = moved !== undefined ? moved : next();
+        if (g != null) movedSale.set(n + '#' + g, to);
         setter(typeof value === 'string' ? String(to) : to);
-        taken.set(to, String(id)); if (to > maxTaken) maxTaken = to;
+        taken.set(to, { id: String(id), g }); if (to > maxTaken) maxTaken = to;
         changes.push({ col: spec.col, id: String(id), from: value, to });
-      } else { taken.set(n, String(id)); if (n > maxTaken) maxTaken = n; }
+      } else { if (owner === undefined) taken.set(n, { id: String(id), g }); if (n > maxTaken) maxTaken = n; }
     };
-    (cd.added || []).forEach(r => { if (spec.is(r)) claim(r.id, r.number, v => { r.renumberedFrom = r.number; r.number = v; }); });
+    (cd.added || []).forEach(r => { if (spec.is(r)) claim(r.id, r.number, v => { r.renumberedFrom = r.number; r.number = v; }, grp(r)); });
     (cd.modified || []).forEach(x => {
       if (x.f.indexOf('number') < 0 || !x.k.startsWith('i:')) return;
       const id = x.k.slice(2), base = cur[x.k] || {};
       if (!spec.is(Object.assign({}, base, x.a))) return;
-      claim(id, x.a.number, v => { x.a.number = v; });
+      claim(id, x.a.number, v => { x.a.number = v; }, grp(Object.assign({}, base, x.a)));
     });
   });
   if (!changes.length) return changes;

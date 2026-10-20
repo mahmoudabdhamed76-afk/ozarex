@@ -176,6 +176,36 @@ test('C5: issuance and purchase numbers are protected the same way (purchase num
   assert.equal(d.expenses.find(e => e.id === 'exp_plain').number, '8000', 'ordinary expenses are not numbered documents');
 });
 
+/* Phase 7.1 · a sale with several paper types is several issuance records with ONE number (the issuance form gives
+   every line of the cart the same number). Those lines are one sale, not a clash — before this fix the 2nd line got
+   the next number and the sale split in two. A different sale (other center, or other day) with that number still moves. */
+const line = (id, number, customerId, date, extra = {}) => Object.assign({ id, number, customerId, date, productId: 'p1', quantity: 1, unitPrice: 10, total: 10, paid: 0, items: [] }, extra);
+test('C5: the lines of one multi-paper sale keep their shared number; another sale with that number still moves', async () => {
+  const r = await send(s.base, sales, ops({ cols: { issuances: col({ added: [line('ms_a', 7400, 'c1', '2026-10-07', { batchIndex: 0 }), line('ms_b', 7400, 'c1', '2026-10-07', { batchIndex: 1 }), line('ms_c', 7400, 'c1', '2026-10-07', { batchIndex: 2 })] }) }, counters: { issuance: 7400 } }));
+  assert.equal(r.status, 200, r.text);
+  assert.deepEqual(r.json.renumbered || [], []);
+  let d = await data(s.base, admin);
+  assert.deepEqual(['ms_a', 'ms_b', 'ms_c'].map(id => d.issuances.find(i => i.id === id).number), [7400, 7400, 7400]);
+  /* another center, same number → a clash: moved */
+  const o = await send(s.base, admin, ops({ cols: { issuances: col({ added: [line('ms_other', 7400, 'c2', '2026-10-07')] }) } }));
+  assert.equal(o.json.renumbered.length, 1);
+  assert.notEqual(o.json.renumbered[0].to, 7400);
+  /* same center, another day, same number → a different sale: moved */
+  const day = await send(s.base, admin, ops({ cols: { issuances: col({ added: [line('ms_day', 7400, 'c1', '2026-10-08')] }) } }));
+  assert.equal(day.json.renumbered.length, 1);
+  /* a multi-paper sale from another device that clashes moves TOGETHER: every line gets the same new number */
+  const two = await send(s.base, admin, ops({ cols: { issuances: col({ added: [line('ms_x1', 7400, 'c2', '2026-10-09'), line('ms_x2', 7400, 'c2', '2026-10-09')] }) } }));
+  assert.equal(two.json.renumbered.length, 2);
+  d = await data(s.base, admin);
+  const x1 = d.issuances.find(i => i.id === 'ms_x1').number, x2 = d.issuances.find(i => i.id === 'ms_x2').number;
+  assert.equal(x1, x2, 'the two lines of the moved sale share their new number');
+  assert.notEqual(x1, 7400);
+  /* numbers stay unique per sale (number + center + day) */
+  const sales7400 = new Set(d.issuances.filter(i => [7400, x1].includes(i.number)).map(i => i.number + '|' + i.customerId + '|' + i.date));
+  const byNumber = {}; for (const k of sales7400) { const n = k.split('|')[0]; byNumber[n] = (byNumber[n] || 0) + 1; }
+  assert.ok(Object.values(byNumber).every(c => c === 1), 'one sale per number: ' + JSON.stringify(byNumber));
+});
+
 test('C5: editing a number onto another invoice\'s number is moved to a free one', async () => {
   const r = await send(s.base, admin, ops({ cols: { invoices: col({ modified: [{ id: 'n_c', before: { number: 5002 }, after: { number: 5000 } }] }) } }));
   assert.equal(r.status, 200);
