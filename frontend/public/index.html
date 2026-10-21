@@ -9506,6 +9506,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 </style>
 <link rel="stylesheet" href="css/aurum.css">
 <link rel="stylesheet" href="css/ads.css">
+<link rel="modulepreload" href="vendor/hairline.js">
 </head>
 <body>
 <div id="ax-splash" role="presentation" aria-hidden="true">
@@ -9691,7 +9692,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 4.42</div>
+      <div class="version">الإصدار 4.43</div>
     </footer>
   </div>
 </div>
@@ -26636,6 +26637,7 @@ function exportSuppliersCSV() {
 <script src="js/papermeter.js"></script>
 <script src="js/assistant.js"></script>
 <script src="vendor/gsap.min.js"></script>
+<script type="module">import * as H from "./vendor/hairline.js"; window.Hairline = H; window.dispatchEvent(new Event("hairline:ready"));</script>
 <script src="js/pulsescene.js"></script>
 <script src="js/mhome.js"></script>
 <script src="js/marker.js"></script>

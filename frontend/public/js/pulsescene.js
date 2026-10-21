@@ -383,9 +383,12 @@
     var intro = !reduce && (Date.now() - state.lastIntro > 20000);
     if (intro) state.lastIntro = Date.now();
     var G = Graph(sec);
-    var W = fillWall(sec);
+    /* 4.43 · the wall of checkboxes became Hairline's Terrain — a field of pillars that plays on its own */
+    var TERR = true;
+    if (state.terr) { try { state.terr.destroy(); } catch (e) {} state.terr = null; }
+    var W = TERR ? null : fillWall(sec);
     var stage = sec.querySelector('.pxs-stage');
-    gsap.set(W.wall, { rotationX: 40, rotationZ: -8, y: 0, transformOrigin: '50% 0%' });
+    if (W) gsap.set(W.wall, { rotationX: 40, rotationZ: -8, y: 0, transformOrigin: '50% 0%' });
 
     state.ctx = gsap.context(function () {
       var loops = [];
@@ -395,10 +398,18 @@
         loops.push(gsap.to('.pxs-g1', { xPercent: 18, yPercent: -12, scale: 1.15, duration: 7, ease: 'sine.inOut', yoyo: true, repeat: -1 }));
         loops.push(gsap.to('.pxs-g2', { xPercent: -22, yPercent: 10, scale: .9, duration: 9, ease: 'sine.inOut', yoyo: true, repeat: -1 }));
         loops.push(gsap.to('.pxs-g3', { opacity: .35, duration: 3.2, ease: 'sine.inOut', yoyo: true, repeat: -1 }));
-        loops.push(gsap.to('.pxs-wall', { y: -12, rotationZ: -8.8, duration: 6, ease: 'sine.inOut', yoyo: true, repeat: -1 }));
+        if (W) loops.push(gsap.to('.pxs-wall', { y: -12, rotationZ: -8.8, duration: 6, ease: 'sine.inOut', yoyo: true, repeat: -1 }));
       }
 
-      /* 2 · checkbox wall — cursor ticks the paid invoices, holds, resets */
+      /* 2 · sales pillars (4.43) — the paid ones rise one by one, the caption counts with them */
+      if (TERR) {
+        var ww = sec.querySelector('.pxs-wall-wrap'); ww.classList.add('pxs-terr'); ww.innerHTML = '';
+        var fbox = document.createElement('div'); fbox.className = 'pxs-terr-fig'; ww.appendChild(fbox);
+        sec.querySelector('.pxs-cap-n').textContent = state.inv.paid;
+        var go = function () { if (!fbox.isConnected || state.terr) return; try { state.terr = window.Hairline.terrain(fbox, { play: !reduce, intensity: 0.75, label: 'أعمدة بتعلى وتنزل' }); } catch (e) {} };
+        if (window.Hairline) go(); else window.addEventListener('hairline:ready', go, { once: true });
+      }
+      if (W) {
       var total = W.cells.length;
       var ratio = state.inv.total ? state.inv.paid / state.inv.total : 0;
       var target = Math.round(total * ratio);
@@ -432,6 +443,7 @@
         tl.to(picks.slice().reverse(), { opacity: 0, duration: .25, stagger: Math.min(.02, 1.2 / target), ease: 'power1.in' });
         tl.call(function () { picks.forEach(function (el) { el.classList.remove('on'); gsap.set(el, { opacity: 1 }); }); cap.textContent = 0; });
         loops.push(tl);
+      }
       }
 
       /* 3 · graph */
@@ -496,8 +508,8 @@
 
       /* intro */
       if (intro) {
-        gsap.from('.pxs-wall-wrap', { rotationX: 70, y: -60, autoAlpha: 0, duration: 1.4, ease: 'expo.out' });
-        gsap.from('.pxs-c', { scale: 0, autoAlpha: 0, duration: .5, ease: 'back.out(2)', stagger: { amount: .9, grid: [W.rows, W.cols], from: 'end' } });
+        gsap.from('.pxs-wall-wrap', W ? { rotationX: 70, y: -60, autoAlpha: 0, duration: 1.4, ease: 'expo.out' } : { y: -30, scale: .92, autoAlpha: 0, duration: 1.2, ease: 'expo.out' });
+        if (W) gsap.from('.pxs-c', { scale: 0, autoAlpha: 0, duration: .5, ease: 'back.out(2)', stagger: { amount: .9, grid: [W.rows, W.cols], from: 'end' } });
         gsap.from('.pxs-cap, .pxs-gh', { y: 16, autoAlpha: 0, duration: .8, ease: 'power3.out', delay: .5, stagger: .1 });
         gsap.from('.pxs-tile', { y: 24, autoAlpha: 0, duration: .7, ease: 'power3.out', stagger: .07, delay: .3 });
         sec.querySelectorAll('.pxs-tv').forEach(function (b) {
@@ -520,7 +532,7 @@
           if (e.pointerType === 'touch') return;
           var r = stage.getBoundingClientRect();
           var nx = (e.clientX - r.left) / r.width - .5, ny = (e.clientY - r.top) / r.height - .5;
-          qx(nx * 10); qwx(nx * -26); qwy(ny * -14); qgx(nx * 12); qgy(ny * 8); qbx(nx * -60); qby(ny * -40);
+          if (W) qx(nx * 10); qwx(nx * (W ? -26 : -10)); qwy(ny * -14); qgx(nx * 12); qgy(ny * 8); qbx(nx * -60); qby(ny * -40);
         });
         stage.addEventListener('pointerleave', function () { qx(0); qwx(0); qwy(0); qgx(0); qgy(0); qbx(0); qby(0); });
         var onScroll = function () {
