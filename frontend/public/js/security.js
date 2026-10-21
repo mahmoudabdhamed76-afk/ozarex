@@ -78,7 +78,14 @@
     var lastMonthEnd = (function () { var d = new Date(); d.setDate(0); return lds(d); })();
     var score = [true, true, !weak, !!last, !!tg.configured, !!closed].filter(Boolean).length;
 
-    host.innerHTML =
+    /* 4.46 · page head: a cabinet beside the title — every drawer is a backup */
+    var head = '<div class="page-header axcab-head ax-hl-off"><div><div class="page-title">الأمان والنسخ الاحتياطي</div>' +
+      '<div class="page-subtitle">' + (last ? 'آخر نسخة ' + when(last.at) + ' · ' + files.length + ' نسخة محفوظة' : (ui.loading ? 'بيحمّل النسخ…' : 'لسه مفيش نسخ')) + '</div>' +
+      '<div class="axcab-chips"><span>نسخة يومية تلقائية</span><span>استرجاع من ملف</span><span>' + (tg.configured ? 'تليجرام شغّال ✓' : 'تليجرام مش متفعّل') + '</span></div></div>' +
+      '<div class="axcab-wrap"><div class="axcab-fig axcab"></div><small>كل درج = نسخة احتياطية</small></div></div>';
+    var keepFig = ui.cab && ui.cabEl && ui.cabEl.isConnected ? ui.cabEl : null;   // a redraw keeps the same moving cabinet
+    if (keepFig) keepFig.remove();
+    host.innerHTML = head +
       '<section class="cus-hero sec-hero">' +
         '<div class="cus-hero-t"><span>حالة الأمان</span><b>' + score + '<i>/6</i></b>' +
           '<small>الدخول والصلاحيات بقت على السيرفر نفسه — مفيش حد يقدر يتخطاها من المتصفح.</small></div>' +
@@ -145,6 +152,9 @@
         '<p class="sec-note">صلاحيات كل مستخدم (الأقسام اللي يدخلها وإيه اللي يحتاج موافقتك) من <a href="javascript:void(0)" onclick="navigate(\'users\')">«المستخدمين»</a>.</p>' +
       '</section>' +
       '</div>';
+    var slot = host.querySelector('.axcab-fig');
+    if (slot && keepFig) slot.replaceWith(keepFig);
+    else if (slot && window.AXCab) { if (ui.cab) { try { ui.cab.destroy(); } catch (e) {} } ui.cabEl = slot; ui.cab = AXCab.mount(slot); }
   }
 
   window.renderSecurity = function () {

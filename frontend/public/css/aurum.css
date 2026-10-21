@@ -5933,3 +5933,33 @@ html.aurum .pxs-wall-wrap.pxs-terr { left: 0 !important; right: 0 !important; to
   .pxs-ev { top: 5%; font-size: 12px; padding: 8px 11px; }
 }
 @media (prefers-reduced-motion: reduce) { .pxs-sp { display: none; } }
+
+/* §4.46 · Cabinet (Hairline): security page head + sync screen — the opening drawer turns gold */
+.axcab { --hairline-plate: #120708; --hairline-hi: #FFC24B; --hairline-edge: #a3343c; --hairline-mid: #5a1d22; --hairline-lo: #331215; --hairline-stroke: 1; cursor: crosshair; }
+.axcab svg path.sil.hi { fill: #3a2507; filter: drop-shadow(0 0 6px rgba(255, 194, 75, .55)); transition: fill .25s ease, stroke .25s ease; }
+[data-theme="light"] .axcab { --hairline-plate: #ffffff; --hairline-hi: #D98A00; --hairline-edge: #d98a90; --hairline-mid: #efc6c9; --hairline-lo: #f7e2e3; }
+[data-theme="light"] .axcab svg path.sil.hi { fill: #FFF1CF; }
+html.aurum .page-header.axcab-head, .page-header.axcab-head { display: flex !important; align-items: center !important; justify-content: flex-start !important; gap: 22px !important; flex-wrap: nowrap !important;
+  padding: 14px 20px !important; margin-bottom: 18px !important; border-radius: 20px !important; border: 1px solid rgba(255, 90, 101, .22) !important;
+  background: radial-gradient(120% 140% at 100% 50%, rgba(229, 35, 47, .14), transparent 60%), var(--ax-surface, #120708) !important; animation: hlxIn .6s cubic-bezier(.2,.8,.2,1) both; }
+.axcab-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.axcab-chips span { font-size: 12px; padding: 4px 10px; border-radius: 99px; background: rgba(255, 90, 101, .12); border: 1px solid rgba(255, 90, 101, .3); }
+.axcab-wrap { flex: 0 0 auto; width: 240px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.axcab-wrap .axcab-fig { width: 100%; }
+.axcab-wrap small { font-size: 11.5px; color: #ff8a93; }
+@keyframes hlxIn { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+@media (max-width: 768px) {
+  html.aurum .page-header.axcab-head, .page-header.axcab-head { flex-wrap: wrap !important; padding: 12px !important; gap: 10px !important; }
+  .axcab-wrap { width: 170px; }
+}
+.axsync { position: fixed; inset: 0; z-index: 9000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; direction: rtl;
+  background: radial-gradient(60% 60% at 50% 45%, rgba(229, 35, 47, .18), transparent 70%), rgba(8, 3, 4, .94); color: #fff; opacity: 0; transition: opacity .35s ease; }
+.axsync.show { opacity: 1; } .axsync.out { opacity: 0; }
+.axsync .axsync-fig { width: min(360px, 78vw); --hairline-plate: #0b0405; }
+.axsync h3 { margin: 0; font-size: 20px; }
+.axsync .axsync-sub { margin: 0; color: #ff9aa2; font-size: 13px; }
+.axsync-bar { width: 220px; height: 4px; border-radius: 9px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.axsync-bar i { display: block; height: 100%; width: 6%; background: linear-gradient(90deg, #FF5A65, #FFC24B); box-shadow: 0 0 12px #FF5A65; transition: width .35s ease; }
+.axsync-tip { color: rgba(255, 255, 255, .45); font-size: 11px; margin-top: 6px; }
+[data-theme="light"] .axsync { background: radial-gradient(60% 60% at 50% 45%, rgba(229, 35, 47, .1), transparent 70%), rgba(255, 255, 255, .95); color: #1a0507; }
+[data-theme="light"] .axsync .axsync-fig { --hairline-plate: #ffffff; }

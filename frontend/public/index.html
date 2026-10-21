@@ -9692,7 +9692,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 4.45</div>
+      <div class="version">الإصدار 4.46</div>
     </footer>
   </div>
 </div>
@@ -10317,7 +10317,9 @@ const OfflineManager = (() => {
     if (!items.length) { _pending = 0; updateUI(); return; }
     _flushing = true;
     SyncEngine.setStatus('syncing');
-    let sent = 0, refused = 0;
+    let sent = 0, refused = 0, nDone = 0;
+    const realItems = items.filter(it => it.ops).length;
+    try { if (realItems && window.AXCab) AXCab.sync.start(realItems); } catch (_) {}   // 4.46 · the cabinet sync screen
     try {
       for (const it of items) {
         if (!it.ops) { await removeItem(it.id); continue; }       // a full copy from before 4.7 — replaced by record-level sync
@@ -10325,13 +10327,16 @@ const OfflineManager = (() => {
         if (st === 'login') { Auth.expired(); break; }
         await removeItem(it.id);
         if (st === 'refused') refused++; else sent++;
+        try { if (window.AXCab) AXCab.sync.step(++nDone); } catch (_) {}
       }
+      try { if (realItems && window.AXCab) AXCab.sync.done(sent); } catch (_) {}
       _pending = (await dequeue()).length; updateUI();
       if (sent && typeof toast === 'function') toast('✓ اترفع ' + sent + ' تعديل اتعمل أوف لاين');
       SyncEngine.setStatus('connected');
       setTimeout(() => SyncEngine.pullLatest('back-online', true), 400);
     } catch (e) {
       console.error('[Offline] flush failed:', e);
+      try { if (window.AXCab) AXCab.sync.hide(); } catch (_) {}
       SyncEngine.setStatus('error');
     } finally { _flushing = false; }
   }
@@ -26638,6 +26643,7 @@ function exportSuppliersCSV() {
 <script src="js/assistant.js"></script>
 <script src="vendor/gsap.min.js"></script>
 <script type="module">import * as H from "./vendor/hairline.js"; window.Hairline = H; window.dispatchEvent(new Event("hairline:ready"));</script>
+<script src="js/cabfig.js"></script>
 <script src="js/pulsescene.js"></script>
 <script src="js/mhome.js"></script>
 <script src="js/marker.js"></script>
