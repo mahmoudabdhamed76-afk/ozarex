@@ -5902,14 +5902,34 @@ html[data-theme="light"] .fx-w > b.pos, html[data-theme="light"] .fx-wt b.pos { 
   .axvw-bar select { flex: 1 1 100%; }
 }
 
-/* §4.43 · dashboard: Hairline Terrain fills the top area instead of the checkbox wall (Ozarex red) */
-html.aurum .pxs-wall-wrap.pxs-terr { left: 0 !important; right: 0 !important; top: 0 !important; height: 74% !important; transform-style: flat; pointer-events: auto; overflow: hidden;
-  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%); mask-image: linear-gradient(to bottom, #000 55%, transparent 100%); }
-.pxs-terr-fig { position: absolute; left: 50%; top: 50%; width: max(84%, 700px); transform: translate(-50%, -47%); touch-action: pan-y; cursor: crosshair;
+/* §4.43–4.44 · dashboard: Hairline Terrain fills the top area (Ozarex red) + sparks + a live event card */
+html.aurum .pxs-wall-wrap.pxs-terr { left: 0 !important; right: 0 !important; top: 0 !important; height: 80% !important; transform-style: flat; pointer-events: auto; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%); mask-image: linear-gradient(to bottom, #000 58%, transparent 100%); }
+.pxs-terr-fig { position: absolute; left: 50%; top: 50%; width: max(94%, 760px); transform: translate(-50%, -47%) scaleX(1.14); touch-action: pan-y; cursor: crosshair;
   --hairline-plate: #120708; --hairline-hi: #FF5A65; --hairline-edge: #a3343c; --hairline-mid: #5a1d22; --hairline-lo: #331215; --hairline-stroke: 1;
   filter: drop-shadow(0 0 26px rgba(229, 35, 47, .22)); }
 [data-theme="light"] .pxs-terr-fig { --hairline-plate: #ffffff; --hairline-hi: #D61F2B; --hairline-edge: #d98a90; --hairline-mid: #efc6c9; --hairline-lo: #f7e2e3; filter: none; }
+.pxs-sp { position: absolute; z-index: 2; border-radius: 50%; background: #FF5A65; box-shadow: 0 0 10px #FF5A65, 0 0 3px #fff; pointer-events: none;
+  animation: pxsSpark 2.4s cubic-bezier(.2,.6,.3,1) forwards; }
+@keyframes pxsSpark { 0% { opacity: 0; transform: translate(0, 0) scale(.6); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx, 0), var(--rise, -100px)) scale(1.1); } }
+.pxs-ev { position: absolute; z-index: 4; left: 50%; top: 7%; display: flex; gap: 10px; align-items: center; direction: rtl; white-space: nowrap; max-width: calc(100% - 24px);
+  padding: 9px 14px; border-radius: 14px; color: #fff; font-size: 13px; font-weight: 600; line-height: 1.5;
+  background: rgba(20, 8, 10, .84); border: 1px solid rgba(255, 90, 101, .55); box-shadow: 0 8px 30px rgba(229, 35, 47, .35), 0 0 0 4px rgba(255, 90, 101, .08);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); opacity: 0; transform: translate(-50%, 10px) scale(.92); pointer-events: none; }
+.pxs-ev.in { animation: pxsEvIn .55s cubic-bezier(.2,1.4,.4,1) forwards; }
+.pxs-ev.out { animation: pxsEvOut .45s ease forwards; }
+@keyframes pxsEvIn { from { opacity: 0; transform: translate(-50%, 14px) scale(.9); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+@keyframes pxsEvOut { from { opacity: 1; transform: translate(-50%, 0) scale(1); } to { opacity: 0; transform: translate(-50%, -12px) scale(.96); } }
+.pxs-ev > i { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 9px; background: rgba(255, 90, 101, .16); display: grid; place-items: center; font-style: normal; }
+.pxs-ev > span { overflow: hidden; text-overflow: ellipsis; }
+.pxs-ev small { display: block; color: #ff9aa2; font-weight: 500; font-size: 11px; }
+.pxs-ev b { color: #FF5A65; }
+.pxs-ev::after { content: ''; position: absolute; left: 50%; bottom: -7px; width: 12px; height: 12px; background: inherit; border-right: 1px solid rgba(255, 90, 101, .55); border-bottom: 1px solid rgba(255, 90, 101, .55); transform: translateX(-50%) rotate(45deg); }
+[data-theme="light"] .pxs-ev { background: rgba(255, 255, 255, .92); color: #2a0a0d; }
+[data-theme="light"] .pxs-ev small { color: #b4232d; }
 @media (max-width: 600px) {
-  html.aurum .pxs-wall-wrap.pxs-terr { height: 66% !important; }
-  .pxs-terr-fig { width: 560px; transform: translate(-50%, -50%); }
+  html.aurum .pxs-wall-wrap.pxs-terr { height: 70% !important; }
+  .pxs-terr-fig { width: 600px; transform: translate(-50%, -44%) scaleX(1.08); }
+  .pxs-ev { top: 5%; font-size: 12px; padding: 8px 11px; }
 }
+@media (prefers-reduced-motion: reduce) { .pxs-sp { display: none; } }
