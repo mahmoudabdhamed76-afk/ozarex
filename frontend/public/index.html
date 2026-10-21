@@ -65,8 +65,11 @@ html.ax-splash-on body{overflow:hidden}
   animation:axsL .8s calc(.1s + var(--i) * .07s) cubic-bezier(.2,.9,.25,1.15) forwards,axsGlint .9s calc(1.25s + var(--i) * .07s) ease-in-out}
 #ax-splash .axs-name .axs-x{transform-origin:50% 50%;animation:axsL .8s calc(.1s + var(--i) * .07s) cubic-bezier(.2,.9,.25,1.15) forwards,axsX .9s 1.2s cubic-bezier(.5,0,.2,1),axsGlint .9s calc(1.25s + var(--i) * .07s) ease-in-out}
 #ax-splash .axs-sub{margin:18px 0 0;font:500 clamp(13px,3.6vw,17px)/1.5 var(--ax-font,'IBM Plex Sans Arabic','Cairo',sans-serif);opacity:.9;animation:axsRise .7s .7s cubic-bezier(.2,.8,.2,1) both}
-#ax-splash .axs-bar{width:min(34vw,150px);height:3px;margin-top:38px;border-radius:3px;background:rgba(255,255,255,.28);overflow:hidden;animation:axsRise .7s .8s both}
-#ax-splash .axs-bar i{display:block;height:100%;width:100%;background:#fff;border-radius:3px;transform-origin:right center;transform:scaleX(0);animation:axsFill 1.5s .85s cubic-bezier(.4,0,.2,1) forwards}
+/* 4.47 · the line under the name became a bank of lockers (Hairline) whose doors open and close in the welcome's own colours */
+#ax-splash .axs-lock{width:min(88vw,430px);margin-top:18px;opacity:0;animation:axsRise .8s .9s cubic-bezier(.2,.8,.2,1) forwards;
+  --hairline-plate:#cf4462;--hairline-hi:#ffffff;--hairline-edge:rgba(255,255,255,.82);--hairline-mid:rgba(255,255,255,.42);--hairline-lo:rgba(255,255,255,.24);--hairline-stroke:1.1;--door:#FFE08A}
+#ax-splash .axs-lock svg path.sil.hi{fill:var(--door);stroke:#fff;filter:drop-shadow(0 0 10px var(--door));transition:fill .35s ease}
+#ax-splash .axs-lock svg path.nf.hi{stroke:#7a1830}
 @keyframes axsRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes axsFill{to{transform:scaleX(1)}}
 @keyframes axsL{0%{opacity:0;transform:translateY(55%) rotateX(-85deg) scale(.85);filter:blur(10px)}60%{opacity:1;filter:blur(0)}100%{opacity:1;transform:none;filter:none}}
@@ -74,7 +77,7 @@ html.ax-splash-on body{overflow:hidden}
 @keyframes axsGlint{0%,100%{text-shadow:0 0 0 rgba(255,255,255,0)}45%{text-shadow:0 0 18px rgba(255,255,255,.95),0 0 42px rgba(255,214,224,.7)}}
 @keyframes axsHalo{to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 @keyframes axsBreath{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.08)}}
-@media (prefers-reduced-motion:reduce){#ax-splash .axs-name span,#ax-splash .axs-sub,#ax-splash .axs-bar,#ax-splash::before{animation:none!important;opacity:1}#ax-splash .axs-bar i{animation:none;transform:scaleX(1)}#ax-splash{transition:opacity .2s}}
+@media (prefers-reduced-motion:reduce){#ax-splash .axs-name span,#ax-splash .axs-sub,#ax-splash .axs-lock,#ax-splash::before{animation:none!important;opacity:1}#ax-splash{transition:opacity .2s}}
 </style>
 <style>
 /* ========================= VARIABLES ========================= */
@@ -9512,10 +9515,10 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 <div id="ax-splash" role="presentation" aria-hidden="true">
   <h1 class="axs-name" aria-label="OZAREX"><span style="--i:0">O</span><span style="--i:1">Z</span><span style="--i:2">A</span><span style="--i:3">R</span><span style="--i:4">E</span><span style="--i:5" class="axs-x">X</span></h1>
   <p class="axs-sub">تجربة مختلفة لإدارة أعمالك</p>
-  <div class="axs-bar"><i></i></div>
+  <div class="axs-lock" aria-hidden="true"></div>
 </div>
 <script>
-/* the welcome screen stays at least ~2.3 s (the word assembles, the light runs over it, the line fills), then goes as soon as the app is ready (never later than 5 s) */
+/* the welcome screen stays at least ~4 s (the word assembles, the light runs over it, the lockers open and close), then goes as soon as the app is ready (never later than 6.5 s) */
 (function(){
   var d = document.documentElement, el = document.getElementById('ax-splash'), t0 = window.__axSplashAt || Date.now(), ready = false, gone = false;
   if (!el || !d.classList.contains('ax-splash-on')) { if (el) el.remove(); window.AXSplash = { done: function(){} }; return; }
@@ -9527,9 +9530,35 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
     el.classList.add('out');
     setTimeout(function(){ d.classList.remove('ax-splash-on'); if (el.parentNode) el.remove(); }, 650);
   }
-  function tryGo(){ if (!ready) return; var left = 2300 - (Date.now() - t0); if (left > 0) setTimeout(go, left); else go(); }
+  function tryGo(){ if (!ready) return; var left = 4000 - (Date.now() - t0); if (left > 0) setTimeout(go, left); else go(); }
   window.AXSplash = { done: function(){ ready = true; tryGo(); } };
-  setTimeout(function(){ ready = true; go(); }, 5000);
+  setTimeout(function(){ ready = true; go(); }, 6500);
+  /* lockers: each door that swings open takes the next colour of the welcome */
+  var box = el.querySelector('.axs-lock'), fig = null, DOORS = ['#FFE08A', '#FFFFFF', '#FFB4C2', '#FFC9A8', '#FFD6E0'], di = 0;
+  function lockers(){
+    if (gone || !box || fig || !window.Hairline) return;
+    var still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    try { fig = window.Hairline.lockers(box, { play: false, intensity: .85, label: 'دولاب خزاين بيتفتح ويتقفل' }); } catch (e) { return; }
+    /* walk the doors ourselves so a new one swings open every half second while the welcome shows */
+    if (!still) {
+      var seq = [[2,0],[4,1],[0,1],[5,0],[1,0],[3,1],[4,0],[0,0],[2,1],[5,1]], k = 0;
+      var walk = setInterval(function () {
+        if (gone || !box.isConnected) { clearInterval(walk); return; }
+        var r = box.getBoundingClientRect(); if (!r.width) return;
+        var c = seq[k % seq.length][0], row = seq[k % seq.length][1]; k++;
+        var x = r.left + r.width * (0.335 + c * 0.062), y = r.top + r.height * (0.33 + c * 0.041 + row * 0.16);
+        try { box.dispatchEvent(new PointerEvent('pointermove', { clientX: x, clientY: y, bubbles: true, pointerType: 'mouse', isPrimary: true })); } catch (e) {}
+      }, 520);
+      setTimeout(function () {}, 0);
+    }
+    try { new MutationObserver(function (m) { for (var i = 0; i < m.length; i++) { var t = m[i].target; if (t.classList && t.classList.contains('sil') && t.classList.contains('hi')) { box.style.setProperty('--door', DOORS[di++ % DOORS.length]); break; } } })
+      .observe(box, { subtree: true, attributes: true, attributeFilter: ['class'] }); } catch (e) {}
+  }
+  if (window.Hairline) lockers(); else {
+    window.addEventListener('hairline:ready', lockers, { once: true });
+    try { import('./vendor/hairline.js').then(function (H) { if (!window.Hairline) { window.Hairline = H; window.dispatchEvent(new Event('hairline:ready')); } else lockers(); }).catch(function(){}); } catch (e) {}
+  }
+  var _go = go; go = function(){ _go(); setTimeout(function(){ try { fig && fig.destroy(); } catch (e) {} }, 700); };
 })();
 </script>
 <div id="route-progress"><div class="rp-bar"></div></div>
@@ -9692,7 +9721,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 4.46</div>
+      <div class="version">الإصدار 4.47</div>
     </footer>
   </div>
 </div>
