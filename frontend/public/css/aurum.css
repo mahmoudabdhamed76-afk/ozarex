@@ -5963,3 +5963,48 @@ html.aurum .page-header.axcab-head, .page-header.axcab-head { display: flex !imp
 .axsync-tip { color: rgba(255, 255, 255, .45); font-size: 11px; margin-top: 6px; }
 [data-theme="light"] .axsync { background: radial-gradient(60% 60% at 50% 45%, rgba(229, 35, 47, .1), transparent 70%), rgba(255, 255, 255, .95); color: #1a0507; }
 [data-theme="light"] .axsync .axsync-fig { --hairline-plate: #ffffff; }
+
+
+/* ════════════════════════════════════════════════════════════════════
+   «اسأل المساعد» — the floating assistant became a pill with a twinkling sparkle
+   (replaces the bouncing robot orb). It floats, the sparkle turns and glints,
+   a light sweeps across it, and a soft ring breathes around it.
+════════════════════════════════════════════════════════════════════ */
+#ai-fab.axask, html.aurum #ai-fab.axask {
+  width: auto !important; height: auto !important; min-width: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 99px !important;
+  background: transparent !important; box-shadow: none !important; overflow: visible !important; color: inherit !important; animation: axaskIn .7s cubic-bezier(.2, 1.3, .4, 1) both, axaskFloat 3.4s .7s ease-in-out infinite !important;
+  -webkit-tap-highlight-color: transparent; }
+html.aurum #ai-fab.axask::before, #ai-fab.axask::before { display: none !important; }
+.axask-pill { position: relative; display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 22px 0 20px; border-radius: 99px; overflow: hidden; white-space: nowrap;
+  background: #F3F4EF; border: 2px solid #C3D3BC; color: #3F6B2B;
+  box-shadow: 0 10px 26px rgba(30, 60, 20, .18), 0 2px 6px rgba(30, 60, 20, .1); transition: transform .2s cubic-bezier(.34, 1.56, .64, 1), box-shadow .2s; }
+.axask-pill::after { content: ''; position: absolute; inset: -2px; border-radius: inherit; pointer-events: none; box-shadow: 0 0 0 0 rgba(120, 170, 95, .45); animation: axaskRing 3.4s ease-out infinite; }
+.axask-t { font: 800 17px/1 var(--ax-font, 'IBM Plex Sans Arabic', system-ui); letter-spacing: .1px; color: inherit; position: relative; z-index: 1; }
+.axask-ic { width: 26px; height: 26px; flex: 0 0 26px; overflow: visible; position: relative; z-index: 1; }
+.axask-ic path { fill: currentColor; transform-box: fill-box; transform-origin: center; }
+.axask-s1 { animation: axaskStar 3.4s ease-in-out infinite; }
+.axask-s2 { animation: axaskTw 1.7s ease-in-out infinite; }
+.axask-s3 { animation: axaskTw 1.7s .85s ease-in-out infinite; }
+.axask-shine { position: absolute; top: -20%; bottom: -20%; width: 38%; left: -45%; pointer-events: none; transform: skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .85), transparent); animation: axaskShine 4.2s 1.2s ease-in-out infinite; }
+#ai-fab.axask:hover .axask-pill { transform: translateY(-2px) scale(1.03); box-shadow: 0 14px 32px rgba(30, 60, 20, .24), 0 2px 6px rgba(30, 60, 20, .12); }
+#ai-fab.axask:active .axask-pill { transform: scale(.94); }
+html[data-theme="dark"] .axask-pill { background: rgba(18, 22, 16, .92); border-color: rgba(150, 200, 125, .45); color: #B6E58C;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .45), 0 0 18px rgba(140, 200, 100, .14); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+html[data-theme="dark"] .axask-shine { background: linear-gradient(90deg, transparent, rgba(200, 255, 170, .28), transparent); }
+@media (max-width: 768px) {
+  .axask-pill { height: 46px; padding: 0 17px 0 15px; gap: 8px; }
+  .axask-t { font-size: 15px; }
+  .axask-ic { width: 22px; height: 22px; flex-basis: 22px; }
+}
+@keyframes axaskIn { from { opacity: 0; transform: translateY(16px) scale(.8); } to { opacity: 1; transform: none; } }
+@keyframes axaskFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes axaskStar { 0%, 100% { transform: rotate(0) scale(1); } 20% { transform: rotate(90deg) scale(1.18); } 35% { transform: rotate(90deg) scale(.92); } 50% { transform: rotate(90deg) scale(1); } }
+@keyframes axaskTw { 0%, 100% { opacity: .35; transform: scale(.6); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes axaskShine { 0% { left: -45%; } 45%, 100% { left: 125%; } }
+@keyframes axaskRing { 0% { box-shadow: 0 0 0 0 rgba(120, 170, 95, .45); } 70%, 100% { box-shadow: 0 0 0 12px rgba(120, 170, 95, 0); } }
+@media (prefers-reduced-motion: reduce) { #ai-fab.axask, .axask-ic path, .axask-shine, .axask-pill::after { animation: none !important; } }
+/* the pill is wider than the old orb: on the computer «المزيد» steps aside while the pill shows */
+@media (min-width: 769px) {
+  html:has(#ai-fab.axask.visible) #ax-more-fab.show { inset-inline-end: calc(18px + var(--axask-w, 186px) + 12px + env(safe-area-inset-left, 0px)); transition: inset-inline-end .3s ease; }
+}
