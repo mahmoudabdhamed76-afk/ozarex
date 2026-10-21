@@ -376,9 +376,10 @@
   /* ── mount ── */
   /* 4.44 · what rides with the pillars: red sparks rising, and a card with a real latest event every few seconds */
   function sceneFx(stage, host) {
-    var ICON = { pay: '💵', iss: '📄', in: '📦', exp: '🧾', sup: '🏭', inv: '🧾' };
+    var ICON = { sold: '✅', pay: '💵', iss: '📄', in: '📦', exp: '🧾', sup: '🏭', inv: '🧾' };
     var vis = true, alive = true, live = 0, si = 0, ci = 0, cardT = 0, hideT = 0, evs = [];
     try { evs = window.AXTicker ? AXTicker.events(6) : []; } catch (e) {}
+    if (state.inv && state.inv.total) evs.unshift({ icon: 'sold', when: '', label: 'المبيعات', html: '<b>' + state.inv.paid + ' من ' + state.inv.total + '</b> عملية بيع اتحصّلت ' + (state.inv.recent ? 'مؤخراً' : 'الشهر ده') });
     var card = document.createElement('div'); card.className = 'pxs-ev ax-hl-off'; card.setAttribute('aria-live', 'polite'); host.appendChild(card);
     function spark() {
       if (!vis || !alive || live > 34) return;
@@ -391,7 +392,7 @@
     function showCard() {
       if (!vis || !alive || !evs.length) return;
       var e = evs[ci++ % evs.length];
-      card.innerHTML = '<i>' + (ICON[e.icon] || '•') + '</i><span><small>' + (e.when ? 'حدث جديد · ' + e.when : 'آخر حركة') + '</small>' + e.html + '</span>';
+      card.innerHTML = '<i>' + (ICON[e.icon] || '•') + '</i><span><small>' + (e.label || (e.when ? 'حدث جديد · ' + e.when : 'آخر حركة')) + '</small>' + e.html + '</span>';
       card.classList.remove('out'); void card.offsetWidth; card.classList.add('in');
       clearTimeout(hideT); hideT = setTimeout(function () { card.classList.remove('in'); card.classList.add('out'); }, 2600);
     }
@@ -525,9 +526,8 @@
       } else { gsap.set([G.head, G.headGlow, G.runner], { autoAlpha: 0 }); }
 
       /* 4 · شريط النبض (js/ticker.js) — the strip on top of this panel */
-      if (window.AXTicker) {
-        AXTicker.create(sec.querySelector('.pxs-tkhost'), { id: 'dash', variant: 'bar', label: 'شريط النبض: كل الأرقام وآخر الحركات', items: tickerItems() });
-      }
+      /* 4.45 · the «مباشر» strip is gone from the scene — the event card over the pillars took its place */
+      var tkh = sec.querySelector('.pxs-tkhost'); if (tkh) tkh.remove();
       /* the panel is the first thing on the dashboard, the cash flow follows (hero after it) —
          aurum.js moves the cash flow in the same render, so settle the order right after */
       Promise.resolve().then(function () {
