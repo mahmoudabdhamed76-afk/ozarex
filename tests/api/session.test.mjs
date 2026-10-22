@@ -43,8 +43,8 @@ test('a ticket dies with the session: after logout it no longer opens the stream
   admin = (await adminLogin(s.base)).token;
 });
 
-test('compatibility: an old client that still sends ?t=<token> keeps working (to be removed later)', async () => {
-  assert.equal(await stream('/api/events?t=' + admin), 200);
+test('the long-lived session token in the URL does not open the stream', async () => {
+  assert.equal(await stream('/api/events?t=' + admin), 401);
 });
 
 test('the session cookie lasts 30 days (was 365) and is still renewed by use', async () => {

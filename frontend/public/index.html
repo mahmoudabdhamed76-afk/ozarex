@@ -10606,7 +10606,7 @@ const SyncEngine = (() => {
     const myTry = ++_connectSeq;
     streamUrl().then(u => { if (myTry === _connectSeq && _online) open(u); });
   }
-  /* Phase 2 · I11: a one-time ticket (60 s) from /api/me — the reusable session token never goes in a URL */
+  /* Phase 2 · I11: a one-time ticket (2 min) from /api/me — the reusable session token never goes in a URL */
   let _connectSeq = 0;
   async function streamUrl() {
     try {
@@ -10775,7 +10775,7 @@ async function bootstrapFromServer() {
 function seedData() {
   DB.data = {
     users: [
-      { id: 'u1', username: 'admin', password: 'admin', name: 'المدير', role: 'admin' }
+      { id: 'u1', username: 'admin', name: 'المدير', role: 'admin' }
     ],
     customers: [],
     products: [],
@@ -10820,6 +10820,12 @@ function fmt(n) { return Number(n||0).toLocaleString('en-US', { minimumFractionD
 function fmtCurrency(n) { return fmt(n) + ' ' + (DB.data.settings.currency || 'ج'); }
 function todayStr() { return dateStr(new Date()); }
 function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+/* same rule as the server: a logo is a base64 image, never HTML */
+function safeLogoSrc(v) {
+  const s = String(v || '').trim();
+  if (s.length < 32 || s.length > 3000000) return '';
+  return /^data:image\/(?:png|jpeg|jpg|gif|webp|svg\+xml);(?:charset=[A-Za-z0-9._-]+;)?base64,[A-Za-z0-9+/=\r\n]+$/.test(s) ? s : '';
+}
 
 /* Arabic text normalization for tolerant search
    Handles common spelling variations:
@@ -11638,7 +11644,7 @@ function applyBrand(src) {
     if (!b) return;
     let name = String(b.name || '').trim() || BRAND_DEFAULT;
     if (name === 'نظام' + ' الحسابات') name = BRAND_DEFAULT;          /* 4.31 · the old default name → Ozarex */
-    const logo = (typeof b.logo === 'string' && b.logo.startsWith('data:image/')) ? b.logo : '';
+    const logo = safeLogoSrc(b.logo);
     const key = name + '|' + logo.length;
     if (applyBrand._k === key) return;
     applyBrand._k = key;
@@ -16339,7 +16345,7 @@ function buildInvoiceHTML(inv, opts) {
     <div class="wrap">
      <div class="frame">
       <div class="top">
-        ${s.companyLogo ? `<img class="logo" src="${s.companyLogo}" alt="شعار">` : `<img class="logo" src="icons/logo-square.png" onerror="this.style.display='none'" alt="شعار">`}
+        ${safeLogoSrc(s.companyLogo) ? `<img class="logo" src="${escapeHtml(safeLogoSrc(s.companyLogo))}" alt="شعار">` : `<img class="logo" src="icons/logo-square.png" onerror="this.style.display='none'" alt="شعار">`}
         <h1>${escapeHtml(s.companyName||'الشركة')}</h1>
         ${branchPrintLine() ? `<div class="info" style="font-weight:800">${escapeHtml(branchPrintLine())}</div>` : ''}
         <div class="info">
@@ -16531,7 +16537,7 @@ async function renderInvoiceToPngBlob(inv, c) {
 
   <!-- Header -->
   <div style="text-align:center;border-bottom:3px solid #111827;padding-bottom:18px;margin-bottom:20px">
-    ${s.companyLogo ? `<img src="${s.companyLogo}" alt="logo" style="display:block;margin:0 auto 12px;max-height:84px;max-width:240px;object-fit:contain" crossorigin="anonymous">` : ''}
+    ${safeLogoSrc(s.companyLogo) ? `<img src="${escapeHtml(safeLogoSrc(s.companyLogo))}" alt="logo" style="display:block;margin:0 auto 12px;max-height:84px;max-width:240px;object-fit:contain" crossorigin="anonymous">` : ''}
     <div style="font-size:30px;font-weight:900;color:#0a0a0a;letter-spacing:-0.5px;line-height:1.2">${escapeHtml(s.companyName||'الشركة')}</div>
     <div style="font-size:12px;color:#B3121B;margin-top:4px;font-weight:800;letter-spacing:.5px">${escapeHtml(branchPrintLine())}</div>
     <div style="font-size:11.5px;color:#525252;margin-top:8px;line-height:1.6">
@@ -21696,8 +21702,8 @@ function renderSettings() {
         <!-- Logo upload -->
         <div class="logo-upload-section">
           <div class="logo-upload-preview" id="logo-preview-box">
-            ${s.companyLogo
-              ? `<img src="${s.companyLogo}" alt="شعار الشركة" id="logo-preview-img">`
+            ${safeLogoSrc(s.companyLogo)
+              ? `<img src="${escapeHtml(safeLogoSrc(s.companyLogo))}" alt="شعار الشركة" id="logo-preview-img">`
               : `<div class="logo-placeholder"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span>لا يوجد شعار</span></div>`
             }
           </div>
@@ -26505,7 +26511,7 @@ function printSupplierStatement(id) {
     </style></head><body>
     <div class="wrap">
       <div class="top">
-        ${settings.companyLogo ? `<img class="logo" src="${settings.companyLogo}" alt="شعار">` : ''}
+        ${safeLogoSrc(settings.companyLogo) ? `<img class="logo" src="${escapeHtml(safeLogoSrc(settings.companyLogo))}" alt="شعار">` : ''}
         <h1>${escapeHtml(settings.companyName||'الشركة')}</h1>
         <div class="info">${settings.companyAddress?escapeHtml(settings.companyAddress)+' • ':''}${settings.companyPhone?'📞 '+escapeHtml(settings.companyPhone):''}${settings.taxNumber?' • سجل ضريبي: '+escapeHtml(settings.taxNumber):''}</div>
       </div>

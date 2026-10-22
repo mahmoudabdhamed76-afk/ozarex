@@ -335,7 +335,7 @@ function importBlob(blob) {
 
 function defaultBlob() {
   return {
-    users: [{ id: 'u1', username: 'admin', password: 'admin', name: 'المدير', role: 'admin' }],
+    users: [{ id: 'u1', username: 'admin', password: '', name: 'المدير', role: 'admin' }],
     customers: [], products: [], invoices: [], payments: [],
     expenses: [], stockMoves: [], issuances: [], bankTransfers: [],
     suppliers: [], supplierPayments: [], notes: [], auditLog: [],

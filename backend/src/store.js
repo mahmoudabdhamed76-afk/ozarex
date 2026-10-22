@@ -39,6 +39,43 @@ const asRefused = e => (e instanceof integrity.IntegrityError ? new Refused(e.co
 const BRANCH_ONLY = new Set(['monthlyTarget', 'countBlind', 'closedUntil']);
 function isBranchKey(k) { k = String(k || ''); return (k.charAt(0) === '_' && k !== '_auditLock') || BRANCH_ONLY.has(k); }
 
+/* company logos are interpolated into <img src="...">. Only a base64 image data URL is stored. */
+const LOGO_RE = /^data:image\/(?:png|jpeg|jpg|gif|webp|svg\+xml);(?:charset=[A-Za-z0-9._-]+;)?base64,[A-Za-z0-9+/=\r\n]+$/;
+const BAD_SETTING_KEY = /^(__proto__|constructor|prototype)$/;
+function safeLogo(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (s.length < 32 || s.length > 3000000) return '';
+  return LOGO_RE.test(s) ? s : '';
+}
+/* customer statement links are unguessable hex. Anything else is dropped (it is rendered into HTML). */
+function cleanPortal(v) {
+  const out = Object.create(null);
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+  for (const k of Object.keys(v)) {
+    if (BAD_SETTING_KEY.test(k)) continue;
+    const tok = String(v[k] == null ? '' : v[k]);
+    if (/^[a-f0-9]{32,64}$/.test(tok)) out[k] = tok;
+  }
+  return out;
+}
+function sanitizeIncomingBlob(blob) {
+  if (!blob || typeof blob !== 'object' || Array.isArray(blob)) {
+    const err = new Error('bad_request'); err.status = 400; throw err;
+  }
+  /* Object.create(null): a "__proto__" key in a restore file must not become Object.prototype */
+  const clean = Object.assign(Object.create(null), blob);
+  delete clean.__version;
+  for (const k of Object.keys(clean)) if (BAD_SETTING_KEY.test(k)) delete clean[k];
+  if (clean.settings && typeof clean.settings === 'object' && !Array.isArray(clean.settings)) {
+    const s = Object.assign(Object.create(null), clean.settings);
+    for (const k of Object.keys(s)) if (BAD_SETTING_KEY.test(k)) delete s[k];
+    if (s.companyLogo) { const logo = safeLogo(s.companyLogo); if (logo) s.companyLogo = logo; else delete s.companyLogo; }
+    if (s._portal) s._portal = cleanPortal(s._portal);
+    clean.settings = s;
+  }
+  return clean;
+}
+
 /* 4.32 · one store per database file. opts: { id, db, bridge, main, bkDir, label(), shared() }
    · main: erp.db — exactly as before (users, every setting, the main branch's data)
    · a branch: its own file; in memory it also shows the company's users + shared settings
@@ -86,8 +123,7 @@ function userByName(name) {
 
 /* full replace (admin restore / reset) */
 function full(blob) {
-  const clean = Object.assign({}, blob);
-  delete clean.__version;
+  const clean = sanitizeIncomingBlob(blob);
   if (!IS_MAIN) {                                   // a branch file never holds users or company settings
     clean.users = [];
     const st = {}; Object.keys(clean.settings || {}).forEach(k => { if (isBranchKey(k)) st[k] = clean.settings[k]; });
@@ -240,6 +276,13 @@ function apply(u, w) {
       if (!r.srvAt) r.srvAt = Date.now();
     });
   });
+
+  if (w.keys && w.keys.companyLogo && own(w.keys.companyLogo, 'a')) {
+    w.keys.companyLogo.a = safeLogo(w.keys.companyLogo.a) || null;
+  }
+  if (w.keys && w.keys._portal && own(w.keys._portal, 'a')) {
+    w.keys._portal.a = cleanPortal(w.keys._portal.a);
+  }
 
   /* what will be written */
   const touched = {};   // blobKey → Set(ids)
@@ -444,4 +487,4 @@ return { id: BRANCH, main: IS_MAIN, db, bridge, load, data, publicData, dataFor,
 }
 
 const main = makeStore({ id: 'main', db: MAIN_DB, bridge: MAIN_BRIDGE, main: true });
-module.exports = Object.assign({}, main, { makeStore, Refused, isBranchKey });
+module.exports = Object.assign({}, main, { makeStore, Refused, isBranchKey, safeLogo });

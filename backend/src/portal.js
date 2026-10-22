@@ -16,6 +16,13 @@ function cur(s) { const c = (s && s.currency) || 'جنيه'; return c === 'جن�
 function today() { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
 const dmy = ds => { if (!ds) return ''; const p = String(ds).slice(0, 10).split('-'); return (+p[2]) + '/' + (+p[1]) + '/' + p[0]; };
 
+const LOGO_RE = /^data:image\/(?:png|jpeg|jpg|gif|webp|svg\+xml);(?:charset=[A-Za-z0-9._-]+;)?base64,[A-Za-z0-9+/=\r\n]+$/;
+function safeLogo(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (s.length < 32 || s.length > 3000000) return '';
+  return LOGO_RE.test(s) ? s : '';
+}
+
 function findCenter(d, token) {
   if (!/^[a-f0-9]{32,64}$/.test(String(token || ''))) return null;
   const map = (d.settings && d.settings._portal) || {};
@@ -30,7 +37,7 @@ function page(d, c) {
   const due = Math.max(0, a.balance), total = a.buckets.reduce((x, v) => x + v, 0) || 1;
   const labels = ['30 يوم أو أقل', '31 – 60 يوم', '61 – 90 يوم', 'أكتر من 90 يوم'];
   const colors = ['#1E9A4C', '#D98200', '#E8590C', '#E01B0F'];
-  const logo = typeof s.companyLogo === 'string' && s.companyLogo.startsWith('data:image') ? s.companyLogo : '';
+  const logo = safeLogo(s.companyLogo);
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
 <title>${esc(c.name)} — كشف حساب ${esc(s.companyName || 'Ozarex')}</title>
@@ -84,7 +91,7 @@ function notFound() {
 /* → true when handled */
 function handle(req, res, pathname, data) {
   const m = /^\/p\/([A-Za-z0-9]+)\/?$/.exec(pathname);
-  if (!m || req.method !== 'GET') return false;
+  if (!m || (req.method !== 'GET' && req.method !== 'HEAD')) return false;
   /* 4.32 · data() may give one dataset or the list of every branch's: the token is looked up in each */
   const all = [].concat(data() || []);
   let d = all[0] || {}, c = null;
@@ -92,9 +99,10 @@ function handle(req, res, pathname, data) {
   const html = c ? page(d, c) : notFound();
   res.writeHead(c ? 200 : 404, {
     'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow',
-    'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY'
+    'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY',
+    'Content-Security-Policy': "default-src 'none'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
   });
-  res.end(html);
+  if (req.method !== 'HEAD') res.end(html); else res.end();
   return true;
 }
 

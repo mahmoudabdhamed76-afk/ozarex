@@ -53,9 +53,23 @@ test('unknown paths fall back to the app page (client routing)', async () => {
 
 test('path traversal never reaches backend files or the database', async () => {
   const page = (await raw('/')).body;
-  for (const p of ['/../backend/server.js', '/..%2f..%2fbackend%2fserver.js', '/....//backend/server.js', '/%2e%2e/%2e%2e/backend/db/schema.sql', '/../data/erp.db', '/../../etc/passwd']) {
+  for (const p of ['/../backend/server.js', '/..%2f..%2fbackend%2fserver.js', '/....//backend/server.js', '/%2e%2e/%2e%2e/backend/db/schema.sql', '/../data/erp.db']) {
     const r = await raw(p);
-    assert.ok(r.status === 404 || r.body === page, p + ' returned something other than the app page');
+    assert.equal(r.status, 404, p);
+    assert.doesNotMatch(r.body, /createServer|CREATE TABLE/);
+  }
+  /* no extension: the app page, never the file outside public */
+  const passwd = await raw('/../../etc/passwd');
+  assert.equal(passwd.body, page);
+  assert.doesNotMatch(passwd.body, /root:/);
+});
+
+test('a missing script or stylesheet is 404, not the HTML app', async () => {
+  for (const p of ['/js/no-such-file.js', '/css/no-such-file.css']) {
+    const r = await raw(p);
+    assert.equal(r.status, 404, p);
+    assert.doesNotMatch(r.body, /<html/i);
+    assert.equal(r.headers['x-content-type-options'], 'nosniff');
   }
 });
 

@@ -14,10 +14,12 @@ before(async () => {
 });
 after(() => s.stop());
 
-/* open the live stream like a device does (EventSource sends the token as ?t=) */
-function openStream(token) {
+/* open the live stream like a device does (a 2-minute ticket, never the session token) */
+async function openStream(token) {
   const ctrl = new AbortController(), events = [], waiters = [];
-  const ready = fetch(s.base + '/api/events?t=' + token, { signal: ctrl.signal }).then(async r => {
+  const me = await req(s.base, 'GET', '/api/me', { token });
+  const q = me.status === 200 && me.json && me.json.streamTicket ? '?st=' + encodeURIComponent(me.json.streamTicket) : '';
+  const ready = fetch(s.base + '/api/events' + q, { signal: ctrl.signal }).then(async r => {
     if (r.status !== 200) { events.push({ status: r.status }); return r.status; }
     (async () => {
       const dec = new TextDecoder(); let buf = '';
@@ -94,12 +96,12 @@ test('an edit of a record deleted meanwhile on another device is ignored, not re
 });
 
 test('live stream: needs a login', async () => {
-  const st = openStream('0'.repeat(64));
+  const st = await openStream('0'.repeat(64));
   assert.equal(await st.ready, 401);
 });
 
 test('live stream: another device is told about a change, with who made it', async () => {
-  const st = openStream(admin);
+  const st = await openStream(admin);
   assert.equal(await st.ready, 200);
   assert.ok(await st.waitFor(e => e.event === 'connected'));
   const r = await req(s.base, 'POST', '/api/ops', { token: sales, headers: { 'X-Client-Id': 'device-B' },
@@ -114,7 +116,7 @@ test('live stream: another device is told about a change, with who made it', asy
 });
 
 test('live stream: a refused change is not announced', async () => {
-  const st = openStream(admin);
+  const st = await openStream(admin);
   await st.ready; await st.waitFor(e => e.event === 'connected');
   const n = st.events.length;
   assert.equal((await send(s.base, sales, ops({ cols: { customers: col({ removed: ['c2'] }) } }))).status, 403);
@@ -125,7 +127,7 @@ test('live stream: a refused change is not announced', async () => {
 
 test('live stream: at most 6 per user — the oldest is closed', async () => {
   const streams = [];
-  for (let i = 0; i < 7; i++) { const st = openStream(sales); await st.ready; await st.waitFor(e => e.event === 'connected'); streams.push(st); }
+  for (let i = 0; i < 7; i++) { const st = await openStream(sales); await st.ready; await st.waitFor(e => e.event === 'connected'); streams.push(st); }
   const first = await streams[0].waitFor(e => e.closed, 2000);
   streams.forEach(x => x.close());
   assert.ok(first, 'the oldest stream was not closed');

@@ -110,8 +110,8 @@
       L.push('', '🧾 *آخر الحركات:*');
       st.rows.forEach(function (r) { L.push('   ' + dm(r.date) + ' — ' + r.label + ': ' + (r.debit ? money(r.debit) : '−' + money(r.credit))); });
     }
-    var tok = (S()._portal || {})[cid];
-    if (tok) L.push('', '🔗 حسابكم كامل في أي وقت: ' + base() + '/p/' + tok);
+    var url = portalUrl((S()._portal || {})[cid]);
+    if (url) L.push('', '🔗 حسابكم كامل في أي وقت: ' + url);
     L.push('', 'شكراً لتعاملكم معانا 🙏');
     if (s.companyPhone) L.push('📞 ' + s.companyPhone);
     return L.join('\n');
@@ -151,18 +151,23 @@
     var a = new Uint8Array(24); (window.crypto || window.msCrypto).getRandomValues(a);
     return Array.from(a, function (b) { return b.toString(16).padStart(2, '0'); }).join('');
   }
+  function portalUrl(tok) {
+    tok = String(tok || '');
+    if (!/^[a-f0-9]{32,64}$/.test(tok)) return '';
+    return base() + '/p/' + tok;
+  }
   function portal(cid) {
     var c = A('customers').find(function (x) { return x.id === cid; }); if (!c) return;
-    var tok = (S()._portal || {})[cid], url = tok ? base() + '/p/' + tok : '';
+    var url = portalUrl((S()._portal || {})[cid]);
     openModal('🔗 لينك ' + esc(c.name),
       '<p class="ax-modal-lead">صفحة للمركز يشوف فيها رصيده وأعمار الدين وآخر الحركات وكشف الحساب — قراءة بس، ومن غير ما يدخل البرنامج. اللينك سري: أي حد معاه يقدر يفتحه، فابعته للمركز بس.</p>' +
-      (tok ? '<div class="ag-link"><input class="form-control" readonly value="' + esc(url) + '" onclick="this.select()"><button class="btn btn-secondary" onclick="AXAging.copy(\'' + esc(url) + '\')">نسخ</button></div>' +
+      (url ? '<div class="ag-link"><input class="form-control" id="ag-portal-url" readonly value="' + esc(url) + '" onclick="this.select()"><button type="button" class="btn btn-secondary" onclick="AXAging.copy(document.getElementById(\'ag-portal-url\').value)">نسخ</button></div>' +
         '<div class="sec-btns" style="margin-top:12px">' +
           '<a class="btn btn-secondary" href="' + esc(url) + '" target="_blank" rel="noopener">فتح اللينك</a>' +
           (phoneOf(c) ? '<button class="btn btn-secondary" onclick="AXAging.sendLink(\'' + cid + '\')">ابعته واتساب</button>' : '') +
           '<button class="btn btn-ghost" onclick="AXAging.revoke(\'' + cid + '\')">وقف اللينك</button></div>'
         : '<div class="skh-empty sm"><span>المركز ده لسه ملوش لينك</span></div>'),
-      tok ? '<button class="btn btn-ghost" onclick="closeModal()">تمام</button>'
+      url ? '<button class="btn btn-ghost" onclick="closeModal()">تمام</button>'
         : '<button class="btn btn-primary" onclick="AXAging.makeLink(\'' + cid + '\')">اعمل لينك</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
   }
   function makeLink(cid) {
@@ -180,8 +185,10 @@
     try { navigator.clipboard.writeText(text).then(function () { T('اتنسخ ✓'); }, function () { T('انسخه من الخانة', 'info'); }); } catch (e) { T('انسخه من الخانة', 'info'); }
   }
   function sendLink(cid) {
-    var c = A('customers').find(function (x) { return x.id === cid; }); var tok = (S()._portal || {})[cid]; if (!c || !tok) return;
-    var txt = 'السلام عليكم ' + c.name + ' 🌿\nده لينك حسابكم عند *' + company() + '* — تقدروا تشوفوا منه الرصيد وكشف الحساب في أي وقت:\n' + base() + '/p/' + tok + '\nشكراً لتعاملكم معانا 🙏';
+    var c = A('customers').find(function (x) { return x.id === cid; });
+    var url = portalUrl((S()._portal || {})[cid]);
+    if (!c || !url) return;
+    var txt = 'السلام عليكم ' + c.name + ' 🌿\nده لينك حسابكم عند *' + company() + '* — تقدروا تشوفوا منه الرصيد وكشف الحساب في أي وقت:\n' + url + '\nشكراً لتعاملكم معانا 🙏';
     window.open('https://wa.me/' + phoneOf(c) + '?text=' + encodeURIComponent(txt), '_blank');
   }
 

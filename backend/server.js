@@ -20,6 +20,8 @@ const adsMod = require('./src/ads');
 const { defaultBlob } = require('./src/bridge');
 const auth  = require('./src/auth');
 const store = require('./src/store');
+/* a real scrypt hash so a login for an unknown name costs the same as a wrong password */
+const DUMMY_HASH = auth.hashPassword('ozarex-unknown-user');
 const branches = require('./src/branches');
 const transfers = require('./src/transfers');
 try { transfers.recover(); } catch (e) { console.error('[transfers] recover:', e.message); }
@@ -107,7 +109,22 @@ function secHeaders(req) {
   const h = {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
-    'Content-Security-Policy': "frame-ancestors 'none'; object-src 'none'; base-uri 'self'",
+    'Cross-Origin-Resource-Policy': 'same-origin',
+    /* inline scripts/styles are how the app is built; external scripts and object/embed are not */
+    'Content-Security-Policy': [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "connect-src 'self' https://open.er-api.com https://api.ipify.org",
+      "media-src 'self' https://server8.mp3quran.net",
+      "worker-src 'self' blob:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'"
+    ].join('; '),
     'Referrer-Policy': 'same-origin',
     'Permissions-Policy': 'camera=(self), microphone=(self), geolocation=(self), payment=()'
   };
@@ -146,12 +163,30 @@ const MIME = {
   '.jpeg': 'image/jpeg', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.webp': 'image/webp',
   '.map': 'application/json; charset=utf-8'
 };
-function serveStatic(res, filePath) {
+/* stay inside PUBLIC: path.resolve treats a second absolute segment as the whole path,
+   and a one-pass ".." strip can be walked around. realpath stops symlink escapes. */
+function resolveStatic(pathname) {
+  if (pathname.includes('\0')) return null;
+  const rel = (pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, ''));
+  const norm = path.normalize(rel);
+  if (!norm || norm === '..' || norm.startsWith('..' + path.sep) || path.isAbsolute(norm)) return null;
+  const root = fs.realpathSync(path.resolve(PUBLIC));
+  const filePath = path.resolve(root, norm);
+  if (filePath !== root && !filePath.startsWith(root + path.sep)) return null;
+  let st;
+  try { st = fs.statSync(filePath); } catch (e) { return null; }
+  if (!st.isFile()) return null;
+  let real;
+  try { real = fs.realpathSync(filePath); } catch (e) { return null; }
+  if (real !== root && !real.startsWith(root + path.sep)) return null;
+  return real;
+}
+function serveStatic(req, res, filePath) {
   fs.readFile(filePath, (err, data) => {
-    if (err) { res.writeHead(404); res.end('Not found'); return; }
+    if (err) { res.writeHead(404, secHeaders(req)); res.end('Not found'); return; }
     const ext = path.extname(filePath).toLowerCase();
     const isHtml = ext === '.html';
-    res.writeHead(200, Object.assign(secHeaders(res.req), {
+    res.writeHead(200, Object.assign(secHeaders(req), {
       'Content-Type':   MIME[ext] || 'application/octet-stream',
       'Content-Length': data.length,
       'Cache-Control':  isHtml ? 'no-cache, no-store, must-revalidate'
@@ -224,7 +259,7 @@ const server = http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
   let pathname = parsed.pathname || '/';
 
-  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
+  if (req.method === 'OPTIONS') { res.writeHead(204, secHeaders(req)); return res.end(); }
 
   // Strip APP_PATH prefix
   if (APP_PATH) {
@@ -238,16 +273,16 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, { ok: true, time: new Date().toISOString() });
     }
     if (pathname === '/sw.js') {
-      const swPath = path.join(PUBLIC, 'sw.js');
-      if (fs.existsSync(swPath)) {
-        res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Service-Worker-Allowed': '/' });
+      const swPath = resolveStatic('/sw.js');
+      if (swPath) {
+        res.writeHead(200, Object.assign(secHeaders(req), { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Service-Worker-Allowed': '/' }));
         return res.end(fs.readFileSync(swPath));
       }
     }
     /* the company name + logo for the login screen (what the buyer set in الإعدادات → الشركة) */
     if (pathname === '/api/brand' && req.method === 'GET') {
       const st = (store.data() || {}).settings || {};
-      const logo = typeof st.companyLogo === 'string' && /^data:image\/(png|jpe?g|webp|gif);base64,/.test(st.companyLogo) ? st.companyLogo : '';
+      const logo = store.safeLogo(st.companyLogo);
       return sendJSON(res, 200, { name: String(st.companyName || '').slice(0, 120), logo });
     }
     if (pathname === '/api/version' && req.method === 'GET') { const vb = String(parsed.query.branch || 'main'); return sendJSON(res, 200, { version: branches.get(vb) ? verOf(vb) : verOf('main') }); }
@@ -258,13 +293,17 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/login' && req.method === 'POST') {
       const b = (await readBody(req, 0.02)) || {};
       const name = String(b.username || '').slice(0, 64), pw = String(b.password || '').slice(0, 256);
+      const pace = auth.loginLimited(req);
+      if (pace) return sendJSON(res, 429, { error: 'too_many', message: 'محاولات كتير — استنى ' + pace + ' دقيقة وجرّب تاني' });
       const wait = auth.throttled(req, name);
       if (wait) return sendJSON(res, 429, { error: 'too_many', message: 'محاولات كتير غلط — استنى ' + wait + ' دقيقة وجرّب تاني' });
       const u = store.userByName(name);
+      /* always run scrypt, so a missing name is not faster than a wrong password */
+      const stored = (u && auth.storedHash(u.id)) || DUMMY_HASH;
       let ok = false;
-      try { ok = !!u && u.disabled !== true && await auth.verifyPasswordAsync(pw, auth.storedHash(u.id)); }
+      try { ok = await auth.verifyPasswordAsync(pw, stored); }
       catch (e) { return sendJSON(res, 503, { error: 'busy', message: 'السيرفر مشغول — جرّب كمان ثانية' }); }
-      if (!ok) { auth.failed(req, name); return sendJSON(res, 401, { error: 'bad_login', message: 'اسم المستخدم أو كلمة السر غلط' }); }
+      if (!u || u.disabled === true || !ok) { auth.failed(req, name); return sendJSON(res, 401, { error: 'bad_login', message: 'اسم المستخدم أو كلمة السر غلط' }); }
       auth.succeeded(req, name);
       if (!auth.isHash(auth.storedHash(u.id))) auth.migratePasswords();
       const token = auth.createSession(u.id, req);
@@ -279,7 +318,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/me' && req.method === 'GET') {
       const u = currentUser(req);
       /* 4.13 · renew the cookie on every visit, so an active device never gets signed out */
-      /* streamTicket: one-time, 60 s — the live stream uses it instead of putting the session token in its URL */
+      /* streamTicket: one-time, 2 min — the live stream uses it instead of putting the session token in its URL */
       return u ? sendJSON(res, 200, { user: publicUser(u), token: auth.tokenOf(req), mustChange: mustChange(u.id), streamTicket: auth.issueTicket(u.id) }, { 'Set-Cookie': auth.cookieHeader(req, auth.tokenOf(req)) }) : sendJSON(res, 401, { error: 'login' });
     }
 
@@ -468,7 +507,7 @@ const server = http.createServer(async (req, res) => {
       /* live updates */
       if (pathname === '/api/events' && req.method === 'GET') {
         const clientId = (++_clientSeq).toString();
-        res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-store', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' });
+        res.writeHead(200, Object.assign(secHeaders(req), { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-store', 'Connection': 'keep-alive', 'X-Accel-Buffering': 'no' }));
         res.write(`data: ${JSON.stringify({ event: 'connected', clientId, version: verOf(bid), branch: bid })}\n\n`);
         /* at most 6 live streams per user — the oldest one is closed */
         const mine = [..._clients].filter(([, c]) => c.userId === me.id);
@@ -493,7 +532,7 @@ const server = http.createServer(async (req, res) => {
           if (!p) return sendJSON(res, 404, { error: 'not_found' });
           buf = fs.readFileSync(p); name = parsed.query.file;
         } else { buf = st.gzBlob(); name = 'erp-' + (bid === 'main' ? '' : bid + '-') + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json.gz'; }
-        res.writeHead(200, { 'Content-Type': 'application/gzip', 'Content-Length': buf.length, 'Content-Disposition': 'attachment; filename="' + name + '"', 'Cache-Control': 'no-store' });
+        res.writeHead(200, Object.assign(secHeaders(req), { 'Content-Type': 'application/gzip', 'Content-Length': buf.length, 'Content-Disposition': 'attachment; filename="' + name + '"', 'Cache-Control': 'no-store' }));
         return res.end(buf);
       }
       if (pathname === '/api/backup/now' && req.method === 'POST') {
@@ -561,11 +600,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     /* ── static files ── */
-    let rel = pathname === '/' ? '/index.html' : pathname;
-    rel = rel.replace(/\.\./g, '');
-    const filePath = path.join(PUBLIC, rel);
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) return serveStatic(res, filePath);
-    return serveStatic(res, path.join(PUBLIC, 'index.html'));
+    const filePath = resolveStatic(pathname === '/' ? '/index.html' : pathname);
+    if (filePath) return serveStatic(req, res, filePath);
+    /* a missing script/style must not come back as HTML (the browser would run it as JS) */
+    if (path.extname(pathname)) { res.writeHead(404, secHeaders(req)); return res.end('Not found'); }
+    const home = resolveStatic('/index.html');
+    if (home) return serveStatic(req, res, home);
+    res.writeHead(404, secHeaders(req)); return res.end('Not found');
 
   } catch (e) {
     if (e && e.status) { if (!res.headersSent) sendJSON(res, e.status, { error: e.message }); else res.destroy(); return; }
