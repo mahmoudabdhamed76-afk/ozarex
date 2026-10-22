@@ -86,9 +86,7 @@ function tokenOf(req) {
   if (c) return c;
   const a = req.headers.authorization || '';
   if (a.startsWith('Bearer ')) return a.slice(7).trim();
-  /* 4.13 · the live stream (EventSource can't send headers) may carry the device token */
-  const u = String(req.url || '');
-  if (u.indexOf('/api/events') >= 0) { const m = u.match(/[?&]t=([a-f0-9]{64})/); if (m) return m[1]; }
+  /* the live stream never reads the session token from the URL — it uses a 2-minute ticket (see issueTicket) */
   return null;
 }
 /* → user id of a valid session, or null */
@@ -107,13 +105,13 @@ function cookieHeader(req, token) {
 }
 
 /* ── one-time tickets for the live stream (EventSource can't send headers) ──
-   valid 60 s, used once, never stored on disk — so no reusable token ends up in a URL */
+   valid 2 minutes, used once, only accepted on /api/events, never stored on disk */
 const tickets = new Map();   // ticket → { userId, exp }
 function issueTicket(userId) {
   const now = Date.now();
   if (tickets.size > 5000) for (const [k, v] of tickets) if (v.exp < now) tickets.delete(k);
   const t = crypto.randomBytes(24).toString('base64url');
-  tickets.set(t, { userId, exp: now + 60e3 });
+  tickets.set(t, { userId, exp: now + 120e3 });
   return t;
 }
 function redeemTicket(t) {
@@ -170,7 +168,31 @@ function failed(req, username) {
   [clientIp(req) + '|' + n, '*|' + n].forEach(k => { const t = tries.get(k) || []; t.push(now); if (t.length > 50) t.shift(); tries.set(k, t); });
 }
 function succeeded(req, username) { const n = uname(username); tries.delete(clientIp(req) + '|' + n); }
-setInterval(() => { const now = Date.now(); for (const k of tries.keys()) recent(k, now); }, WIN).unref();
+/* every login POST from one address, any username. The counters above are per name,
+   so a flood of random names would otherwise each run scrypt until the queue fills. */
+const LOGIN_MAX = 60, LOGIN_IPS = 20000;
+const loginPosts = new Map();
+function loginLimited(req) {
+  const now = Date.now(), ip = clientIp(req) || '?';
+  let t = loginPosts.get(ip);
+  if (!t) {
+    if (loginPosts.size >= LOGIN_IPS) return 1;
+    t = [];
+  }
+  while (t.length && now - t[0] >= WIN) t.shift();
+  if (t.length >= LOGIN_MAX) { loginPosts.set(ip, t); return Math.max(1, Math.ceil((WIN - (now - t[0])) / 60000)); }
+  t.push(now);
+  loginPosts.set(ip, t);
+  return 0;
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const k of tries.keys()) recent(k, now);
+  for (const [k, t] of loginPosts) {
+    while (t.length && now - t[0] >= WIN) t.shift();
+    if (!t.length) loginPosts.delete(k);
+  }
+}, WIN).unref();
 
 /* password checks off the main thread, at most 4 at a time — a login flood can't freeze the app */
 let running = 0; const waiting = [];
@@ -191,5 +213,5 @@ async function verifyPasswordAsync(pw, stored) {
 module.exports = {
   COOKIE, hashPassword, isHash, verifyPassword, verifyPasswordAsync, migratePasswords, storedHash,
   loadSessions, createSession, dropSession, dropUserSessions, dropSessionById, listSessions,
-  tokenOf, sessionUserId, cookieHeader, clientIp, throttled, failed, succeeded, sha, isHttps, issueTicket, redeemTicket, SESSION_MS, SESSION_MAX_MS
+  tokenOf, sessionUserId, cookieHeader, clientIp, throttled, loginLimited, failed, succeeded, sha, isHttps, issueTicket, redeemTicket, SESSION_MS, SESSION_MAX_MS
 };

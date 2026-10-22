@@ -39,7 +39,7 @@ throw-away `DATA_DIR`, so tests never touch your real data and can run in parall
 | `api/http.test.mjs` | security headers, every page asset exists, service worker headers, SPA fallback, path traversal, brand endpoint, customer portal |
 | `api/access.test.mjs` | Phase 2 · C1: the permission matrix (kept equal to the browser's), what each kind of user receives, what each may change, API-bypass attempts |
 | `api/audit.test.mjs` | Phase 2 · C3: server-written, append-only audit log; device entries ignored (reason kept); refused changes leave no entry; restore/reset keep history |
-| `api/session.test.mjs` | Phase 2 · I11: 30-day idle / 90-day maximum sessions, one-time live-stream tickets, old `?t=` clients still served |
+| `api/session.test.mjs` | Phase 2 · I11: 30-day idle / 90-day maximum sessions, one-time live-stream tickets, `?t=<session>` refused |
 | `api/integrity.test.mjs` | Phase 1: required fields + DB-refusal rollback (C2), id collisions (I10), unique document numbers (C5), restore safety (I14) |
 | `browser/pages.spec.mjs` | each of the 25 pages: correct title, content rendered, **no JS errors**, injection probes never run |
 | `browser/layout.spec.mjs` | each page: **no horizontal overflow**, no `NaN` / `undefined` printed |
