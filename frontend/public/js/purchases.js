@@ -15,7 +15,6 @@
   var ui = { range: '', from: '', to: '', q: '' };
 
   function D() { return (typeof DB !== 'undefined' && DB && DB.data) || {}; }
-  function S() { var d = D(); if (!d.settings) d.settings = {}; return d.settings; }
   function A(k) { var d = D(); return Array.isArray(d[k]) ? d[k] : []; }
   function esc(s) { return (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s); }
   function num(n, dec) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: dec ? 2 : 0, maximumFractionDigits: dec ? 2 : 0 }); }

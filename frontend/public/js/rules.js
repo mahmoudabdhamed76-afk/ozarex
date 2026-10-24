@@ -17,8 +17,6 @@
   function D() { return (typeof DB !== 'undefined' && DB && DB.data) || {}; }
   function S() { var d = D(); if (!d.settings) d.settings = {}; return d.settings; }
   function A(k) { var d = D(); return Array.isArray(d[k]) ? d[k] : []; }
-  function esc(s) { return (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s); }
-  function num(n) { return Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 }); }
   function T(m, t, ms) { if (typeof toast === 'function') toast(m, t || 'success', ms); }
   function today() { return (typeof todayStr === 'function') ? todayStr() : new Date().toISOString().slice(0, 10); }
   function pd(s) { var p = String(s || '').slice(0, 10).split('-'); return new Date(+p[0], (+p[1] || 1) - 1, +p[2] || 1); }

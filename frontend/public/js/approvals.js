@@ -130,7 +130,6 @@
   function computeDiff() { var r = X.diff(base, D(), SNAP); r.cur.top = topId(); return r; }
 
   /* ════════ 2 · what needs the admin — roles + rules (js/axcore.js) ════════ */
-  var ADMIN_ONLY = X.ADMIN_ONLY_PAGES, ALWAYS = ['dashboard', 'approvals'];
   /* the admin sets, per user in «المستخدمين», what needs approval (js/axcore.js levelOf) */
   function freshUser() { var u = user(); if (!u) return null; return A('users').find(function (x) { return x.id === u.id; }) || u; }
   function levelFor() { return X.levelOf(S(), freshUser()); }

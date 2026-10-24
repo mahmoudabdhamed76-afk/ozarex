@@ -25,6 +25,7 @@ const branches = require('./branches');
 db.exec(`CREATE TABLE IF NOT EXISTS branch_transfers (
   id TEXT PRIMARY KEY, number INTEGER NOT NULL, kind TEXT NOT NULL, from_branch TEXT NOT NULL, to_branch TEXT NOT NULL,
   status TEXT NOT NULL, data TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_branch_transfers_status ON branch_transfers(status)');
 
 class TransferError extends Error { constructor(code, msg, status) { super(msg); this.code = code; this.status = status || 400; } }
 const now = () => new Date().toISOString();

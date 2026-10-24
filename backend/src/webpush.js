@@ -13,6 +13,7 @@ const { db } = require('../db');
 
 db.exec(`CREATE TABLE IF NOT EXISTS app_meta (k TEXT PRIMARY KEY, v TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, user_id TEXT NOT NULL, data TEXT NOT NULL, ua TEXT, created_at TEXT NOT NULL, last_ok TEXT, fails INTEGER DEFAULT 0)`);
+db.exec('CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subs(user_id)');
 
 const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64u = s => Buffer.from(String(s || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
@@ -52,8 +53,15 @@ function subscribe(user, sub, ua) {
 }
 function unsubscribe(endpoint) { db.prepare('DELETE FROM push_subs WHERE endpoint = ?').run(String(endpoint || '')); }
 function subsOf(userIds) {
-  const ids = new Set((userIds || []).map(String));
-  return db.prepare('SELECT * FROM push_subs').all().filter(r => ids.has(r.user_id)).map(r => { try { return Object.assign(JSON.parse(r.data), { _user: r.user_id }); } catch (_) { return null; } }).filter(Boolean);
+  const ids = [...new Set((userIds || []).map(String))].filter(id => id && id.length <= 80);
+  if (!ids.length) return [];
+  const out = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200);
+    const rows = db.prepare(`SELECT * FROM push_subs WHERE user_id IN (${chunk.map(() => '?').join(',')})`).all(...chunk);
+    for (const r of rows) { try { out.push(Object.assign(JSON.parse(r.data), { _user: r.user_id })); } catch (_) {} }
+  }
+  return out;
 }
 function countFor(userId) { return db.prepare('SELECT COUNT(*) AS n FROM push_subs WHERE user_id = ?').get(String(userId)).n; }
 

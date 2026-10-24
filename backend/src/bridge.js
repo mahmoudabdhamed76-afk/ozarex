@@ -4,6 +4,13 @@ const { db: MAIN_DB } = require('../db');
 
 /* 4.32 · one bridge per database file: the main one (erp.db) and one for each branch */
 function makeBridge(db) {
+/* one prepared statement per SQL string — import / save used to compile the same statement on every row */
+const stmtCache = new Map();
+function prep(sql) {
+  let s = stmtCache.get(sql);
+  if (!s) stmtCache.set(sql, s = db.prepare(sql));
+  return s;
+}
 
 const tables = {
   users: { cols: ['id','username','password','name','role','data','created_at','updated_at'], json: ['data'] },
@@ -43,41 +50,52 @@ function snakeToCamel(s) { return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase
 function snakeKeys(o) { const r = {}; for (const k of Object.keys(o)) r[camelToSnake(k)] = o[k]; return r; }
 function camelKeys(o) { const r = {}; for (const k of Object.keys(o)) r[snakeToCamel(k)] = o[k]; return r; }
 
+function groupBy(rows, key) {
+  const map = new Map();
+  for (const row of rows) {
+    const k = row[key];
+    let list = map.get(k);
+    if (!list) map.set(k, list = []);
+    list.push(row);
+  }
+  return map;
+}
 function listInvoices() {
-  const heads = db.prepare(`SELECT * FROM invoices ORDER BY date DESC, id DESC`).all();
-  const itemsStmt = db.prepare(`SELECT * FROM invoice_items WHERE invoice_id = ?`);
+  const heads = prep(`SELECT * FROM invoices ORDER BY date DESC, id DESC`).all();
+  /* one read for every line, in id order — the same order a per-invoice lookup returned (rowid) */
+  const items = groupBy(prep(`SELECT * FROM invoice_items ORDER BY id`).all(), 'invoice_id');
   return heads.map(h => {
-    const items = itemsStmt.all(h.id).map(it => {
+    const obj = unpackJson(h, ['data']);
+    const lines = (items.get(h.id) || []).map(it => {
       const x = unpackJson(it, ['data']);
       return { productId: x.product_id, name: x.name, qty: x.qty, price: x.price, total: x.total, ...(x.data || {}) };
     });
-    const obj = unpackJson(h, ['data']);
     return {
       id: obj.id, number: obj.number, customerId: obj.customer_id,
       date: obj.date, subtotal: obj.subtotal, discount: obj.discount,
       tax: obj.tax, total: obj.total, paid: obj.paid, status: obj.status,
-      notes: obj.notes, items, ...(obj.data || {})
+      notes: obj.notes, items: lines, ...(obj.data || {})
     };
   });
 }
 
 function listIssuances() {
-  const heads = db.prepare(`SELECT * FROM issuances ORDER BY date DESC, id DESC`).all();
-  const itemsStmt = db.prepare(`SELECT * FROM issuance_items WHERE issuance_id = ?`);
+  const heads = prep(`SELECT * FROM issuances ORDER BY date DESC, id DESC`).all();
+  const items = groupBy(prep(`SELECT * FROM issuance_items ORDER BY id`).all(), 'issuance_id');
   return heads.map(h => {
-    const items = itemsStmt.all(h.id).map(it => {
+    const obj = unpackJson(h, ['data']);
+    const lines = (items.get(h.id) || []).map(it => {
       const x = unpackJson(it, ['data']);
       return { productId: x.product_id, name: x.name, qty: x.qty, ...(x.data || {}) };
     });
-    const obj = unpackJson(h, ['data']);
-    return { id: obj.id, number: obj.number, customerId: obj.customer_id, date: obj.date, notes: obj.notes, items, ...(obj.data || {}) };
+    return { id: obj.id, number: obj.number, customerId: obj.customer_id, date: obj.date, notes: obj.notes, items: lines, ...(obj.data || {}) };
   });
 }
 
 function exportBlob() {
   const blob = {};
   for (const [blobKey, tableName] of Object.entries(blobToTable)) {
-    const rows = db.prepare(`SELECT * FROM ${tableName}`).all();
+    const rows = prep(`SELECT * FROM ${tableName}`).all();
     const jsonCols = tables[tableName].json;
     blob[blobKey] = rows.map(r => {
       const obj = unpackJson(r, jsonCols);
@@ -94,7 +112,7 @@ function exportBlob() {
   blob.issuances = listIssuances();
   // Audit log: the full frontend entry is stored as JSON in `details`.
   // Reconstruct it so all fields (timestamp, before/after, suspicionFlags...) survive.
-  blob.auditLog = db.prepare(`SELECT * FROM audit_log ORDER BY id DESC LIMIT 5000`).all().map(r => {
+  blob.auditLog = prep(`SELECT * FROM audit_log ORDER BY id DESC LIMIT 5000`).all().map(r => {
     if (r.details) {
       try {
         const full = JSON.parse(r.details);
@@ -108,12 +126,12 @@ function exportBlob() {
     };
   });
 
-  const sRows = db.prepare(`SELECT key, value FROM settings`).all();
+  const sRows = prep(`SELECT key, value FROM settings`).all();
   blob.settings = {};
   for (const r of sRows) {
     try { blob.settings[r.key] = JSON.parse(r.value); } catch (_) { blob.settings[r.key] = r.value; }
   }
-  const cRows = db.prepare(`SELECT name, value FROM counters`).all();
+  const cRows = prep(`SELECT name, value FROM counters`).all();
   blob.counters = {};
   for (const r of cRows) blob.counters[r.name] = r.value;
 
@@ -205,7 +223,7 @@ function insertGeneric(tableName, item, cfg) {
   if (cols.length === 0) return;
   const placeholders = cols.map(() => '?').join(', ');
   let values = cols.map(c => toSqliteValue(row[c]));
-  const stmt = db.prepare(`INSERT OR REPLACE INTO ${tableName} (${cols.join(', ')}) VALUES (${placeholders})`);
+  const stmt = prep(`INSERT OR REPLACE INTO ${tableName} (${cols.join(', ')}) VALUES (${placeholders})`);
   try {
     stmt.run(...values);
   } catch (err) {
@@ -237,7 +255,7 @@ function insertInvoice(inv) {
   const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
   const str = (v) => (v === null || v === undefined) ? null : String(v);
   try {
-    db.prepare(`INSERT OR REPLACE INTO invoices (id, number, customer_id, date, subtotal, discount, tax, total, paid, status, notes, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    prep(`INSERT OR REPLACE INTO invoices (id, number, customer_id, date, subtotal, discount, tax, total, paid, status, notes, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(
         str(inv.id), num(inv.number),
         str(inv.customerId ?? inv.customer_id),
@@ -252,7 +270,7 @@ function insertInvoice(inv) {
     err.message = `[invoices ${inv.id}] ${err.message}`;   // C2: no silent skip
     throw err;
   }
-  const itemStmt = db.prepare(`INSERT INTO invoice_items (invoice_id, product_id, name, qty, price, total, data) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  const itemStmt = prep(`INSERT INTO invoice_items (invoice_id, product_id, name, qty, price, total, data) VALUES (?, ?, ?, ?, ?, ?, ?)`);
   for (const it of (inv.items || [])) {
     const known = new Set(['productId','product_id','name','qty','price','total']);
     const d = {};
@@ -268,13 +286,13 @@ function insertIssuance(iss) {
   const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
   const str = (v) => (v === null || v === undefined) ? null : String(v);
   try {
-    db.prepare(`INSERT OR REPLACE INTO issuances (id, number, customer_id, date, notes, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+    prep(`INSERT OR REPLACE INTO issuances (id, number, customer_id, date, notes, data, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(str(iss.id), num(iss.number), str(iss.customerId ?? iss.customer_id), str(iss.date) || new Date().toISOString().slice(0,10), str(iss.notes),
         Object.keys(headerData).length ? JSON.stringify(headerData) : null,
         str(iss.createdAt || iss.created_at) || new Date().toISOString(),
         str(iss.updatedAt || iss.updated_at) || new Date().toISOString());
   } catch (err) { err.message = `[issuances ${iss.id}] ${err.message}`; throw err; }   // C2: no silent skip
-  const itemStmt = db.prepare(`INSERT INTO issuance_items (issuance_id, product_id, name, qty, data) VALUES (?, ?, ?, ?, ?)`);
+  const itemStmt = prep(`INSERT INTO issuance_items (issuance_id, product_id, name, qty, data) VALUES (?, ?, ?, ?, ?)`);
   for (const it of (iss.items || [])) {
     const k2 = new Set(['productId','product_id','name','qty']);
     const d = {};
@@ -297,19 +315,19 @@ function userWithHash(item, existing) {
 
 function importBlob(blob) {
   const oldHash = {};
-  try { for (const r of db.prepare('SELECT id, password FROM users').all()) oldHash[r.id] = r.password; } catch (_) {}
+  try { for (const r of prep('SELECT id, password FROM users').all()) oldHash[r.id] = r.password; } catch (_) {}
   db.exec('BEGIN');
   try {
     for (const tableName of Object.values(blobToTable)) {
-      db.prepare(`DELETE FROM ${tableName}`).run();
+      prep(`DELETE FROM ${tableName}`).run();
     }
-    db.prepare(`DELETE FROM invoice_items`).run();
-    db.prepare(`DELETE FROM invoices`).run();
-    db.prepare(`DELETE FROM issuance_items`).run();
-    db.prepare(`DELETE FROM issuances`).run();
+    prep(`DELETE FROM invoice_items`).run();
+    prep(`DELETE FROM invoices`).run();
+    prep(`DELETE FROM issuance_items`).run();
+    prep(`DELETE FROM issuances`).run();
     /* Phase 2 · C3: the audit log is append-only — a restore / reset never deletes it, and never
        brings in entries from a file (they would be unverifiable); the server logs the restore itself */
-    db.prepare(`DELETE FROM settings`).run();
+    prep(`DELETE FROM settings`).run();
 
     for (const [blobKey, tableName] of Object.entries(blobToTable)) {
       const items = Array.isArray(blob[blobKey]) ? blob[blobKey] : [];
@@ -319,11 +337,11 @@ function importBlob(blob) {
     for (const iss of (blob.issuances || [])) insertIssuance(iss);
 
     if (blob.settings && typeof blob.settings === 'object') {
-      const sst = db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`);
+      const sst = prep(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`);
       for (const [k, v] of Object.entries(blob.settings)) sst.run(k, typeof v === 'string' ? v : JSON.stringify(v));
     }
     if (blob.counters && typeof blob.counters === 'object') {
-      const cst = db.prepare(`INSERT INTO counters (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value`);
+      const cst = prep(`INSERT INTO counters (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value`);
       for (const [n, v] of Object.entries(blob.counters)) cst.run(n, Number(v) || 0);
     }
     db.exec('COMMIT');
@@ -350,42 +368,42 @@ function insertAudit(a) {
   if (!a || typeof a !== 'object') return;
   const createdAt = a.createdAt || a.created_at ||
     (typeof a.timestamp === 'number' ? new Date(a.timestamp).toISOString() : null) || a.date || new Date().toISOString();
-  db.prepare(`INSERT INTO audit_log (user_id, action, entity, entity_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
+  prep(`INSERT INTO audit_log (user_id, action, entity, entity_id, details, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
     .run(a.userId || a.user_id || null, a.operation || a.action || null, a.table || a.entity || null,
       a.recordId || a.entityId || a.entity_id || null, JSON.stringify(a), createdAt);
 }
 /* (Phase 2: no function deletes or trims audit rows — the log is append-only) */
 function upsertRecord(blobKey, rec) {
   if (!rec || rec.id === undefined || rec.id === null) return;
-  if (blobKey === 'invoices') { db.prepare('DELETE FROM invoice_items WHERE invoice_id = ?').run(String(rec.id)); insertInvoice(rec); return; }
-  if (blobKey === 'issuances') { db.prepare('DELETE FROM issuance_items WHERE issuance_id = ?').run(String(rec.id)); insertIssuance(rec); return; }
+  if (blobKey === 'invoices') { prep('DELETE FROM invoice_items WHERE invoice_id = ?').run(String(rec.id)); insertInvoice(rec); return; }
+  if (blobKey === 'issuances') { prep('DELETE FROM issuance_items WHERE issuance_id = ?').run(String(rec.id)); insertIssuance(rec); return; }
   if (blobKey === 'auditLog') return;   // audit entries are written by the server only (audit.js)
   const table = blobToTable[blobKey]; if (!table) return;
-  if (blobKey === 'users') { rec = userWithHash(rec, (db.prepare('SELECT password FROM users WHERE id = ?').get(String(rec.id)) || {}).password); }
+  if (blobKey === 'users') { rec = userWithHash(rec, (prep('SELECT password FROM users WHERE id = ?').get(String(rec.id)) || {}).password); }
   insertGeneric(table, rec, tables[table]);
 }
 function deleteRecord(blobKey, id) {
   if (id === undefined || id === null) return;
   id = String(id);
-  if (blobKey === 'invoices') { db.prepare('DELETE FROM invoice_items WHERE invoice_id = ?').run(id); db.prepare('DELETE FROM invoices WHERE id = ?').run(id); return; }
-  if (blobKey === 'issuances') { db.prepare('DELETE FROM issuance_items WHERE issuance_id = ?').run(id); db.prepare('DELETE FROM issuances WHERE id = ?').run(id); return; }
+  if (blobKey === 'invoices') { prep('DELETE FROM invoice_items WHERE invoice_id = ?').run(id); prep('DELETE FROM invoices WHERE id = ?').run(id); return; }
+  if (blobKey === 'issuances') { prep('DELETE FROM issuance_items WHERE issuance_id = ?').run(id); prep('DELETE FROM issuances WHERE id = ?').run(id); return; }
   if (blobKey === 'auditLog') return;   // append-only
   const table = blobToTable[blobKey]; if (!table) return;
-  db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
+  prep(`DELETE FROM ${table} WHERE id = ?`).run(id);
 }
 function setSetting(key, v) {
-  if (v === undefined || v === null) { db.prepare('DELETE FROM settings WHERE key = ?').run(key); return; }
-  db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
+  if (v === undefined || v === null) { prep('DELETE FROM settings WHERE key = ?').run(key); return; }
+  prep(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')`)
     .run(key, typeof v === 'string' ? v : JSON.stringify(v));
 }
 function setCounter(name, v) {
-  db.prepare('INSERT INTO counters (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value').run(name, Number(v) || 0);
+  prep('INSERT INTO counters (name, value) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET value = excluded.value').run(name, Number(v) || 0);
 }
 const KNOWN_KEYS = new Set(Object.keys(blobToTable).concat(['invoices', 'issuances', 'auditLog']));
 
 /* Read one settings value without exporting the whole database. */
 function getSetting(key) {
-  const r = db.prepare(`SELECT value FROM settings WHERE key = ?`).get(key);
+  const r = prep(`SELECT value FROM settings WHERE key = ?`).get(key);
   if (!r) return undefined;
   try { return JSON.parse(r.value); } catch (_) { return r.value; }
 }

@@ -15,7 +15,7 @@
 (function () {
   'use strict';
   var MQ = window.matchMedia ? window.matchMedia('(max-width: 768px)') : { matches: false, addEventListener: function () {} };
-  var classic = false, boxHome = null;
+  var boxHome = null;
   var MO = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
   var WD = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
 
@@ -463,7 +463,7 @@
     go: function (p) { more(false); go(p); },
     setMine: function (k) { var u = me() || {}; ls('ax_mine_' + (u.id || ''), k); buildNav(); if (typeof updateHomeFab === 'function') updateHomeFab(); if (typeof toast === 'function') toast('«شاشتي» بقت: ' + ((navItem(k) || {}).label || k)); },
     excel: function () { if (window.AXX) AXX.exportAll(); },
-    classic: function (on) { classic = !!on; if (typeof renderDashboard === 'function') renderDashboard(); try { window.scrollTo(0, 0); } catch (e) {} },
+    classic: function () { if (typeof renderDashboard === 'function') renderDashboard(); try { window.scrollTo(0, 0); } catch (e) {} },
     _metrics: metrics
   };
 })();

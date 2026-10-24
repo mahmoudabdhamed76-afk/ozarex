@@ -135,7 +135,7 @@
     A('invoices').forEach(function (inv) {
       if (!inv.sourceIssuanceId && byInv[inv.id]) { inv.sourceIssuanceId = byInv[inv.id]; inv.fromIssuance = true; changed++; }
     });
-    if (changed) { saveNoGuard(); console.info('[biz] data fixes:', changed); }
+    if (changed) saveNoGuard();
   }
 
   /* ─────────── 2 · center prices in invoices ─────────── */

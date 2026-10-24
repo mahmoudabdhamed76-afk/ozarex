@@ -86,7 +86,7 @@
   /* ── model ── */
   function model() {
     var t0 = today0(), from = lds(addDays(t0, -(WIN - 1)));
-    var outs = {}, lastMove = {}, series = {};
+    var outs = {}, lastMove = {};
     A('stockMoves').forEach(function (m) {
       if (!m || !m.productId) return;
       var d = String(m.date || '').slice(0, 10);

@@ -8,6 +8,7 @@
    the program itself uses.
 ════════════════════════════════════════════════════════════════════ */
 const path = require('node:path');
+const zlib = require('node:zlib');
 const AX = require(process.env.PUBLIC_DIR ? path.join(process.env.PUBLIC_DIR, 'js', 'axcore.js') : path.join(__dirname, '..', '..', 'frontend', 'public', 'js', 'axcore.js'));
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -90,10 +91,22 @@ function handle(req, res, pathname, data) {
   let d = all[0] || {}, c = null;
   for (const x of all) { const k = findCenter(x, m[1]); if (k) { d = x; c = k; break; } }
   const html = c ? page(d, c) : notFound();
-  res.writeHead(c ? 200 : 404, {
+  const status = c ? 200 : 404;
+  const headers = {
     'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow',
     'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY'
-  });
+  };
+  const buf = Buffer.from(html);
+  if (status === 200 && buf.length >= 1024 && /\bgzip\b/i.test(String(req.headers['accept-encoding'] || ''))) {
+    zlib.gzip(buf, { level: 6 }, (err, gz) => {
+      if (res.headersSent || res.writableEnded) return;
+      if (err || !gz || gz.length >= buf.length) { res.writeHead(status, headers); res.end(html); return; }
+      res.writeHead(status, Object.assign({}, headers, { 'Content-Encoding': 'gzip', 'Content-Length': gz.length, 'Vary': 'Accept-Encoding' }));
+      res.end(gz);
+    });
+    return true;
+  }
+  res.writeHead(status, headers);
   res.end(html);
   return true;
 }

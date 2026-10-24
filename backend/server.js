@@ -14,6 +14,7 @@ const http = require('node:http');
 const fs   = require('node:fs');
 const path = require('node:path');
 const url  = require('node:url');
+const zlib = require('node:zlib');
 
 const { db, DB_FILE } = require('./db');
 const adsMod = require('./src/ads');
@@ -117,12 +118,42 @@ function secHeaders(req) {
 function sendJSON(res, status, obj, extraHeaders) {
   if (res.headersSent || res.writableEnded) return;
   const body = JSON.stringify(obj);
-  res.writeHead(status, Object.assign(secHeaders(res.req), {
+  const headers = Object.assign(secHeaders(res.req), {
     'Content-Type':   'application/json; charset=utf-8',
-    'Content-Length': Buffer.byteLength(body),
     'Cache-Control':  'no-store'
-  }, extraHeaders || {}));
-  res.end(body);
+  }, extraHeaders || {});
+  endBody(res.req, res, status, body, headers, true);
+}
+/* gzip only when the client asked for it and the payload is worth it.
+   Clients that don't send Accept-Encoding (and the tests' raw http.get) get the same bytes as before. */
+function endBody(req, res, status, body, headers, compressible) {
+  if (res.headersSent || res.writableEnded) return;
+  const buf = Buffer.isBuffer(body) ? body : Buffer.from(body);
+  const h = Object.assign({}, headers);
+  const gzipOk = status === 200 && compressible && buf.length >= 1024
+    && /\bgzip\b/i.test(String((req && req.headers && req.headers['accept-encoding']) || ''))
+    && !h['Content-Encoding'];
+  if (!gzipOk) {
+    h['Content-Length'] = buf.length;
+    res.writeHead(status, h);
+    res.end(buf);
+    return;
+  }
+  zlib.gzip(buf, { level: 6 }, (err, gz) => {
+    if (res.headersSent || res.writableEnded || res.destroyed) return;
+    if (err || !gz || gz.length >= buf.length) {
+      h['Content-Length'] = buf.length;
+      res.writeHead(status, h);
+      res.end(buf);
+      return;
+    }
+    res.writeHead(status, Object.assign({}, h, {
+      'Content-Encoding': 'gzip',
+      'Content-Length': gz.length,
+      'Vary': h.Vary ? h.Vary + ', Accept-Encoding' : 'Accept-Encoding'
+    }));
+    res.end(gz);
+  });
 }
 function readBody(req, limitMb) {
   return new Promise((resolve, reject) => {
@@ -146,22 +177,24 @@ const MIME = {
   '.jpeg': 'image/jpeg', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.webp': 'image/webp',
   '.map': 'application/json; charset=utf-8'
 };
-function serveStatic(res, filePath) {
+function serveStatic(req, res, filePath) {
   fs.readFile(filePath, (err, data) => {
-    if (err) { res.writeHead(404); res.end('Not found'); return; }
+    if (err) { if (!res.headersSent) { res.writeHead(404); res.end('Not found'); } return; }
     const ext = path.extname(filePath).toLowerCase();
     const isHtml = ext === '.html';
-    res.writeHead(200, Object.assign(secHeaders(res.req), {
+    const longCache = ext === '.woff2' || ext === '.woff';
+    const headers = Object.assign(secHeaders(req), {
       'Content-Type':   MIME[ext] || 'application/octet-stream',
-      'Content-Length': data.length,
       'Cache-Control':  isHtml ? 'no-cache, no-store, must-revalidate'
-                      : (ext === '.woff2' || ext === '.woff') ? 'public, max-age=31536000, immutable'
+                      : longCache ? 'public, max-age=31536000, immutable'
                       : 'no-cache',
-      'Pragma': 'no-cache', 'Expires': '0',
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'same-origin'
-    }));
-    res.end(data);
+    });
+    /* long-lived fonts must not also say Expires: 0 — that header cancels the year-long cache */
+    if (!longCache) { headers.Pragma = 'no-cache'; headers.Expires = '0'; }
+    const alreadyPacked = longCache || ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.webp' || ext === '.gif' || ext === '.ico' || ext === '.gz';
+    endBody(req, res, 200, data, headers, !alreadyPacked);
   });
 }
 /* an internal snapshot in the database (kept 20) — taken at most every 10 minutes */
@@ -191,6 +224,7 @@ setInterval(dailyAll, 3600e3);
 /* changes already applied — a retry (lost response, offline queue, the
    service worker) must never apply the same difference twice */
 const _seenOps = new Set();
+let _opDoneStmt;
 try {
   db.prepare('DELETE FROM applied_ops WHERE at < ?').run(Date.now() - 30 * 864e5);
   for (const r of db.prepare('SELECT id FROM applied_ops').all()) _seenOps.add(r.id);
@@ -199,7 +233,10 @@ function opSeen(id) { return !!id && _seenOps.has(String(id)); }
 function opDone(id) {
   if (!id) return;
   _seenOps.add(String(id));
-  try { db.prepare('INSERT OR IGNORE INTO applied_ops (id, at) VALUES (?, ?)').run(String(id), Date.now()); } catch (_) {}
+  try {
+    if (!_opDoneStmt) _opDoneStmt = db.prepare('INSERT OR IGNORE INTO applied_ops (id, at) VALUES (?, ?)');
+    _opDoneStmt.run(String(id), Date.now());
+  } catch (_) {}
 }
 
 /* who is calling */
@@ -213,8 +250,21 @@ function currentUser(req) {
 }
 const publicUser = u => ({ id: u.id, username: u.username, name: u.name, role: u.role });
 /* weak password → must change it first */
-function mustChange(id) { if (process.env.EMX_DEV_WEAK_OK === '1') return false; try { const r = db.prepare('SELECT must_change FROM user_flags WHERE user_id = ?').get(id); return !!(r && r.must_change); } catch (e) { return false; } }
-function setMustChange(id, on) { try { db.prepare('INSERT INTO user_flags (user_id, must_change) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET must_change = excluded.must_change').run(id, on ? 1 : 0); } catch (e) { console.error('[user_flags]', e.message); } }
+let _mustChangeStmt, _setMustChangeStmt;
+function mustChange(id) {
+  if (process.env.EMX_DEV_WEAK_OK === '1') return false;
+  try {
+    if (!_mustChangeStmt) _mustChangeStmt = db.prepare('SELECT must_change FROM user_flags WHERE user_id = ?');
+    const r = _mustChangeStmt.get(id);
+    return !!(r && r.must_change);
+  } catch (e) { return false; }
+}
+function setMustChange(id, on) {
+  try {
+    if (!_setMustChangeStmt) _setMustChangeStmt = db.prepare('INSERT INTO user_flags (user_id, must_change) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET must_change = excluded.must_change');
+    _setMustChangeStmt.run(id, on ? 1 : 0);
+  } catch (e) { console.error('[user_flags]', e.message); }
+}
 function weakPw(pw, username) { pw = String(pw || ''); return pw.length < 6 || pw.toLowerCase() === String(username || '').toLowerCase() || /^(admin|123456?|1234|0000|000000|111111|password|12345678|qwerty)$/i.test(pw); }
 
 /* ═══════════════════════════════════════════════════════
@@ -239,10 +289,11 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/sw.js') {
       const swPath = path.join(PUBLIC, 'sw.js');
-      if (fs.existsSync(swPath)) {
-        res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Service-Worker-Allowed': '/' });
-        return res.end(fs.readFileSync(swPath));
-      }
+      try {
+        const data = await fs.promises.readFile(swPath);
+        const headers = { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Service-Worker-Allowed': '/' };
+        return endBody(req, res, 200, data, headers, true);
+      } catch (_) { /* missing worker falls through, same as before */ }
     }
     /* the company name + logo for the login screen (what the buyer set in الإعدادات → الشركة) */
     if (pathname === '/api/brand' && req.method === 'GET') {
@@ -491,14 +542,14 @@ const server = http.createServer(async (req, res) => {
         if (parsed.query.file) {
           const p = st.backupPath(parsed.query.file);
           if (!p) return sendJSON(res, 404, { error: 'not_found' });
-          buf = fs.readFileSync(p); name = parsed.query.file;
-        } else { buf = st.gzBlob(); name = 'erp-' + (bid === 'main' ? '' : bid + '-') + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json.gz'; }
+          buf = await fs.promises.readFile(p); name = parsed.query.file;
+        } else { buf = await st.gzBlob(); name = 'erp-' + (bid === 'main' ? '' : bid + '-') + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.json.gz'; }
         res.writeHead(200, { 'Content-Type': 'application/gzip', 'Content-Length': buf.length, 'Content-Disposition': 'attachment; filename="' + name + '"', 'Cache-Control': 'no-store' });
         return res.end(buf);
       }
       if (pathname === '/api/backup/now' && req.method === 'POST') {
         if (!admin) return adminOnly();
-        const r = st.writeDaily(true);
+        const r = await st.writeDaily(true);
         return sendJSON(res, 200, { ok: true, file: r.file, files: st.listBackups() });
       }
       if (pathname === '/api/backup/telegram' && req.method === 'POST') {
@@ -536,7 +587,10 @@ const server = http.createServer(async (req, res) => {
         const next = String(b.next || '');
         if (next.length < 6 || next.length > 128) return sendJSON(res, 400, { error: 'weak', message: 'كلمة السر الجديدة من 6 حروف لـ 128' });
         if (weakPw(next, me.username)) return sendJSON(res, 400, { error: 'weak', message: 'كلمة السر دي سهلة التخمين — اختار حاجة أصعب' });
-        db.prepare('UPDATE users SET password = ? WHERE id = ?').run(auth.hashPassword(next), me.id);
+        let hash;
+        try { hash = await auth.hashPasswordAsync(next); }
+        catch (e) { return sendJSON(res, 503, { error: 'busy', message: 'السيرفر مشغول — جرّب كمان ثانية' }); }
+        db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hash, me.id);
         setMustChange(me.id, false);
         store.logEvent(me, { operation: 'edit', table: 'users', recordId: me.id, recordLabel: me.name || me.username, before: { password: '•••' }, after: { password: '(اتغيّرت — بنفسه)' } });
         auth.dropUserSessions(me.id, auth.tokenOf(req));
@@ -564,8 +618,11 @@ const server = http.createServer(async (req, res) => {
     let rel = pathname === '/' ? '/index.html' : pathname;
     rel = rel.replace(/\.\./g, '');
     const filePath = path.join(PUBLIC, rel);
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) return serveStatic(res, filePath);
-    return serveStatic(res, path.join(PUBLIC, 'index.html'));
+    try {
+      const st = await fs.promises.stat(filePath);
+      if (st.isFile()) return serveStatic(req, res, filePath);
+    } catch (_) { /* missing file → the app page */ }
+    return serveStatic(req, res, path.join(PUBLIC, 'index.html'));
 
   } catch (e) {
     if (e && e.status) { if (!res.headersSent) sendJSON(res, e.status, { error: e.message }); else res.destroy(); return; }

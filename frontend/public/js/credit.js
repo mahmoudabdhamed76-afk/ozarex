@@ -118,7 +118,7 @@
 
   /* ════════ 2 · margins ════════ */
   function lastCosts() {
-    var byId = {}, byName = {}, prods = A('products');
+    var byId = {}, prods = A('products');
     var nameToId = {}; prods.forEach(function (p) { nameToId[norm(p.name)] = p.id; });
     A('expenses').filter(function (e) { return e.kind === 'purchase'; })
       .sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')) || N(a.createdAt) - N(b.createdAt); })

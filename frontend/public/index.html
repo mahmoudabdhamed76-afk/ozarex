@@ -10394,7 +10394,6 @@ const OfflineManager = (() => {
           SyncEngine.pullLatest('sw-sync');
         }
       });
-      console.log('[SW] registered');
     } catch (e) { console.warn('[SW] registration failed:', e.message); }
   }
 
@@ -10540,7 +10539,6 @@ const SyncEngine = (() => {
     if (!fn) return;
     fn();
     requestAnimationFrame(() => { pc.scrollTop = scrollY; });
-    console.log('[Sync] page updated:', page, '(' + reason + ')');
   }
 
   async function pullLatest(reason = '', force) {
