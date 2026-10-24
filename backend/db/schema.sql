@@ -116,6 +116,7 @@ CREATE TABLE IF NOT EXISTS issuance_items (
   qty          REAL DEFAULT 0,
   data         TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_issuance_items_issuance ON issuance_items(issuance_id);
 
 CREATE TABLE IF NOT EXISTS payments (
   id           TEXT PRIMARY KEY,
@@ -231,9 +232,13 @@ CREATE TABLE IF NOT EXISTS sessions (
   ua           TEXT,
   ip           TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_last_seen ON sessions(last_seen);
+CREATE INDEX IF NOT EXISTS idx_sessions_ip ON sessions(ip);
 
 -- 4.7 · changes already applied (a device that retries never applies one twice)
 CREATE TABLE IF NOT EXISTS applied_ops (
   id           TEXT PRIMARY KEY,
   at           INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_applied_ops_at ON applied_ops(at);

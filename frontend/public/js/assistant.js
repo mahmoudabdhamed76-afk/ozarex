@@ -39,7 +39,6 @@
   function dayName(s) { var t = today(); if (s === t) return 'النهارده'; if (s === addDays(t, -1)) return 'امبارح'; var d = dt(s); return DAYS[d.getDay()] + ' ' + dm(s); }
   function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
   function allowed(page) { try { return typeof can !== 'function' || can(page); } catch (e) { return true; } }
-  function me() { return (typeof currentUser !== 'undefined' && currentUser) || {}; }
   function fn(f) { var id = 'f' + (++st.fid); st.fns[id] = f; return "AXA.run('" + id + "')"; }
   function plural(n, one, few, many) { return n === 1 ? one : (n >= 2 && n <= 10) ? few : many; }
 
@@ -1060,10 +1059,6 @@
   function pageNow() { try { return typeof currentPage !== 'undefined' ? currentPage : ''; } catch (e) { return ''; } }
 
   /* ───────────────────────── page ───────────────────────── */
-  function greeting() {
-    var h = new Date().getHours(), n = String(me().name || '').trim().split(' ')[0];
-    return (h < 12 ? 'صباح الخير' : h < 17 ? 'نهارك سعيد' : 'مساء الخير') + (n ? ' يا ' + n : '');
-  }
   function heroLines() {
     var t = today(), P0 = { from: t, to: t }, s = sales(P0), pyl = pays(P0).filter(function (x) { return +x.amount > 0; }), py = sum(pyl, 'amount'), npy = pyl.length;
     var PI = paperInfo(), pq = paperOut(s, PI), pqt = qtyTxt(paperByUnit(s, PI));

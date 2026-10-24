@@ -151,34 +151,7 @@
   function svgEl(tag, a, p) { var e = document.createElementNS(NS, tag); for (var k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; }
   function ico(path) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + path + '</svg>'; }
 
-  /* ── ticker items: each metric + its change since yesterday, mixed with the latest activity ── */
   var UP_GOOD = { paper: true, ink: true, invoices: false, collect: true, suppliers: false, treasury: true };
-  function invDelta(n) {                       // overdue invoices: compared with the first look today
-    try {
-      var today = lds(new Date()), b = JSON.parse(localStorage.getItem('ax_tk_inv') || 'null');
-      if (!b || b.date !== today) { localStorage.setItem('ax_tk_inv', JSON.stringify({ date: today, n: n })); return null; }
-      var diff = n - b.n; if (!diff) return null;
-      return { dir: diff > 0 ? 'up' : 'down', text: String(Math.abs(diff)), good: diff < 0, hint: 'من أول النهارده' };
-    } catch (e) { return null; }
-  }
-  function tickerItems() {
-    var items = ORDER.map(function (k) {
-      var c = state.cards[k] || {}, d = null;
-      try {
-        if (k === 'invoices') d = invDelta(numOf(c.value));
-        else {
-          var raw = series(k), diff = raw[raw.length - 1] - raw[raw.length - 2];
-          if (Math.abs(diff) >= .5) d = { dir: diff > 0 ? 'up' : 'down', text: fmtN(Math.abs(diff)), good: (diff > 0) === UP_GOOD[k],
-            hint: k === 'collect' ? 'مقارنة بتحصيل امبارح' : 'التغيير عن امبارح' };
-        }
-      } catch (e) {}
-      return { key: 'm-' + k, label: META[k].title, value: c.value || '—', level: (LEVEL[c.level] || LEVEL.info)[0], delta: d, go: META[k].go };
-    });
-    /* 4.44 · «X من Y عملية بيع اتحصّلت» moved from the scene into the live strip */
-    if (state.inv) items.unshift({ key: 'm-sold', label: 'عملية بيع اتحصّلت ' + (state.inv.recent ? 'مؤخراً' : 'الشهر ده'), value: state.inv.paid + ' من ' + state.inv.total,
-      level: state.inv.total && state.inv.paid >= state.inv.total ? 'ok' : 'info', delta: null, go: 'invoices' });
-    return AXTicker.withEvents(items, 4);
-  }
 
   /* ── build ── */
   function build(grid) {

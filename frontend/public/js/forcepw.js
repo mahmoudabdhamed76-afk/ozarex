@@ -6,7 +6,6 @@
 (function () {
   'use strict';
   var shown = false;
-  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
   function open() {
     if (shown || document.getElementById('axpw')) return;

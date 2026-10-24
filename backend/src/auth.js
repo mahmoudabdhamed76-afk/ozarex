@@ -176,6 +176,14 @@ setInterval(() => { const now = Date.now(); for (const k of tries.keys()) recent
 let running = 0; const waiting = [];
 function slot() { return new Promise((res, rej) => { if (running < 4) { running++; res(); } else if (waiting.length > 200) rej(new Error('busy')); else waiting.push(res); }); }
 function release() { const next = waiting.shift(); if (next) next(); else running--; }
+async function hashPasswordAsync(pw) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  await slot();
+  try {
+    const key = await new Promise((res, rej) => crypto.scrypt(String(pw), salt, 64, { N: 16384, r: 8, p: 1 }, (e, k) => e ? rej(e) : res(k)));
+    return 'scrypt$' + salt + '$' + key.toString('hex');
+  } finally { release(); }
+}
 async function verifyPasswordAsync(pw, stored) {
   if (!stored) return false;
   if (!isHash(stored)) return verifyPassword(pw, stored);
@@ -189,7 +197,7 @@ async function verifyPasswordAsync(pw, stored) {
 }
 
 module.exports = {
-  COOKIE, hashPassword, isHash, verifyPassword, verifyPasswordAsync, migratePasswords, storedHash,
+  COOKIE, hashPassword, hashPasswordAsync, isHash, verifyPassword, verifyPasswordAsync, migratePasswords, storedHash,
   loadSessions, createSession, dropSession, dropUserSessions, dropSessionById, listSessions,
   tokenOf, sessionUserId, cookieHeader, clientIp, throttled, failed, succeeded, sha, isHttps, issueTicket, redeemTicket, SESSION_MS, SESSION_MAX_MS
 };

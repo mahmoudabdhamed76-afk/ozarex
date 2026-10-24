@@ -382,7 +382,8 @@ let dirty = true;
 function today() { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
 function gzBlob() {
   const blob = Object.assign({}, data(), { __exportedAt: new Date().toISOString(), __app: 'ERP' });
-  return zlib.gzipSync(Buffer.from(JSON.stringify(blob)), { level: 9 });
+  const raw = Buffer.from(JSON.stringify(blob));
+  return new Promise((resolve, reject) => zlib.gzip(raw, { level: 6 }, (err, gz) => err ? reject(err) : resolve(gz)));
 }
 function listBackups() {
   if (!fs.existsSync(BK_DIR)) return [];
@@ -394,12 +395,12 @@ function backupPath(file) {
   const p = path.join(BK_DIR, file);
   return fs.existsSync(p) ? p : null;
 }
-function writeDaily(force) {
+async function writeDaily(force) {
   if (!fs.existsSync(BK_DIR)) fs.mkdirSync(BK_DIR, { recursive: true });
   const file = 'erp-' + today() + '.json.gz', p = path.join(BK_DIR, file);
   if (!force && fs.existsSync(p) && !dirty) return { file, skipped: true };
-  const gz = gzBlob();
-  fs.writeFileSync(p + '.tmp', gz); fs.renameSync(p + '.tmp', p);
+  const gz = await gzBlob();
+  await fs.promises.writeFile(p + '.tmp', gz); fs.renameSync(p + '.tmp', p);
   dirty = false;
   /* keep the last KEEP_DAYS days */
   listBackups().slice(KEEP_DAYS).forEach(b => { try { fs.unlinkSync(path.join(BK_DIR, b.file)); } catch (_) {} });
@@ -411,13 +412,13 @@ function telegramReady() { return !!(process.env.TELEGRAM_BOT_TOKEN && process.e
 let lastTelegram = { at: 0, ok: null, error: '' };
 async function sendTelegram(note) {
   if (!telegramReady()) return { ok: false, error: 'not_configured' };
-  const r = writeDaily(true);
+  const r = await writeDaily(true);
   const p = path.join(BK_DIR, r.file);
   const base = (process.env.TELEGRAM_API_BASE || 'https://api.telegram.org').replace(/\/$/, '');
   const fd = new FormData();
   fd.append('chat_id', process.env.TELEGRAM_CHAT_ID);
   fd.append('caption', '📦 نسخة احتياطية' + (((data() || {}).settings || {}).companyName ? ' — ' + data().settings.companyName : '') + (IS_MAIN ? '' : ' · ' + (typeof opts.label === 'function' ? opts.label() : BRANCH)) + '\n' + r.file + (note ? '\n' + note : ''));
-  fd.append('document', new Blob([fs.readFileSync(p)], { type: 'application/gzip' }), r.file);
+  fd.append('document', new Blob([await fs.promises.readFile(p)], { type: 'application/gzip' }), r.file);
   try {
     const res = await fetch(base + '/bot' + process.env.TELEGRAM_BOT_TOKEN + '/sendDocument', { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) });
     const j = await res.json().catch(() => ({}));
@@ -431,7 +432,7 @@ const TG_MARK = () => path.join(BK_DIR, '.telegram-day');
 async function daily() {
   try {
     const t = today();
-    writeDaily(false);
+    await writeDaily(false);
     if (telegramReady()) {
       let last = ''; try { last = fs.readFileSync(TG_MARK(), 'utf8').trim(); } catch (_) {}
       if (last !== t) { const r = await sendTelegram(); if (r.ok) fs.writeFileSync(TG_MARK(), t); }
