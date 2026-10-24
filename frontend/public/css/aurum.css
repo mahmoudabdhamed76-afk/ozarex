@@ -6120,3 +6120,69 @@ html[data-theme="light"] .axface-orb {
   92%, 97% { transform: translate(0, 3px); }
   100% { transform: translate(0, 0); }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   4.52 · Bottom-to-top sliding background on two sidebar items only:
+   لوحة التحكم (dashboard) and صرف الورق (issuances). Other items are untouched.
+   The fill is ::before, scaled from the bottom edge. Text and icon stay above it.
+════════════════════════════════════════════════════════════════════ */
+html.aurum .nav-item.nav-rise:not(.active) {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+  overflow: hidden;
+  transition: none !important;
+}
+html.aurum .nav-item.nav-rise > span {
+  position: relative;
+  z-index: 1;
+}
+html.aurum .nav-item.nav-rise .icon { transition: none !important; }
+html.aurum .nav-item.nav-rise::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: auto !important;
+  height: auto !important;
+  border-radius: inherit;
+  background: #14161c;
+  transform: scaleY(0);
+  transform-origin: bottom center;
+  transition: transform 350ms cubic-bezier(0.77, 0, 0.18, 1) !important;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 1;
+}
+@media (hover: hover) {
+  html.aurum .nav-item.nav-rise:hover:not(.active) {
+    background: transparent !important;
+    background-image: none !important;
+    color: #f4f6f8 !important;
+    transform: none !important;
+    filter: none !important;
+    box-shadow: none !important;
+  }
+  html.aurum .nav-item.nav-rise:hover:not(.active)::before { transform: scaleY(1); }
+  html.aurum .nav-item.nav-rise:hover:not(.active) .icon {
+    color: #f4f6f8 !important;
+    background: transparent !important;
+  }
+}
+html.aurum .nav-item.nav-rise:is(:focus-visible, :active):not(.active) {
+  background: transparent !important;
+  background-image: none !important;
+  color: #f4f6f8 !important;
+  transform: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
+html.aurum .nav-item.nav-rise:is(:focus-visible, :active):not(.active)::before { transform: scaleY(1); }
+html.aurum .nav-item.nav-rise:is(:focus-visible, :active):not(.active) .icon {
+  color: #f4f6f8 !important;
+  background: transparent !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.aurum .nav-item.nav-rise::before { transition: none !important; }
+}
