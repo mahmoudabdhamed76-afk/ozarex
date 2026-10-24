@@ -6008,3 +6008,115 @@ html[data-theme="dark"] .axask-shine { background: linear-gradient(90deg, transp
 @media (min-width: 769px) {
   html:has(#ai-fab.axask.visible) #ax-more-fab.show { inset-inline-end: calc(18px + var(--axask-w, 186px) + 12px + env(safe-area-inset-left, 0px)); transition: inset-inline-end .3s ease; }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   4.49 · وش المساعد العايم: دايرة ناعمة وعينين كبسولة
+   بتنط نطة هادية، لونها بيتدرج بهدوء، وعينيها ترمش وتبص
+   فوق وتحت ويمين وشمال وهي ساكتة.
+   happy قوس ابتسامة (هوفر / الصفحة مفتوحة / رد إيجابي)
+   sad العيون بتميل وتنزل (خطأ أو رد فاشل)
+   thinking بتبص يمين وشمال وهي بتستنى الرد
+   js/aibot.js بيحط .mood-* و .is-open · الليبل «AI agent»
+════════════════════════════════════════════════════════════════════ */
+html.aurum #ai-fab.axface, #ai-fab.axface {
+  width: 52px !important; height: 52px !important; min-width: 0 !important; padding: 0 !important;
+  border: 0 !important; border-radius: 50% !important; background: transparent !important;
+  box-shadow: none !important; overflow: visible !important; color: #14161c !important;
+  animation: none !important; -webkit-tap-highlight-color: transparent;
+}
+html.aurum #ai-fab.axface::before, #ai-fab.axface::before { display: none !important; }
+#ai-fab.axface:hover, #ai-fab.axface:active { transform: none !important; }
+#ai-fab.axface:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+html[data-theme="dark"] #ai-fab.axface:focus-visible { outline-color: #fff; }
+
+.axface-float { position: absolute; inset: 0; }
+.axface-orb {
+  position: absolute; inset: 0; border-radius: 50%; overflow: hidden;
+  background: linear-gradient(145deg, #ffe7b0, #c8f6df 46%, #c9e2ff);
+  box-shadow: 0 0 0 1px rgba(20, 22, 28, .16), 0 10px 22px rgba(0, 0, 0, .28);
+  transition: transform .18s cubic-bezier(.2, .8, .2, 1);
+}
+html[data-theme="dark"] .axface-orb {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .2), 0 12px 26px rgba(0, 0, 0, .5), 0 0 18px rgba(160, 210, 255, .2);
+}
+html[data-theme="light"] .axface-orb {
+  box-shadow: 0 0 0 1px rgba(11, 22, 48, .22), 0 10px 22px rgba(11, 22, 48, .2);
+}
+.axface-hue {
+  position: absolute; inset: -30%;
+  background: linear-gradient(115deg, #ffd48a 0%, #fff0b8 14%, #d9ffb3 28%, #8feec8 42%, #8fd4ff 56%, #c9c0ff 70%, #ffc2d6 84%, #ffd0a4 100%);
+  background-size: 320% 320%; background-position: 0% 40%;
+}
+.axface-hue::after {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at 32% 26%, rgba(255, 255, 255, .62), rgba(255, 255, 255, .16) 48%, rgba(255, 255, 255, .05) 72%);
+}
+.axface-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; display: block; overflow: visible; }
+.axface-pill { fill: currentColor; }
+.axface-smile { fill: none; stroke: currentColor; stroke-width: 3.4; stroke-linecap: round; opacity: 0; }
+.axface-slot, .axface-eye { transform-box: fill-box; transform-origin: center; }
+.axface-slot { transition: transform .28s cubic-bezier(.2, .8, .2, 1); }
+.axface-pill, .axface-smile { transition: opacity .22s ease; }
+.axface-shd {
+  position: absolute; left: 50%; bottom: -7px; width: 30px; height: 7px; margin-left: -15px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, .38), transparent); pointer-events: none;
+}
+/* the label above the face is Latin, so it types left to right inside the RTL page */
+#ai-fab.axface .axbot-tag { direction: ltr; unicode-bidi: isolate; }
+
+/* neutral pills; happy arcs on hover, focus, the open assistant, or a positive reply */
+#ai-fab.axface:is(:hover, :focus-visible, .is-open, .mood-happy) .axface-pill { opacity: 0; }
+#ai-fab.axface:is(:hover, :focus-visible, .is-open, .mood-happy) .axface-smile { opacity: 1; }
+
+/* waiting: eyes travel together. Wins over hover / open. */
+#ai-fab.axface.mood-thinking .axface-pill { opacity: 1; }
+#ai-fab.axface.mood-thinking .axface-smile { opacity: 0; }
+
+/* error / failed reply: eyes tilt down and sit lower. Wins over everything else. */
+#ai-fab.axface.mood-sad .axface-pill { opacity: 1; }
+#ai-fab.axface.mood-sad .axface-smile { opacity: 0; }
+#ai-fab.axface.mood-sad .axface-slot.axface-l { transform: translateY(4px) rotate(26deg) scaleY(.78); }
+#ai-fab.axface.mood-sad .axface-slot.axface-r { transform: translateY(4px) rotate(-26deg) scaleY(.78); }
+
+#ai-fab.axface:active .axface-orb { animation: none; transform: scale(.92); }
+
+@media (max-width: 768px) {
+  html.aurum #ai-fab.axface, #ai-fab.axface { width: 48px !important; height: 48px !important; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .axface-float { animation: axFaceFloat 3.8s ease-in-out infinite, axFaceBeat 6.4s linear infinite; }
+  .axface-orb { animation: axFaceBreathe 3.8s ease-in-out infinite; }
+  .axface-hue { animation: axFaceHue 16s ease-in-out infinite; }
+  .axface-shd { animation: axFaceShd 3.8s ease-in-out infinite; }
+  .axface-eye { animation: axFaceBlink 4.8s ease-in-out infinite; }
+  .axface-r .axface-eye { animation-delay: .06s; }
+  /* idle: glance up, down, left, and right between blinks. Moods below replace it. */
+  .axface-eyes { animation: axFaceGlance 9.6s ease-in-out infinite; }
+  #ai-fab.axface:is(:hover, :focus-visible, .is-open, .mood-happy) .axface-eyes { animation: none; }
+  #ai-fab.axface.mood-thinking .axface-eyes { animation: axFaceLook 1.35s ease-in-out infinite; }
+  #ai-fab.axface.mood-sad .axface-eyes { animation: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .axface-float, .axface-orb, .axface-hue, .axface-shd, .axface-eye, .axface-eyes { animation: none !important; }
+  .axface-slot, .axface-pill, .axface-smile { transition: none !important; }
+  #ai-fab.axface.mood-thinking .axface-eyes { transform: translateX(3px); }
+}
+
+@keyframes axFaceFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes axFaceBeat { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 .4px transparent; } }
+@keyframes axFaceBreathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.045); } }
+@keyframes axFaceHue { 0% { background-position: 0% 40%; } 50% { background-position: 100% 62%; } 100% { background-position: 0% 40%; } }
+@keyframes axFaceShd { 0%, 100% { transform: scaleX(1); opacity: .9; } 50% { transform: scaleX(.68); opacity: .35; } }
+@keyframes axFaceBlink { 0%, 78%, 86%, 100% { transform: scaleY(1); } 82% { transform: scaleY(.07); } }
+@keyframes axFaceLook { 0%, 12% { transform: translateX(0); } 32%, 48% { transform: translateX(4px); } 68%, 84% { transform: translateX(-4px); } 100% { transform: translateX(0); } }
+@keyframes axFaceGlance {
+  0%, 8% { transform: translate(0, 0); }
+  14%, 24% { transform: translate(4px, 0); }
+  32%, 40% { transform: translate(0, 0); }
+  46%, 56% { transform: translate(-4px, 0); }
+  64%, 72% { transform: translate(0, 0); }
+  78%, 86% { transform: translate(0, -3.5px); }
+  92%, 97% { transform: translate(0, 3px); }
+  100% { transform: translate(0, 0); }
+}
