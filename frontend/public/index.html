@@ -81,6 +81,51 @@ html.ax-splash-on body{overflow:hidden}
 @media (prefers-reduced-motion:reduce){#ax-splash .axs-name span,#ax-splash .axs-sub,#ax-splash .axs-lock,#ax-splash::before{animation:none!important;opacity:1}#ax-splash{transition:opacity .2s}}
 </style>
 <style>
+/* 4.51 · Bounce & Wobble on the brand word only (login title + sidebar name above «نظام الإدارة»).
+   Letters are inline-block spans. Motion is transform-only, so the line box and the subtitle stay put.
+   Direction is set per word so Latin stays left-to-right inside the RTL page, and Arabic stays right-to-left. */
+.bw-ch, .bw-glyph { display: inline-block; vertical-align: baseline; transform-origin: 50% 100%; }
+.bw-title.bw-ltr { direction: ltr; unicode-bidi: isolate; }
+.bw-title.bw-rtl { direction: rtl; unicode-bidi: isolate; }
+.lgn-title.bw-title { text-align: center; }
+.sidebar-brand .brand-name.bw-title { text-align: right; }
+.bw-title.bw-in .bw-ch {
+  animation: bw-bounce .72s cubic-bezier(.22, 1.25, .36, 1) both;
+  animation-delay: calc(var(--i) * .07s);
+}
+.bw-glyph {
+  animation: bw-wobble 4.8s ease-in-out infinite;
+  animation-delay: calc(1.2s + var(--i) * .08s);
+}
+.bw-title:is(:hover, :active) .bw-glyph,
+.bw-title.bw-tap .bw-glyph {
+  animation: bw-wobble-hot .7s ease-in-out 1 both;
+  animation-delay: calc(var(--i) * .045s);
+}
+@keyframes bw-bounce {
+  0% { transform: translate3d(0, -.4em, 0); }
+  52% { transform: translate3d(0, 0, 0); }
+  70% { transform: translate3d(0, -.16em, 0); }
+  86% { transform: translate3d(0, .05em, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@keyframes bw-wobble {
+  0%, 68%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  76% { transform: translate3d(0, -.07em, 0) rotate(-3.5deg); }
+  84% { transform: translate3d(0, .02em, 0) rotate(3.5deg); }
+  92% { transform: translate3d(0, -.03em, 0) rotate(-1.5deg); }
+}
+@keyframes bw-wobble-hot {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  28% { transform: translate3d(0, -.12em, 0) rotate(-7deg); }
+  52% { transform: translate3d(0, .04em, 0) rotate(6deg); }
+  74% { transform: translate3d(0, -.05em, 0) rotate(-3deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bw-ch, .bw-glyph { animation: none !important; transform: none !important; }
+}
+</style>
+<style>
 /* ========================= VARIABLES ========================= */
 :root {
   /* Primary action color - Vibrant Emerald Green */
@@ -9585,7 +9630,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
     </div>
 
     <div class="lgn-card">
-      <h1 class="lgn-title js-brand-name">Ozarex</h1>
+      <h1 class="lgn-title js-brand-name bw-title">Ozarex</h1>
       <p class="lgn-sub">سجّل دخولك إلى لوحة التحكم</p>
 
       <form id="login-form" autocomplete="on">
@@ -9631,7 +9676,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div>
-        <div class="brand-name js-brand-name">Ozarex</div>
+        <div class="brand-name js-brand-name bw-title">Ozarex</div>
         <div class="brand-sub">نظام الإدارة</div>
       </div>
       <div class="brand-logo brand-logo-svg" aria-label="الشعار">
@@ -11626,6 +11671,64 @@ window.addEventListener('resize', function () {
 /* 4.32 · printed papers from a branch say which branch (nothing for the main branch) */
 function branchPrintLine() { try { if (!window.Branch || Branch.get() === 'main') return ''; const b = Branch.info(); return b.name + (b.code ? ' (' + b.code + ')' : ''); } catch (_) { return ''; } }
 const BRAND_DEFAULT = 'Ozarex';
+/* 4.51 · wrap the login title and the sidebar brand (the one above «نظام الإدارة») letter by letter.
+   Other .js-brand-name spots (banner, footer, papers) stay plain text. */
+function brandMotionOff() {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+}
+function brandWordDir(name) {
+  var i, c;
+  for (i = 0; i < name.length; i++) {
+    c = name.charCodeAt(i);
+    if ((c >= 0x0590 && c <= 0x08FF) || (c >= 0xFB1D && c <= 0xFDFF) || (c >= 0xFE70 && c <= 0xFEFF)) return 'rtl';
+    if ((c >= 65 && c <= 90) || (c >= 97 && c <= 122)) return 'ltr';
+  }
+  return 'ltr';
+}
+function bounceBrandTitles() {
+  var off = brandMotionOff();
+  document.querySelectorAll('.bw-title').forEach(function (el) {
+    if (off) {
+      if (el.getAttribute('data-bw')) {
+        el.textContent = el.getAttribute('data-bw');
+        el.removeAttribute('data-bw');
+        el.classList.remove('bw-on', 'bw-ltr', 'bw-rtl', 'bw-in', 'bw-tap');
+      }
+      return;
+    }
+    var name = el.querySelector('.bw-ch') ? (el.getAttribute('data-bw') || '') : String(el.textContent || '').replace(/\u00a0/g, ' ');
+    if (!String(name).trim()) return;
+    if (el.getAttribute('data-bw') === name && el.querySelector('.bw-ch')) return;
+    var dir = brandWordDir(name);
+    el.setAttribute('data-bw', name);
+    el.classList.add('bw-on', 'bw-in');
+    el.classList.toggle('bw-ltr', dir === 'ltr');
+    el.classList.toggle('bw-rtl', dir === 'rtl');
+    if (!el._bwTapBound) {
+      el._bwTapBound = true;
+      el.addEventListener('pointerup', function () {
+        el.classList.remove('bw-tap');
+        void el.offsetWidth;
+        el.classList.add('bw-tap');
+        clearTimeout(el._bwTapT);
+        el._bwTapT = setTimeout(function () { el.classList.remove('bw-tap'); }, 820);
+      });
+    }
+    var frag = document.createDocumentFragment();
+    Array.from(name).forEach(function (ch, i) {
+      var outer = document.createElement('span');
+      outer.className = 'bw-ch';
+      outer.style.setProperty('--i', String(i));
+      var inner = document.createElement('span');
+      inner.className = 'bw-glyph';
+      inner.textContent = ch === ' ' ? '\u00a0' : ch;
+      outer.appendChild(inner);
+      frag.appendChild(outer);
+    });
+    el.textContent = '';
+    el.appendChild(frag);
+  });
+}
 function applyBrand(src) {
   try {
     let b = src;
@@ -11641,7 +11744,12 @@ function applyBrand(src) {
     const key = name + '|' + logo.length;
     if (applyBrand._k === key) return;
     applyBrand._k = key;
-    document.querySelectorAll('.js-brand-name').forEach(el => { el.textContent = name; });
+    document.querySelectorAll('.js-brand-name').forEach(el => {
+      /* a title already split into the same letters keeps its bounce; rewriting it would restart the motion */
+      if (el.classList.contains('bw-title') && el.getAttribute('data-bw') === name && el.querySelector('.bw-ch')) return;
+      el.textContent = name;
+    });
+    bounceBrandTitles();
     document.querySelectorAll('.js-brand-logo').forEach(el => {
       const want = logo || 'icons/logo-square.png';
       if (el.getAttribute('src') !== want) { el.style.display = ''; el.setAttribute('src', want); }
@@ -11653,6 +11761,7 @@ function applyBrand(src) {
 }
 document.addEventListener('DOMContentLoaded', () => {
   applyBrand();
+  bounceBrandTitles();
   fetch(API_BASE + '/api/brand', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(b => { if (b) applyBrand(b); }).catch(() => {});
 });
 
