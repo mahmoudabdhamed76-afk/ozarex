@@ -772,7 +772,7 @@
     if (!q) return helpAns();
     var calc = calcAns(raw); if (calc) return calc;
     var words = q.split(' ').length;
-    if (has(q, I.thanks) && words <= 4) return { icon: 'spark', title: 'العفو', note: 'تحب أجيبلك حاجة تانية؟', follow: ['ملخص النهارده', 'أعمل إيه النهارده؟'], plainOnly: true };
+    if (has(q, I.thanks) && words <= 4) return { icon: 'spark', title: 'العفو', note: 'تحب أجيبلك حاجة تانية؟', tone: 'ok', follow: ['ملخص النهارده', 'أعمل إيه النهارده؟'], plainOnly: true };
     if (has(q, I.help)) return helpAns();
     if (has(q, I.hi) && words <= 4 && !has(q, I.brief)) return brief();
     var sm = smart(q); if (sm) return sm;
@@ -958,6 +958,15 @@
     return '<div class="axa-follow" role="group" aria-label="أسئلة مقترحة">' + list.map(function (q) { return '<button type="button" onclick="' + fn(function () { ask(q); }) + '">' + esc(q) + '</button>'; }).join('') + '</div>';
   }
 
+  /* the floating face follows the real wait / answer / failure (js/aibot.js) */
+  function faceMood(m) { try { if (window.AXFace) AXFace.set(m); } catch (e) {} }
+  function moodOf(r) {
+    if (!r) return 'neutral';
+    if (r.failed || r.tone === 'bad') return 'sad';
+    if (r.tone === 'ok' || r.icon === 'check') return 'happy';
+    return 'neutral';
+  }
+
   /* ───────────────────────── conversation ───────────────────────── */
   function ask(q, force) {
     q = String(q || '').trim();
@@ -965,6 +974,7 @@
     if (pageNow() !== 'aiassistant') { st.pending = { q: q, force: force }; navigate('aiassistant'); return; }
     if (st.tab !== 'chat') { st.tab = 'chat'; render(); }
     st.busy = true;
+    faceMood('thinking');
     var box = document.getElementById('axa-msgs'), inp = document.getElementById('axa-q');
     if (inp) inp.value = '';
     st.msgs.push({ who: 'me', q: q });
@@ -976,7 +986,7 @@
       scrollEnd();
     }
     var r;
-    try { r = understand(q, force); } catch (e) { console.error(e); r = { icon: 'question', title: 'حصلت مشكلة وأنا بحسب', note: 'جرّب تاني، ولو اتكررت قول للمدير.', tone: 'bad' }; }
+    try { r = understand(q, force); } catch (e) { console.error(e); r = { icon: 'question', title: 'حصلت مشكلة وأنا بحسب', note: 'جرّب تاني، ولو اتكررت قول للمدير.', tone: 'bad', failed: true }; }
     setTimeout(function () {
       var th = document.getElementById('axa-thinking'); if (th) th.remove();
       var at = clock(), m = { who: 'bot', html: slip(r, at), follow: r.follow, q2: { q: q, f: force }, at: at };
@@ -989,6 +999,7 @@
         scrollEnd(true);
       }
       st.busy = false;
+      faceMood(moodOf(r));
     }, 420 + Math.random() * 260);
   }
   /* the answer types itself in fast — same typewriter + colors as «مساعدك الذكي» over the floating robot */
@@ -1165,9 +1176,9 @@
     if (b) b.classList.add('on');
     if (inp) inp.placeholder = 'بسمعك…';
     r.onresult = function (e) { var t = ''; for (var i = e.resultIndex; i < e.results.length; i++) { if (e.results[i].isFinal) fin += e.results[i][0].transcript; else t += e.results[i][0].transcript; } if (inp) inp.value = (fin + t).trim(); };
-    r.onerror = function (e) { if (typeof toast === 'function') toast(e.error === 'not-allowed' ? 'المتصفح مش سامح بالميكروفون' : 'مسمعتش كويس، جرّب تاني', 'warning'); };
+    r.onerror = function (e) { faceMood('sad'); if (typeof toast === 'function') toast(e.error === 'not-allowed' ? 'المتصفح مش سامح بالميكروفون' : 'مسمعتش كويس، جرّب تاني', 'warning'); };
     r.onend = function () { st.rec = null; if (b) b.classList.remove('on'); if (inp) inp.placeholder = 'مثلاً: حساب مركز النور، أو مبيعات الشهر اللي فات'; if (fin.trim()) ask(fin.trim()); };
-    try { r.start(); } catch (e) { st.rec = null; if (b) b.classList.remove('on'); }
+    try { r.start(); } catch (e) { st.rec = null; if (b) b.classList.remove('on'); faceMood('sad'); }
   }
 
   window.renderAIAssistant = render;

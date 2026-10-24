@@ -9721,7 +9721,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 4.48</div>
+      <div class="version">الإصدار 4.49</div>
     </footer>
   </div>
 </div>
@@ -26608,16 +26608,30 @@ function exportSuppliersCSV() {
   </button>
 </nav>
 
-<!-- AI FAB — floating on dashboard -->
-<button id="ai-fab" class="axask ax-hl-off" onclick="navigate('aiassistant')" title="اسأل المساعد" aria-label="اسأل المساعد">
-  <span class="axask-pill">
-    <svg class="axask-ic" viewBox="0 0 24 24" aria-hidden="true">
-      <path class="axask-s1" d="M10 2.5c.5 4.3 2.7 6.5 7 7-4.3.5-6.5 2.7-7 7-.5-4.3-2.7-6.5-7-7 4.3-.5 6.5-2.7 7-7z"/>
-      <path class="axask-s2" d="M18.5 13.5c.25 2 1.25 3 3.25 3.25-2 .25-3 1.25-3.25 3.25-.25-2-1.25-3-3.25-3.25 2-.25 3-1.25 3.25-3.25z"/>
-      <path class="axask-s3" d="M18 2.2c.15 1.1.75 1.7 1.85 1.85-1.1.15-1.7.75-1.85 1.85-.15-1.1-.75-1.7-1.85-1.85 1.1-.15 1.7-.75 1.85-1.85z"/>
-    </svg>
-    <span class="axask-t">اسأل المساعد</span>
-    <i class="axask-shine" aria-hidden="true"></i>
+<!-- AI FAB — floating face on the dashboard (label + click stay; js/aibot.js) -->
+<button id="ai-fab" class="axface ax-hl-off" type="button" onclick="navigate('aiassistant')" title="AI agent" aria-label="AI agent">
+  <span class="axface-float">
+    <span class="axbot-tag" aria-hidden="true"><span class="axbot-txt">AI agent</span><i class="axbot-caret" aria-hidden="true"></i></span>
+    <i class="axface-shd" aria-hidden="true"></i>
+    <span class="axface-orb">
+      <span class="axface-hue" aria-hidden="true"></span>
+      <svg class="axface-svg" viewBox="0 0 64 64" aria-hidden="true">
+        <g class="axface-eyes">
+          <g class="axface-slot axface-l">
+            <g class="axface-eye">
+              <rect class="axface-pill" x="19.5" y="22" width="9" height="20" rx="4.5"/>
+              <path class="axface-smile" d="M19.5 34.2 Q24 24.2 28.5 34.2"/>
+            </g>
+          </g>
+          <g class="axface-slot axface-r">
+            <g class="axface-eye">
+              <rect class="axface-pill" x="35.5" y="22" width="9" height="20" rx="4.5"/>
+              <path class="axface-smile" d="M35.5 34.2 Q40 24.2 44.5 34.2"/>
+            </g>
+          </g>
+        </g>
+      </svg>
+    </span>
   </span>
 </button>
 
