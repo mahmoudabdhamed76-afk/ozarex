@@ -7,7 +7,8 @@
    · الرد «إيصال» منظم: سطور حساب بنقط، رسم صغير لأيام الفترة، ترتيب
      بالأعمدة، والخلاصة، وأزرار تنفّذ على طول (تحصيل، كشف واتساب،
      طلب شراء…) — ويتنسخ أو يتبعت واتساب
-   · كل الحسابات من بيانات البرنامج نفسه، على الجهاز، ومن غير إنترنت
+   · كل الحسابات من بيانات البرنامج نفسه، على الجهاز
+   · مقارنة الفروع والتحويلات بينهم بتطلب السيرفر لو النت موجود، وترجع للي على الجهاز لو لأ
    · بيحترم صلاحيات المستخدم: اللي ملوش «الأرباح» مثلاً ميعرفش الربح منه
 ════════════════════════════════════════════════════════════════════ */
 (function () {
@@ -39,6 +40,7 @@
   function dayName(s) { var t = today(); if (s === t) return 'النهارده'; if (s === addDays(t, -1)) return 'امبارح'; var d = dt(s); return DAYS[d.getDay()] + ' ' + dm(s); }
   function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
   function allowed(page) { try { return typeof can !== 'function' || can(page); } catch (e) { return true; } }
+  function me() { return (typeof currentUser !== 'undefined' && currentUser) || {}; }
   function fn(f) { var id = 'f' + (++st.fid); st.fns[id] = f; return "AXA.run('" + id + "')"; }
   function plural(n, one, few, many) { return n === 1 ? one : (n >= 2 && n <= 10) ? few : many; }
 
@@ -111,9 +113,34 @@
       var sub = items.reduce(function (s, it) { return s + (+it.total || 0); }, 0) || 1, k = (+v.total || 0) / sub, kp = (+v.paid || 0) / sub;
       items.forEach(function (it) { out.push({ date: v.date, cid: v.customerId, total: (+it.total || 0) * k, paid: (+it.total || 0) * kp, qty: +(it.qty || it.quantity) || 0, pid: it.productId, pname: it.productName || it.name, n: v.number, kind: 'inv' }); });
     });
+    appendSaleReturns(out, p);
     return out;
   }
-  function ops(list) { var s = {}; list.forEach(function (x) { s[x.kind + (x.n || '') + '|' + x.cid + '|' + x.date] = 1; }); return Object.keys(s).length; }
+  /* Sale returns live in settings._returns and never edit the original document.
+     Money totals subtract r.amount — the same rule as the branch summary and the mobile home.
+     Quantity stays on the issuance (what left the store). kind 'ret' is not an operation. */
+  function appendSaleReturns(out, p) {
+    var list = S()._returns;
+    if (!Array.isArray(list)) return;
+    list.forEach(function (r) {
+      if (!r || r.type !== 'sale' || !inP(p, r.date)) return;
+      var amt = +r.amount || 0;
+      if (!(amt > 0)) return;
+      var items = Array.isArray(r.items) ? r.items.filter(Boolean) : [];
+      var weights = items.map(function (it) { return Math.abs(+(it.net != null ? it.net : it.total) || 0); });
+      var sub = weights.reduce(function (s, w) { return s + w; }, 0);
+      var date = String(r.date || '').slice(0, 10);
+      var base = { date: date, cid: r.customerId, name: r.customerName, paid: 0, qty: 0, n: r.number || r.id, kind: 'ret' };
+      if (!items.length || !sub) { out.push(Object.assign({ total: -amt }, base)); return; }
+      var left = amt;
+      items.forEach(function (it, i) {
+        var share = i === items.length - 1 ? left : Math.round((amt * weights[i] / sub) * 100) / 100;
+        left = Math.round((left - share) * 100) / 100;
+        out.push(Object.assign({ total: -share, pid: it.productId, pname: it.name, unit: it.unit }, base));
+      });
+    });
+  }
+  function ops(list) { var s = {}; list.forEach(function (x) { if (!x || x.kind === 'ret') return; s[x.kind + (x.n || '') + '|' + x.cid + '|' + x.date] = 1; }); return Object.keys(s).length; }
   /* paper = the products the paper balance counts (same rule as «رصيد الورق»: ورق/أفلام بالورقة، مش حبر) */
   function paperInfo() {
     var ids = {}, unit = 'ورقة', ok = false;
@@ -258,6 +285,8 @@
       r.note = 'متوسط اليوم ' + money(tot / days) + '، وأعلى يوم كان ' + best.l + ' بـ ' + money(best.v) + '.';
     }
     if (pr && ptot) r.ledger[0].sub = p.prev.label + ': ' + money(ptot);
+    var retAmt = -sum(s.filter(function (x) { return x.kind === 'ret'; }), 'total');
+    if (retAmt > 0.5) r.ledger.splice(1, 0, { l: 'مرتجعات اتخصمت', v: money(retAmt), tone: 'warn', sub: 'قبل المرتجع ' + money(tot + retAmt) });
     return r;
   }
 
@@ -593,12 +622,31 @@
     return { icon: 'list', title: 'أولويات النهارده', sub: 'بالترتيب — الأهم الأول', rows: rows, ordered: true, follow: ['ملخص النهارده', 'قارن الشهر ده بالشهر اللي فات'] };
   }
 
+  /* the sixteen sharper questions, hidden when this account can't open that page */
+  function moreQs() {
+    var money = ['صافي المبيعات بعد المرتجعات', 'إيه المرتجعات الأسبوع ده؟', 'هدف الشهر وصلنا لكام؟'];
+    if (allowed('payments') || allowed('expenses') || allowed('profit')) money.push('الخزنة متظبطة مع آخر جرد؟');
+    if (allowed('profit')) money.push('هامش ربح الأصناف', 'فيه صرف اتباع تحت التكلفة؟');
+    var centers = ['مين عدّى حد الائتمان؟', 'هيدخل كام من السحب المتوقع الأسبوع ده؟'];
+    var stock = [];
+    if (allowed('stock') || allowed('purchases') || allowed('inventory')) stock.push('أطلب إيه دلوقتي ومن أنهي مورد؟');
+    if (allowed('stock') || allowed('purchases')) stock.push('طلبات الشراء المفتوحة وصلت؟');
+    if (allowed('requests') || mgr()) stock.push('طلبات الشراء المستنية موافقة');
+    var decide = [];
+    if (allowed('approvals')) decide.push('فيه موافقات مستنية؟');
+    if (allowed('purchases') || allowed('suppliers') || allowed('expenses') || allowed('debts')) decide.push('مشتريات الآجل هتستحق إمتى؟');
+    if (allowed('transfers')) decide.push('فيه تحويل بنكي لسه متسجلش تحصيل؟');
+    if (mgr()) decide.push('قارن الفروع الشهر ده');
+    if (allowed('inventory') || allowed('stock') || allowed('payments') || allowed('expenses') || mgr()) decide.push('فيه تحويلات بين الفروع لسه متستلمتش؟');
+    return { money: money, centers: centers, stock: stock, decide: decide };
+  }
   function helpAns() {
+    var x = moreQs();
     var g = [
-      ['الفلوس', ['مبيعات الشهر ده', 'اتحصّل كام الأسبوع ده؟', 'مين أكتر مركز عليه فلوس؟'].concat(allowed('profit') ? ['الأرباح الشهر اللي فات'] : [])],
-      ['المراكز', ['حساب ' + ((A('customers')[0] || {}).name || 'مركز النور'), 'مين متأخر في الدفع؟', 'مراكز وقفت سحب']],
-      ['المخزن', ['إيه اللي قرب يخلص؟', 'طلعنا قد إيه ورق الشهر ده؟', 'أكتر صنف بيتباع']],
-      ['مقارنات وحسابات', ['قارن الشهر ده بالشهر اللي فات', 'أعمل إيه النهارده؟', '1500*12']]
+      ['الفلوس', ['مبيعات الشهر ده', 'اتحصّل كام الأسبوع ده؟', 'مين أكتر مركز عليه فلوس؟'].concat(x.money).concat(allowed('profit') ? ['الأرباح الشهر اللي فات'] : [])],
+      ['المراكز', ['حساب ' + ((A('customers')[0] || {}).name || 'مركز النور'), 'مين متأخر في الدفع؟', 'مراكز وقفت سحب'].concat(x.centers)],
+      ['المخزن', ['إيه اللي قرب يخلص؟', 'طلعنا قد إيه ورق الشهر ده؟', 'أكتر صنف بيتباع'].concat(x.stock)],
+      ['مقارنات وحسابات', ['قارن الشهر ده بالشهر اللي فات', 'أعمل إيه النهارده؟', '1500*12'].concat(x.decide)]
     ];
     return { icon: 'spark', title: 'بتعرف تسألني عن إيه؟', sub: 'اكتب بطريقتك — بفهم الفترة واسم المركز أو الصنف',
       groups: g, note: 'ممكن تكمّل على آخر سؤال: «والشهر اللي فات؟» أو «وامبارح؟».' };
@@ -705,8 +753,510 @@
         { l: 'كل التحصيلات', v: money(inn) }, { l: 'كل المصروفات', v: money(ex) }, { l: 'كل اللي اتدفع للموردين', v: money(sp) }],
       follow: ['اتحصّل كام النهارده؟', 'المصروفات الشهر ده', 'عليا كام للموردين؟'] };
   }
-  /* rules for everyday phrasing — run before the old keyword routing */
+
+  /* ───────────────────────── 4.50 · sixteen sharper questions ───────────────────────── */
+  function mgr() { return me().role === 'admin'; }
+  function loaded(k) { var s = D().settings; return !!(s && k in s); }
+  function colLoaded(k) { return Array.isArray(D()[k]); }
+  function missing(title, what) { return { icon: 'box', title: title, note: 'بيانات «' + what + '» مش محمّلة على الحساب ده.', tone: 'warn' }; }
+  function online() {
+    try { if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) return false; } catch (e) {}
+    return typeof fetch === 'function';
+  }
+  function apiGet(path) {
+    if (!online()) return Promise.resolve(null);
+    var base = '';
+    try { base = typeof API_BASE === 'string' ? API_BASE : ''; } catch (e) {}
+    return fetch(base + path, { credentials: 'same-origin', cache: 'no-store', headers: { 'X-Branch': 'main' } })
+      .then(function (r) { return r && r.ok && r.json ? r.json() : null; })
+      .catch(function () { return null; });
+  }
+  function retAmtOf(list) { return -sum((list || []).filter(function (x) { return x.kind === 'ret'; }), 'total'); }
+  function grossOf(list) { return sum((list || []).filter(function (x) { return x.kind !== 'ret'; }), 'total'); }
+
+  var NI = {
+    net: W(['بعد المرتجع', 'صافي المبيعات', 'صافي البيع', 'المبيعات الصافيه', 'المبيعات الصافي', 'خصم المرتجع', 'من غير المرتجعات', 'بدون المرتجعات', 'بعد خصم المرتجع', 'المبيعات ناقص المرتجع']),
+    returns: W(['مرتجع', 'مرتجعات', 'الرجاع', 'رجع البضاعه', 'رجعت البضاعه', 'بضاعه مرجعه', 'مرتجع مبيعات', 'مرتجع مشتريات', 'المرتد', 'حاجات رجعت']),
+    approvals: W(['موافقات', 'موافقه', 'طلبات الموافقه', 'لسه متوافقش', 'مستني الموافقه', 'موافقات معلقه', 'موافقات مفتوحه', 'اوافق على ايه', 'في الموافقات']),
+    poWait: W(['طلبات الشراء المستنيه', 'طلب شراء مستني', 'موافقه الشراء', 'لسه المدير موافقش', 'شراء مستني الموافقه', 'مستنيه موافقه الشراء', 'اوامر الشراء المستنيه', 'طلب الشراء لسه']),
+    order: W(['اطلب ايه دلوقتي', 'نطلب ايه', 'اطلب ايه', 'من انهي مورد', 'من اي مورد', 'من انهو مورد', 'اقتراح شراء', 'اقترح شراء', 'اشتري ايه من', 'اجيب ايه من المورد', 'كميه الطلب', 'الكميه المطلوب', 'محتاج اطلب منين', 'نشتري من مين']),
+    poOpen: W(['طلبات الشراء المفتوحه', 'طلب الشراء وصل', 'اتستلم الطلب', 'اوامر الشراء المفتوحه', 'اوردرات الشراء', 'في الطريق من المورد', 'الشراء المفتوح', 'لسه جاي من المورد', 'طلبية مفتوحه', 'طلبيات مفتوحه']),
+    target: W(['هدف الشهر', 'هدف المبيعات', 'التارجت', 'التارجيت', 'المستهدف', 'وصلنا لكام من الهدف', 'نسبه الهدف', 'هدفنا كام', 'فاضل كام على الهدف']),
+    credit: W(['حد الائتمان', 'حد ائتمان', 'سقف الائتمان', 'سقف الدين', 'عدى الحد', 'عدوا الحد', 'فوق الحد', 'الليميت', 'الكريديت', 'ائتمانهم']),
+    apdue: W(['مشتريات اجل', 'مشتريات الاجل', 'فواتير الشراء المستحقه', 'استحقاق الموردين', 'اجل الموردين', 'هتستحق للمورد', 'مستحقات الموردين القريبه', 'فواتير المورد المستحقه', 'آجل المورد', 'ميعاد الموردين']),
+    cashCount: W(['متظبطه مع الجرد', 'متظبط مع الجرد', 'الخزنه متظبطه', 'متظبطه مع اخر جرد', 'متظبط مع اخر جرد', 'جرد الخزنه', 'جرد الصندوق', 'عجز الخزنه', 'زياده الخزنه', 'فرق الجرد', 'الخزنه مظبوطه', 'العده مطابقه', 'اخر جرد للخزنه', 'اخر جرد للصندوق', 'جرد الكاش']),
+    bank: W(['تحويل بنكي مش متسجل', 'لسه متسجلش تحصيل', 'تحويلات مش متحصله', 'بنك من غير تحصيل', 'تحويل مش متسجل تحصيل', 'تحويلات بنكيه معلقه', 'بنك مش متحضر', 'تحويل بنكي لسه']),
+    branches: W(['قارن الفروع', 'مقارنه الفروع', 'كل الفروع', 'الفروع كلها', 'مبيعات الفروع', 'احسن فرع', 'أضعف فرع', 'اضعف فرع', 'ملخص الفروع', 'فرع مين اعلى', 'فرع مين احسن']),
+    xfer: W(['تحويلات بين الفروع', 'تحويل بين الفروع', 'لسه متستلمش', 'لسه متستلمتش', 'بضاعه في الطريق', 'فلوس في الطريق', 'تحويل فرع', 'استلام الفروع', 'متستلمهاش']),
+    fcValue: W(['هيدخل كام من السحب', 'السحب المتوقع', 'قيمه السحب المتوقع', 'توقع السحب', 'توقع المبيعات', 'فلوس السحب الجاي', 'هنجيب كام من المواعيد', 'السحب الجاي بكام', 'متوقع يدخل']),
+    below: W(['تحت التكلفه', 'اقل من التكلفه', 'صرف تحت التكلفه', 'اتباع تحت التكلفه', 'سعره اقل من التكلفه', 'هامش سالب', 'بخساره', 'تحت سعر التكلفه']),
+    margin: W(['هامش ربح الصنف', 'هامش ربح الاصناف', 'هامش الصنف', 'هامش المنتج', 'ربح الصنف', 'مكسب الصنف', 'هامش الاصناف', 'هامش الأصناف'])
+  };
+
+  function netSalesAns(p) {
+    st.ctx = { intent: 'net', p: p };
+    var lines = sales(p), prev = p.prev ? sales(p.prev) : null;
+    var gross = grossOf(lines), ret = retAmtOf(lines), net = gross - ret;
+    var pg = prev ? grossOf(prev) - retAmtOf(prev) : 0;
+    if (!lines.length && !ret) return { icon: 'chart', title: 'صافي المبيعات ' + p.label, sub: rangeTxt(p), note: 'مفيش مبيعات ولا مرتجعات في الفترة دي.', follow: ['مبيعات الشهر ده', 'إيه المرتجعات الأسبوع ده؟'] };
+    return {
+      icon: 'chart', title: 'صافي المبيعات ' + p.label, sub: rangeTxt(p),
+      ledger: [
+        { l: 'قبل المرتجعات', v: money(gross) },
+        { l: 'مرتجعات مبيعات', v: money(ret), tone: ret > 0.5 ? 'warn' : 'ok' },
+        { l: 'الصافي', v: money(net), big: true, d: prev ? delta(net, pg) : '', tone: net < 0 ? 'bad' : 'ok', sub: prev ? p.prev.label + ': ' + money(pg) : '' }
+      ],
+      note: 'نفس قاعدة الفروع: الصرف + الفواتير اللي مش من صرف، ناقص مبلغ مرتجع المبيعات.',
+      follow: ['إيه المرتجعات ' + p.label + '؟', 'مبيعات ' + p.label, 'قارن الشهر ده بالشهر اللي فات']
+    };
+  }
+  function returnsAns(p) {
+    st.ctx = { intent: 'returns', p: p };
+    if (!loaded('_returns')) return missing('المرتجعات', 'المرتجعات');
+    var list = (S()._returns || []).filter(function (r) { return r && (r.type === 'sale' || r.type === 'purchase') && inP(p, r.date); });
+    if (!list.length) return { icon: 'check', title: 'مفيش مرتجعات ' + p.label, sub: rangeTxt(p), note: 'مفيش مرتجع مبيعات ولا مشتريات متسجل في الفترة دي.', tone: 'ok', follow: ['صافي المبيعات بعد المرتجعات', 'مبيعات ' + p.label] };
+    var sale = list.filter(function (r) { return r.type === 'sale'; }), buy = list.filter(function (r) { return r.type === 'purchase'; });
+    return {
+      icon: 'receipt', title: 'المرتجعات ' + p.label, sub: rangeTxt(p),
+      ledger: [
+        { l: 'مرتجع مبيعات', v: money(sum(sale, 'amount')) + ' — ' + sale.length, tone: sale.length ? 'warn' : '' },
+        { l: 'اترد كاش للعملاء', v: money(sum(sale, 'refund')) },
+        { l: 'مرتجع مشتريات', v: money(sum(buy, 'amount')) + ' — ' + buy.length }
+      ],
+      rows: list.slice().sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); }).slice(0, 8).map(function (r) {
+        var items = (r.items || []).map(function (it) { return num(it.qty) + ' ' + (it.name || ''); }).join('، ');
+        return { l: (r.type === 'sale' ? 'من ' : 'لـ ') + (r.customerName || r.supplierName || '—'), sub: dayName(String(r.date).slice(0, 10)) + (items ? ' · ' + items : '') + (r.refund ? ' · كاش ' + money(r.refund) : ''), v: money(r.amount), tone: r.type === 'sale' ? 'warn' : '' };
+      }),
+      follow: ['صافي المبيعات بعد المرتجعات', 'مبيعات ' + p.label]
+    };
+  }
+  function approvalsAns() {
+    if (!allowed('approvals')) return noAccess('الموافقات');
+    if (!loaded('_approvals')) return missing('الموافقات', 'الموافقات');
+    var list = (S()._approvals || []).filter(function (r) { return r && r.status === 'pending'; });
+    if (!mgr()) { var id = me().id; list = list.filter(function (r) { return r.by && r.by.id === id; }); }
+    if (!list.length) return { icon: 'check', title: mgr() ? 'مفيش موافقات مستنية' : 'مفيش طلبات ليك مستنية', note: mgr() ? 'كل طلبات التعديل اتاخد فيها قرار.' : 'طلبات غيرك مش بتظهر غير للمدير.', tone: 'ok', acts: [{ t: 'افتح الموافقات', on: fn(function () { navigate('approvals'); }) }] };
+    return {
+      icon: 'list', title: mgr() ? 'موافقات مستنية قرارك' : 'طلباتك المستنية', sub: list.length + ' ' + plural(list.length, 'طلب', 'طلبات', 'طلب'),
+      rows: list.slice().sort(function (a, b) { return (b.at || 0) - (a.at || 0); }).slice(0, 8).map(function (r) {
+        return { l: r.title || 'طلب تعديل', sub: ((r.by && r.by.name) || '—') + (r.page ? ' · ' + r.page : '') + (r.kind ? ' · ' + r.kind : ''), v: r.no ? '#' + r.no : '', tone: 'warn' };
+      }),
+      note: mgr() ? '' : 'دي طلباتك بس. المدير يشوف طلبات الفريق كلها.',
+      acts: [{ t: 'افتح الموافقات', pri: true, on: fn(function () { navigate('approvals'); }) }],
+      follow: ['طلبات الشراء المستنية موافقة', 'أعمل إيه النهارده؟']
+    };
+  }
+  function poWaitAns() {
+    if (!allowed('requests') && !mgr()) return noAccess('الطلبات');
+    if (!loaded('_requests')) return missing('طلبات الشراء', 'الطلبات');
+    var list = (S()._requests || []).filter(function (r) { return r && r.type === 'po' && r.status === 'pending'; });
+    if (!mgr()) { var id = me().id; list = list.filter(function (r) { return r.by && r.by.id === id; }); }
+    if (!list.length) return { icon: 'check', title: 'مفيش طلب شراء مستني موافقة', tone: 'ok', note: mgr() ? 'مفيش حاجة واقفة عندك.' : 'يا إما مفيش، يا إما الطلب مش بتاعك.', acts: [{ t: 'افتح الطلبات', on: fn(function () { navigate('requests'); }) }] };
+    return {
+      icon: 'box', title: mgr() ? 'طلبات شراء مستنية موافقتك' : 'طلبات الشراء بتاعتك المستنية', sub: list.length + ' ' + plural(list.length, 'طلب', 'طلبات', 'طلب'),
+      rows: list.slice(0, 8).map(function (r) {
+        var items = (r.items || []).slice(0, 3).map(function (it) { return (it.name || 'صنف') + ' ' + num(it.qty) + (it.supplierName ? ' · ' + it.supplierName : ''); }).join('، ');
+        return { l: r.title || ('طلب #' + (r.no || '')), sub: ((r.by && r.by.name) || '') + (items ? ' · ' + items : ''), v: money((r.items || []).reduce(function (t, it) { return t + (+it.qty || 0) * (+it.price || 0); }, 0)), tone: 'warn' };
+      }),
+      acts: [{ t: 'افتح الطلبات', pri: true, on: fn(function () { navigate('requests'); }) }],
+      follow: ['أطلب إيه دلوقتي ومن أنهي مورد؟', 'طلبات الشراء المفتوحة وصلت؟']
+    };
+  }
+  function bestSup(p) {
+    var n = N(p && p.name), best = null;
+    A('suppliers').forEach(function (s) {
+      (s.priceList || []).forEach(function (it) {
+        var m = N(it.name); if (!m || !n) return;
+        if (m === n || m.indexOf(n) >= 0 || n.indexOf(m) >= 0) {
+          var pr = +it.price || 0;
+          if (pr > 0 && (!best || pr < best.price)) best = { name: s.name, price: pr };
+        }
+      });
+    });
+    if (best) return best;
+    var last = A('expenses').filter(function (e) { return e && e.kind === 'purchase' && (e.items || []).some(function (it) { return N(it.name) === n || it.productId === p.id; }); })
+      .sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); })[0];
+    if (last) {
+      var it = (last.items || []).find(function (x) { return N(x.name) === n || x.productId === p.id; }) || {};
+      return { name: last.supplierName || '', price: +it.price || +p.cost || 0 };
+    }
+    return { name: '', price: +((p && p.cost) || 0) };
+  }
+  function orderSuggestions() {
+    try { if (window.AXPO && typeof AXPO.suggestions === 'function') { var ready = AXPO.suggestions(); if (Array.isArray(ready)) return ready; } } catch (e) {}
+    if (!colLoaded('products')) return null;
+    var L = +S()._poLead > 0 ? +S()._poLead : 7, COVER = 30, SAFETY = 7, from = addDays(today(), -29), out = [];
+    stockModel().forEach(function (it) {
+      var avg = +it.avg || 0;
+      if (!(avg > 0)) {
+        var pulled = 0;
+        A('issuances').forEach(function (i) { if (i && i.productId === it.id && String(i.date || '').slice(0, 10) >= from) pulled += +i.quantity || 0; });
+        avg = pulled / 30;
+      }
+      var bal = Math.max(0, +it.bal || 0), cover = avg > 0 ? bal / avg : it.cover;
+      var minQ = +it.min || +((it.p && it.p.minQuantity) || 0);
+      var need = 0, why = '', lvl = '';
+      if (avg > 0) {
+        need = Math.ceil(avg * (L + COVER) - bal);
+        if (cover < L) { lvl = 'urgent'; why = 'هيخلص قبل ما الطلب يوصل'; }
+        else if (cover < L + SAFETY) { lvl = 'order'; why = 'اطلب دلوقتي'; }
+        else if (cover < L + SAFETY + 14) { lvl = 'soon'; why = 'قرّب'; }
+      } else if (it.belowMin || (minQ > 0 && bal <= minQ)) {
+        need = Math.ceil(minQ * 2 - bal); lvl = 'order'; why = 'تحت الحد الأدنى';
+      }
+      if (!lvl || need <= 0) return;
+      var sup = bestSup(it.p || it);
+      out.push({ it: it, need: need, lvl: lvl, why: why, sup: { name: sup.name, price: sup.price } });
+    });
+    var rank = { urgent: 0, order: 1, soon: 2 };
+    return out.sort(function (a, b) { return (rank[a.lvl] - rank[b.lvl]) || ((a.it.cover || 0) - (b.it.cover || 0)); });
+  }
+  function orderAns() {
+    if (!allowed('stock') && !allowed('purchases') && !allowed('inventory')) return noAccess('المخزن');
+    var sg = orderSuggestions();
+    if (sg == null) return missing('طلب الشراء', 'الأصناف');
+    if (!sg.length) return { icon: 'check', title: 'مفيش صنف محتاج طلبية دلوقتي', tone: 'ok', note: 'الرصيد يكفي فترة التوريد والشغل، ومفيش صنف تحت الحد.', follow: ['إيه اللي قرب يخلص؟', 'طلبات الشراء المفتوحة وصلت؟'] };
+    var est = sg.reduce(function (t, s) { return t + s.need * ((s.sup && s.sup.price) || 0); }, 0);
+    return {
+      icon: 'box', title: 'اطلب دول دلوقتي', sub: (S()._poLead > 0 ? S()._poLead : 7) + ' يوم توريد + شهر شغل',
+      ledger: [{ l: 'أصناف محتاجة طلب', v: num(sg.length), tone: 'warn' }, { l: 'تكلفة تقريبية', v: money(est) }],
+      rows: sg.slice(0, 8).map(function (s) {
+        var it = s.it || {};
+        return { l: it.name || 'صنف', sub: (s.why || '') + (s.sup && s.sup.name ? ' · ' + s.sup.name : ' · من غير مورد معروف') + (s.sup && s.sup.price ? ' · ' + money(s.sup.price) : ''), v: num(s.need) + ' ' + (it.unit || ''), tone: s.lvl === 'urgent' ? 'bad' : 'warn' };
+      }),
+      acts: [{ t: 'اعمل طلب شراء', pri: true, on: fn(function () { navigate('stock'); setTimeout(function () { if (window.AXStock) AXStock.tab('po'); }, 120); }) }],
+      follow: ['طلبات الشراء المستنية موافقة', 'إيه اللي قرب يخلص؟']
+    };
+  }
+  function poOpenAns(p) {
+    if (!allowed('stock') && !allowed('purchases')) return noAccess('طلبات الشراء');
+    if (!loaded('_po')) return missing('طلبات الشراء المفتوحة', 'أوامر الشراء');
+    var lead = +S()._poLead > 0 ? +S()._poLead : 7;
+    var list = (S()._po || []).filter(function (o) { return o && o.status !== 'received' && o.status !== 'cancelled' && (!p || inP(p, o.date)); });
+    var lab = { draft: 'مسودة', sent: 'اتبعت ومستني الاستلام' };
+    if (!list.length) return { icon: 'check', title: 'مفيش طلبات شراء مفتوحة', tone: 'ok', note: 'كل الأوامر يا اتسلمت يا اتلغت.', follow: ['أطلب إيه دلوقتي ومن أنهي مورد؟'] };
+    return {
+      icon: 'truck', title: 'طلبات الشراء المفتوحة', sub: list.length + ' ' + plural(list.length, 'أمر', 'أوامر', 'أمر'),
+      rows: list.slice().sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); }).slice(0, 8).map(function (o) {
+        var age = o.date ? daysBetween(String(o.date).slice(0, 10), today()) : 0;
+        var late = o.status === 'sent' && age > lead;
+        var items = (o.items || []).slice(0, 3).map(function (it) { return (it.name || 'صنف') + ' ' + num(it.qty || it.quantity); }).join('، ');
+        return { l: 'طلب #' + (o.no || '') + ' — ' + (o.supplierName || 'من غير مورد'), sub: (lab[o.status] || o.status || '') + (o.date ? ' · من ' + age + ' يوم' : '') + (late ? ' · متأخر عن التوريد' : '') + (items ? ' · ' + items : ''), v: money((o.items || []).reduce(function (t, it) { return t + (+(it.qty || it.quantity) || 0) * (+it.price || 0); }, 0)), tone: late ? 'bad' : 'warn' };
+      }),
+      acts: [{ t: 'افتح مخزوني', on: fn(function () { navigate('stock'); setTimeout(function () { if (window.AXStock) AXStock.tab('po'); }, 120); }) }],
+      follow: ['أطلب إيه دلوقتي ومن أنهي مورد؟', 'طلبات الشراء المستنية موافقة']
+    };
+  }
+  function targetAns(p) {
+    st.ctx = { intent: 'target', p: p };
+    var target = +S().monthlyTarget || 0;
+    var lines = sales(p), net = sum(lines, 'total'), ret = retAmtOf(lines);
+    if (!target) return { icon: 'target', title: 'مفيش هدف مبيعات متسجل', sub: p.label, note: 'اكتب هدف الشهر من لوحة التحكم، وبعدين اسألني تاني.', ledger: [{ l: 'صافي المبيعات', v: money(net) }], tone: 'warn', follow: ['صافي المبيعات بعد المرتجعات'] };
+    var end = lds(new Date(dt(today()).getFullYear(), dt(today()).getMonth() + 1, 0));
+    var sameMonth = p.from.slice(0, 7) === today().slice(0, 7) && p.to >= today();
+    var daysLeft = sameMonth ? Math.max(1, daysBetween(today(), end) + 1) : 0;
+    var gap = target - net;
+    var led = [
+      { l: 'الهدف', v: money(target) },
+      { l: 'صافي المبيعات ' + p.label, v: money(net), big: true, tone: net + 0.5 >= target ? 'ok' : 'warn', sub: ret > 0.5 ? 'بعد خصم مرتجع ' + money(ret) : '' },
+      { l: 'النسبة', v: pct(net, target) + '%' }
+    ];
+    if (gap > 0.5) led.push({ l: 'فاضل', v: money(gap), tone: 'warn' });
+    else led.push({ l: 'زيادة عن الهدف', v: money(-gap), tone: 'ok' });
+    if (daysLeft && gap > 0.5) led.push({ l: 'مطلوب في اليوم', v: money(gap / daysLeft), sub: daysLeft + ' ' + plural(daysLeft, 'يوم', 'أيام', 'يوم') + ' لآخر الشهر' });
+    return { icon: 'target', title: 'هدف المبيعات ' + p.label, sub: rangeTxt(p), ledger: led, note: sameMonth ? '' : 'الهدف المسجّل هو هدف الشهر الحالي، والمبيعات دي بتاعة الفترة اللي سألت عنها.', follow: ['صافي المبيعات بعد المرتجعات', 'قارن الشهر ده بالشهر اللي فات'] };
+  }
+  function creditAns() {
+    if (!colLoaded('customers')) return missing('حد الائتمان', 'العملاء');
+    var withLim = A('customers').filter(function (c) { return c && +c.creditLimit > 0; });
+    if (!withLim.length) return { icon: 'wallet', title: 'مفيش حد ائتمان متسجل', note: 'اكتب سقف الدين على بطاقة المركز، وبعدين أقدر أقولك مين عدّاه.', tone: 'warn', follow: ['مين أكتر مركز عليه فلوس؟'] };
+    var over = withLim.filter(function (c) { return +c.balance > +c.creditLimit + 0.5; }).sort(function (a, b) { return (b.balance - b.creditLimit) - (a.balance - a.creditLimit); });
+    if (!over.length) return { icon: 'check', title: 'مفيش حد عدّى حد الائتمان', tone: 'ok', note: withLim.length + ' ' + plural(withLim.length, 'مركز', 'مراكز', 'مركز') + ' عليهم سقف، وكلهم جواه.', follow: ['مين أكتر مركز عليه فلوس؟', 'مين متأخر في الدفع؟'] };
+    var mx = over[0].balance - over[0].creditLimit;
+    return {
+      icon: 'wallet', title: 'عدّوا حد الائتمان', sub: over.length + ' من ' + withLim.length,
+      bars: { items: over.slice(0, 8).map(function (c) { var d = c.balance - c.creditLimit; return { l: c.name, txt: money(d) + ' زيادة', sub: 'عليه ' + money(c.balance) + ' · السقف ' + money(c.creditLimit), w: d / mx, tone: 'bad', on: fn(function () { ask('حساب ' + c.name, { cid: c.id }); }) }; }) },
+      follow: ['مين متأخر في الدفع؟', 'مين أكتر مركز عليه فلوس؟']
+    };
+  }
+  function apDueAns(p) {
+    st.ctx = { intent: 'apdue', p: p };
+    if (!allowed('purchases') && !allowed('suppliers') && !allowed('expenses') && !allowed('debts')) return noAccess('المشتريات');
+    if (!colLoaded('expenses')) return missing('مشتريات آجل', 'فواتير الشراء');
+    var lateToo = p.to >= today();
+    var rows = A('expenses').filter(function (e) {
+      if (!e || e.kind !== 'purchase' || !e.dueDate) return false;
+      var pm = N(e.paymentMethod || '');
+      if (pm !== 'credit' && pm !== 'اجل') return false;
+      var due = String(e.dueDate).slice(0, 10);
+      if (inP(p, due)) return true;
+      return lateToo && due < p.from;
+    }).sort(function (a, b) { return String(a.dueDate).localeCompare(String(b.dueDate)); });
+    if (!rows.length) return { icon: 'check', title: 'مفيش مشتريات آجل مستحقة ' + p.label, sub: rangeTxt(p), tone: 'ok', note: 'مفيش فاتورة شراء آجل ميعادها في الفترة دي' + (lateToo ? '، ولا فات ميعادها.' : '.'), follow: ['عليا كام للموردين؟'] };
+    return {
+      icon: 'truck', title: 'مشتريات آجل مستحقة', sub: rangeTxt(p),
+      ledger: [{ l: 'الإجمالي', v: money(sum(rows, 'amount')), big: true, tone: 'warn' }, { l: 'عدد الفواتير', v: num(rows.length) }],
+      rows: rows.slice(0, 8).map(function (e) {
+        var due = String(e.dueDate).slice(0, 10), d = daysBetween(today(), due);
+        return { l: e.supplierName || 'مورد', sub: 'استحقاق ' + dayName(due) + (d < 0 ? ' · متأخر ' + (-d) + ' يوم' : d === 0 ? ' · النهارده' : ' · بعد ' + d + ' يوم'), v: money(e.amount), tone: d < 0 ? 'bad' : d <= 3 ? 'warn' : '' };
+      }),
+      acts: [{ t: 'افتح المشتريات', on: fn(function () { navigate('purchases'); }) }],
+      follow: ['عليا كام للموردين؟', 'الشيكات']
+    };
+  }
+  function cashCountAns() {
+    if (!allowed('payments') && !allowed('expenses') && !allowed('profit')) return noAccess('الخزنة');
+    if (!loaded('_cashCounts')) return missing('جرد الخزنة', 'جرد الخزنة');
+    var raw = S()._cashCounts || [];
+    if (!raw.length) return { icon: 'cash', title: 'لسه مفيش جرد للخزنة', note: 'اعمل جرد يومي من صفحة الفلوس عشان أقارن العدّة بالرصيد المحسوب.', tone: 'warn' };
+    var last = null, expectedNow = null, diff, counted;
+    try {
+      if (window.AXCash && AXCash.ledger) {
+        var L = AXCash.ledger(D());
+        last = L.counts && L.counts.length ? L.counts[L.counts.length - 1] : null;
+        expectedNow = L.expectedAt ? L.expectedAt(today()) : null;
+      }
+    } catch (e) {}
+    if (!last) {
+      var sorted = raw.filter(function (c) { return c && c.date; }).slice().sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+      last = sorted.length ? { date: String(sorted[sorted.length - 1].date).slice(0, 10), total: +sorted[sorted.length - 1].total || 0, diff: null, expected: null } : null;
+    }
+    if (!last) return { icon: 'cash', title: 'جرد الخزنة', note: 'الجرد متسجل من غير تاريخ، مش قادر أقارنه.', tone: 'warn' };
+    counted = +last.total || 0;
+    diff = last.diff;
+    var led = [{ l: 'آخر عدّة', v: money(counted), big: true, sub: dayName(last.date) }];
+    if (last.expected != null) led.push({ l: 'المفروض يومها', v: money(last.expected) });
+    if (diff != null) led.push({ l: diff < -0.5 ? 'عجز' : diff > 0.5 ? 'زيادة' : 'الفرق', v: money(diff), tone: diff < -0.5 ? 'bad' : diff > 0.5 ? 'warn' : 'ok' });
+    if (expectedNow != null) led.push({ l: 'المتوقع في الخزنة دلوقتي', v: money(expectedNow), sub: 'آخر جرد + حركة الكاش بعده' });
+    return {
+      icon: 'cash', title: diff == null ? 'آخر جرد للخزنة' : (Math.abs(diff) < 0.5 ? 'الخزنة متظبطة' : 'الخزنة مش متظبطة'),
+      sub: dayName(last.date), ledger: led,
+      note: diff == null ? 'أول جرد (أو مفيش رصيد افتتاحي) — مفيش رقم أقارن العدّة بيه.' : '',
+      tone: diff != null && diff < -0.5 ? 'bad' : '',
+      follow: ['الخزنة فيها كام؟', 'اتحصّل كام النهارده؟']
+    };
+  }
+  function bankAns(p) {
+    st.ctx = { intent: 'bank', p: p };
+    if (!allowed('transfers')) return noAccess('التحويلات البنكية');
+    if (!colLoaded('bankTransfers')) return missing('تحويلات بنكية', 'التحويلات البنكية');
+    var pays = A('payments'), used = {}, bad = [];
+    function bankish(m) { return /تحويل|بنك|ايداع|إيداع|شيك|انستا|إنستا|محفظ|فيزا|bank|transfer|cheque|wallet|visa/i.test(String(m || '')); }
+    A('bankTransfers').forEach(function (t) {
+      if (!t || !inP(p, t.date) || t.type === 'out' || t.type === 'withdrawal') return;
+      var a = +t.amount || 0;
+      var m = pays.find(function (pay) {
+        if (!pay || used[pay.id]) return false;
+        if (t.customerId && pay.customerId !== t.customerId) return false;
+        if (Math.abs((+pay.amount || 0) - a) > 0.01) return false;
+        if (!bankish(pay.method)) return false;
+        return Math.abs(daysBetween(String(pay.date || '').slice(0, 10), String(t.date || '').slice(0, 10))) <= 7;
+      });
+      if (m) used[m.id] = 1; else bad.push(t);
+    });
+    if (!A('bankTransfers').length) return { icon: 'cheque', title: 'مفيش تحويلات بنكية', sub: rangeTxt(p), note: 'مفيش تحويل متسجل أصلًا.', tone: 'ok' };
+    if (!bad.length) return { icon: 'check', title: 'كل التحويلات ليها تحصيل', sub: rangeTxt(p), tone: 'ok', note: 'كل تحويل داخل في الفترة دي لقيته دفعة بنكية لنفس العميل وبنفس المبلغ خلال أسبوع.', follow: ['اتحصّل كام ' + p.label + '؟'] };
+    return {
+      icon: 'cheque', title: 'تحويلات لسه متتسجلش تحصيل', sub: rangeTxt(p),
+      ledger: [{ l: 'عددها', v: num(bad.length), tone: 'warn' }, { l: 'قيمتها', v: money(sum(bad, 'amount')), big: true, tone: 'bad' }],
+      rows: bad.slice(0, 8).map(function (t) { return { l: t.customerName || 'عميل', sub: dayName(String(t.date).slice(0, 10)) + (t.reference ? ' · ' + t.reference : ''), v: money(t.amount), tone: 'warn' }; }),
+      note: 'دول واردين في التحويلات البنكية ومن غير دفعة مطابقة (±7 أيام، نفس العميل ونفس المبلغ).',
+      acts: [{ t: 'افتح التحويلات', pri: true, on: fn(function () { navigate('transfers'); }) }],
+      follow: ['اتحصّل كام ' + p.label + '؟', 'الشيكات']
+    };
+  }
+  function branchQuery(p) {
+    var t = today(), d = dt(t), y = d.getFullYear(), m = d.getMonth();
+    if (p.all) return 'p=all';
+    if (p.from === t && p.to === t) return 'p=today';
+    if (p.from === lds(new Date(y, m, 1)) && p.to === t) return 'p=month';
+    if (p.from === lds(new Date(y, m - 1, 1)) && p.to === lds(new Date(y, m, 0))) return 'p=last';
+    if (p.from === lds(new Date(y, 0, 1)) && p.to === t) return 'p=year';
+    return 'p=custom&from=' + encodeURIComponent(p.from) + '&to=' + encodeURIComponent(p.to);
+  }
+  function branchLocal(p, offline) {
+    var one = null;
+    try { if (window.AXBStats && AXBStats.summary) one = AXBStats.summary(D(), [p.from, p.to]); } catch (e) {}
+    var note = offline ? 'مفيش نت دلوقتي. أرقام الفروع التانية على السيرفر، وده الفرع المفتوح بس.' : 'السيرفر مردّش بأرقام الفروع. دي أرقام الفرع المفتوح لو موجودة على الجهاز.';
+    if (!one) return { icon: 'scale', title: 'مقارنة الفروع', note: note, tone: 'warn' };
+    return {
+      icon: 'scale', title: 'الفرع المفتوح بس', sub: p.label, tone: 'warn', note: note,
+      ledger: [
+        { l: 'المبيعات', v: money(one.sales), sub: one.salesReturns ? 'بعد مرتجع ' + money(one.salesReturns) : '' },
+        { l: 'التحصيل', v: money(one.collections) },
+        { l: 'الربح', v: money(one.profit), tone: one.profit < 0 ? 'bad' : 'ok' },
+        { l: 'الخزنة', v: money(one.treasury) },
+        { l: 'نواقص', v: num(one.lowStock) }
+      ]
+    };
+  }
+  function branchesAns(p) {
+    if (!mgr()) return noAccess('مقارنة الفروع');
+    st.ctx = { intent: 'branches', p: p };
+    if (!online()) return branchLocal(p, true);
+    return apiGet('/api/branches/summary?' + branchQuery(p)).then(function (j) {
+      if (!j || !Array.isArray(j.branches)) return branchLocal(p, false);
+      var rows = j.branches.slice().sort(function (a, b) { return (b.sales || 0) - (a.sales || 0); });
+      if (!rows.length) return { icon: 'scale', title: 'مقارنة الفروع ' + p.label, sub: rangeTxt(p), note: 'السيرفر مرجعش أي فرع.', tone: 'warn' };
+      var tot = j.total || {};
+      var best = rows[0], weak = rows.slice().sort(function (a, b) { return (a.sales || 0) - (b.sales || 0); })[0];
+      return {
+        icon: 'scale', title: 'مقارنة الفروع ' + p.label, sub: (j.from || p.from) + ' → ' + (j.to || p.to),
+        ledger: [
+          { l: 'مبيعات كل الفروع', v: money(tot.sales), big: true, sub: tot.salesReturns ? 'بعد مرتجع ' + money(tot.salesReturns) : '' },
+          { l: 'التحصيل', v: money(tot.collections) },
+          { l: 'الربح', v: money(tot.profit), tone: (tot.profit || 0) < 0 ? 'bad' : 'ok' },
+          { l: 'الخزنة', v: money(tot.treasury) }
+        ],
+        bars: { title: 'المبيعات', items: rows.map(function (b) { var mx = rows[0].sales || 1; return { l: b.name || b.id, txt: money(b.sales), sub: 'ربح ' + money(b.profit) + ' · تحصيل ' + money(b.collections), w: (b.sales || 0) / mx }; }) },
+        note: rows.length > 1 ? 'أعلى مبيعات: ' + (best.name || '') + '، وأقلهم: ' + (weak.name || '') + '.' : '',
+        follow: ['صافي المبيعات بعد المرتجعات', 'فيه تحويلات بين الفروع لسه متستلمتش؟']
+      };
+    });
+  }
+  function xferLocal(offline) {
+    var moves = loaded('_cashMoves') ? (S()._cashMoves || []) : null;
+    var note = offline ? 'مفيش نت. تحويلات البضاعة اللي لسه في الطريق على السيرفر.' : 'مش قادر أوصل لسجل التحويلات. بحاول من اللي على الجهاز.';
+    if (!moves) return { icon: 'truck', title: 'تحويلات الفروع', note: note + ' فلوس الفرع كمان مش محمّلة.', tone: 'warn' };
+    if (!moves.length) return { icon: 'truck', title: 'تحويلات الفروع', note: note + ' مفيش حركة فلوس بين الفروع متسجلة هنا.', tone: 'warn' };
+    var inn = moves.filter(function (m) { return m && m.dir === 'in'; }), out = moves.filter(function (m) { return m && m.dir !== 'in'; });
+    return {
+      icon: 'truck', title: 'فلوس الفرع ده مع الفروع التانية', tone: 'warn', note: note,
+      ledger: [{ l: 'فلوس جت', v: money(sum(inn, 'amount')) }, { l: 'فلوس خرجت', v: money(sum(out, 'amount')) }],
+      rows: moves.slice().sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')); }).slice(0, 6).map(function (m) {
+        return { l: (m.dir === 'in' ? 'من ' : 'إلى ') + (m.otherName || 'فرع'), sub: m.date ? dayName(String(m.date).slice(0, 10)) : '', v: money(m.amount), tone: m.dir === 'in' ? 'ok' : 'warn' };
+      })
+    };
+  }
+  function transfersAns(p) {
+    st.ctx = { intent: 'transfers', p: p || null };
+    if (!allowed('inventory') && !allowed('stock') && !allowed('payments') && !allowed('expenses') && !mgr()) return noAccess('التحويلات بين الفروع');
+    if (!online()) return xferLocal(true);
+    return apiGet('/api/transfers').then(function (j) {
+      if (!j || !Array.isArray(j.transfers)) return xferLocal(false);
+      var list = j.transfers.filter(function (t) {
+        if (!t || (t.status !== 'sent' && t.status !== 'receiving')) return false;
+        if (!p) return true;
+        var d = String(t.sentAt || t.createdAt || '').slice(0, 10);
+        return !d || inP(p, d);
+      });
+      if (!list.length) return { icon: 'check', title: 'مفيش تحويل بين الفروع مستني استلام', tone: 'ok', note: 'كل التحويلات يا اتسلمت يا اتلغت.', follow: ['قارن الفروع الشهر ده'] };
+      return {
+        icon: 'truck', title: 'لسه متستلمش', sub: list.length + ' ' + plural(list.length, 'تحويل', 'تحويلات', 'تحويل'),
+        rows: list.slice(0, 8).map(function (t) {
+          var what = t.kind === 'cash' ? money(t.amount) : ((t.items || []).length + ' ' + plural((t.items || []).length, 'صنف', 'أصناف', 'صنف'));
+          var items = t.kind === 'cash' ? '' : (t.items || []).slice(0, 3).map(function (it) { return (it.name || 'صنف') + ' ' + num(it.qty); }).join('، ');
+          return { l: (t.kind === 'cash' ? 'فلوس' : 'بضاعة') + ' · ' + (t.fromName || t.from || '') + ' → ' + (t.toName || t.to || ''), sub: '#' + (t.number || '') + ' · ' + (t.status === 'receiving' ? 'بيتأكد الاستلام' : 'في الطريق') + (items ? ' · ' + items : ''), v: what, tone: 'warn' };
+        }),
+        follow: ['قارن الفروع الشهر ده']
+      };
+    });
+  }
+  function fcValueAns(q) {
+    if (!window.AXFc || typeof AXFc.model !== 'function') return { icon: 'clock', title: 'توقع السحب', note: 'مواعيد السحب مش محمّلة دلوقتي.', tone: 'warn' };
+    var horizon = has(q, K.today) ? 0 : has(q, K.month) || has(q, K.lmonth) ? 31 : 7;
+    var label = horizon <= 0 ? 'النهارده' : horizon > 7 ? 'الشهر الجاي تقريبًا' : 'الأسبوع ده';
+    var list;
+    try { list = (AXFc.model().list || []).filter(function (x) { return x && x.st !== 'stopped' && (x.st === 'late' || x.st === 'due' || (x.left != null && x.left <= horizon)); }); } catch (e) { list = []; }
+    if (!list.length) return { icon: 'clock', title: 'مفيش سحب متوقع ' + label, tone: 'ok', note: 'محدش معاده قريب على أساس عادته.', follow: ['مين هيسحب الأسبوع ده؟'] };
+    var sumV = list.reduce(function (s, x) { return s + (+x.value || 0); }, 0);
+    var hi = list.filter(function (x) { return x.conf === 'high'; }), mid = list.filter(function (x) { return x.conf === 'mid'; });
+    var called = list.filter(function (x) { return x.quiet; }).length;
+    return {
+      icon: 'clock', title: 'متوقع يدخل ' + label, sub: list.length + ' ' + plural(list.length, 'مركز', 'مراكز', 'مركز'),
+      ledger: [
+        { l: 'قيمة السلال المعتادة', v: money(sumV), big: true },
+        { l: 'ثقة عالية', v: money(hi.reduce(function (s, x) { return s + (+x.value || 0); }, 0)) + ' — ' + hi.length },
+        { l: 'ثقة متوسطة', v: money(mid.reduce(function (s, x) { return s + (+x.value || 0); }, 0)) + ' — ' + mid.length }
+      ],
+      rows: list.slice(0, 8).map(function (x) { return { l: x.name, sub: (window.AXFc.label ? AXFc.label(x) : x.st) + (x.conf === 'high' ? ' · ثقة عالية' : x.conf === 'low' ? ' · ثقة ضعيفة' : '') + (x.quiet ? ' · اتكلمنا' : ''), v: money(x.value), tone: x.st === 'late' ? 'bad' : x.st === 'due' ? 'warn' : '' }; }),
+      note: 'تقدير من عادة السحب، مش طلبية مؤكدة.' + (called ? ' ' + called + ' منهم اتسجل إننا كلّمناهم.' : ''),
+      acts: [{ t: 'افتح مواعيد السحب', pri: true, on: fn(function () { navigate('forecast'); }) }],
+      follow: ['مين هيسحب الأسبوع ده؟', 'مراكز وقفت سحب']
+    };
+  }
+  function marginAns(prods, p) {
+    if (!allowed('profit')) return noAccess('الأرباح');
+    st.ctx = { intent: 'margin', p: p, pids: (prods || []).map(function (x) { return x.id; }) };
+    if (!colLoaded('products')) return missing('هامش الأصناف', 'الأصناف');
+    var list = prods && prods.length ? prods : A('products');
+    if (!list.length) return { icon: 'coin', title: 'هامش الأصناف', note: 'مفيش أصناف متسجلة.', tone: 'warn' };
+    var lines = sales(p);
+    var rows = list.map(function (pr) {
+      var ls = lines.filter(function (x) { return x.pid === pr.id; });
+      var rev = sum(ls, 'total'), qty = sum(ls.filter(function (x) { return x.kind !== 'ret'; }), 'qty');
+      var cost = (+pr.cost || 0) * (sum(ls, 'qty'));
+      return { pr: pr, rev: rev, qty: qty, cost: cost, profit: rev - cost, priced: +pr.cost > 0 };
+    }).filter(function (x) { return x.qty > 0 || x.rev !== 0 || (prods && prods.length); });
+    var blind = rows.filter(function (x) { return !x.priced; }).length;
+    if (!rows.length) return { icon: 'coin', title: 'هامش الأصناف ' + p.label, sub: rangeTxt(p), note: 'مفيش بيع للأصناف دي في الفترة.', follow: ['أكتر صنف بيتباع'] };
+    rows.sort(function (a, b) { return b.profit - a.profit; });
+    return {
+      icon: 'coin', title: prods && prods.length === 1 ? 'هامش ' + prods[0].name : 'هامش الأصناف ' + p.label, sub: rangeTxt(p),
+      rows: rows.slice(0, 8).map(function (x) {
+        var m = x.rev ? Math.round(x.profit / x.rev * 100) : 0;
+        return { l: x.pr.name, sub: x.priced ? ('بيع ' + money(x.pr.price || 0) + ' · تكلفة ' + money(x.pr.cost) + ' · كمية ' + num(x.qty)) : 'من غير تكلفة مسجّلة', v: x.priced ? (money(x.profit) + ' · ' + m + '%') : '—', tone: !x.priced ? 'warn' : x.profit < 0 ? 'bad' : 'ok' };
+      }),
+      note: blind ? blind + ' ' + plural(blind, 'صنف', 'أصناف', 'صنف') + ' من غير سعر تكلفة، فهامشهم مش محسوب.' : '',
+      tone: blind ? 'warn' : '',
+      follow: ['فيه صرف اتباع تحت التكلفة؟', 'الأرباح ' + p.label]
+    };
+  }
+  function belowCostAns(p) {
+    if (!allowed('profit')) return noAccess('الأرباح');
+    st.ctx = { intent: 'below', p: p };
+    if (!colLoaded('products')) return missing('البيع تحت التكلفة', 'الأصناف');
+    var prod = {}; A('products').forEach(function (pr) { if (pr) prod[pr.id] = pr; });
+    var hits = [];
+    sales(p).forEach(function (x) {
+      if (!x || x.kind === 'ret' || !(x.qty > 0) || !x.pid || !prod[x.pid]) return;
+      var cost = +prod[x.pid].cost || 0;
+      if (!(cost > 0)) return;
+      var unit = x.total / x.qty;
+      if (unit + 0.001 < cost) hits.push({ x: x, unit: unit, cost: cost, gap: (cost - unit) * x.qty });
+    });
+    if (!hits.length) return { icon: 'check', title: 'مفيش بيع تحت التكلفة ' + p.label, sub: rangeTxt(p), tone: 'ok', note: 'كل سطر ليه تكلفة، سعر البيع فيه أعلى من التكلفة أو مساويها. الأصناف من غير تكلفة مش داخلة في الفحص.', follow: ['هامش ربح الأصناف', 'الأرباح ' + p.label] };
+    hits.sort(function (a, b) { return b.gap - a.gap; });
+    return {
+      icon: 'coin', title: 'اتباع تحت التكلفة', sub: rangeTxt(p),
+      ledger: [{ l: 'عدد الأسطر', v: num(hits.length), tone: 'bad' }, { l: 'فرق التكلفة', v: money(hits.reduce(function (s, h) { return s + h.gap; }, 0)), big: true, tone: 'bad' }],
+      rows: hits.slice(0, 8).map(function (h) { return { l: (h.x.pname || 'صنف') + ' · ' + cname(h.x.cid, h.x.name), sub: 'اتباع بـ ' + money(h.unit) + ' والتكلفة ' + money(h.cost) + ' · ' + dayName(h.x.date), v: money(h.gap), tone: 'bad' }; }),
+      follow: ['هامش ربح الأصناف', 'الأرباح ' + p.label]
+    };
+  }
+  function dueWindow(q) {
+    if (hasPeriod(q)) return period(q, 'month');
+    return { from: today(), to: addDays(today(), 7), label: 'خلال أسبوع', prev: null };
+  }
+  /* only phrases that name one of the new questions — anything else falls through */
+  function extra(q) {
+    if (has(q, NI.net)) { var pn = period(q, 'month'); return netSalesAns(pn); }
+    if (has(q, NI.returns)) { var prr = period(q, 'month'); return returnsAns(prr); }
+    if (has(q, NI.poWait)) return poWaitAns();
+    if (has(q, NI.approvals)) return approvalsAns();
+    if (has(q, NI.order)) return orderAns();
+    if (has(q, NI.poOpen)) return poOpenAns(hasPeriod(q) ? period(q, 'all') : null);
+    if (has(q, NI.target)) return targetAns(period(q, 'month'));
+    if (has(q, NI.credit)) return creditAns();
+    if (has(q, NI.apdue)) return apDueAns(dueWindow(q));
+    if (has(q, NI.cashCount) && (has(q, W(['خزنه', 'صندوق', 'كاش', 'عده', 'جرد'])) )) return cashCountAns();
+    if (has(q, NI.bank)) { var pb = period(q, 'month'); return bankAns(pb); }
+    if (has(q, NI.branches)) return branchesAns(period(q, 'month'));
+    if (has(q, NI.xfer)) return transfersAns(hasPeriod(q) ? period(q, 'all') : null);
+    if (has(q, NI.fcValue)) return fcValueAns(q);
+    if (has(q, NI.below)) return belowCostAns(period(q, 'month'));
+    if (has(q, NI.margin) || (has(q, W(['هامش'])) && (findProducts(q).length || has(q, W(['الصنف', 'الاصناف', 'المنتج', 'المنتجات']))))) {
+      var prods = findProducts(q);
+      return marginAns(prods, period(q, 'month'));
+    }
+    return null;
+  }
+
+  /* rules for everyday phrasing — run before the old keyword routing.
+     New intents (extra) are tried first, and only when their own phrases match,
+     so the older rules below keep their order. */
   function smart(q) {
+    var ex = extra(q); if (ex) return ex;
     var c = findCustomer(q), paperish = has(q, X.paper), prods = findProducts(q);
     /* «فيلم A4» / «ورق A4»: the kind of paper named narrows the products */
     if (prods.length > 1) {
@@ -814,7 +1364,11 @@
     if (st.ctx && hasPeriod(q) && words <= 6) {
       var p2 = per('month'), x = st.ctx;
       if (x.intent === 'customer') { var cc = cust(x.cid); if (cc) return customerAns(cc, p2); }
-      var map = { sales: salesAns, collect: collectAns, profit: profitAns, expenses: expensesAns, output: outputAns, topP: topProductsAns, topC: topCustomersAns, compare: compareAns, invoices: invoicesAns };
+      if (x.intent === 'margin') {
+        var kept = (x.pids || []).map(function (id) { return A('products').find(function (pr) { return pr.id === id; }); }).filter(Boolean);
+        return marginAns(kept, p2);
+      }
+      var map = { sales: salesAns, collect: collectAns, profit: profitAns, expenses: expensesAns, output: outputAns, topP: topProductsAns, topC: topCustomersAns, compare: compareAns, invoices: invoicesAns, net: netSalesAns, returns: returnsAns, target: targetAns, apdue: apDueAns, bank: bankAns, below: belowCostAns, branches: branchesAns, transfers: transfersAns };
       if (map[x.intent]) { set(x.intent, p2); return map[x.intent](p2); }
     }
     if (hasPeriod(q) && words <= 4) { var pd = per('month'); set('sales', pd); return salesAns(pd); }
@@ -823,8 +1377,17 @@
     if (gq && N(gq) !== q && !st.guessing) {
       st.guessing = true;
       try { var gr = understand(gq); } finally { st.guessing = false; }
+      if (gr && typeof gr.then === 'function') {
+        return gr.then(function (ans) {
+          if (ans && ans.title && ans.title !== 'مش متأكد فهمت') { ans.heard = gq; return ans; }
+          return unsure();
+        });
+      }
       if (gr && gr.title !== 'مش متأكد فهمت') { gr.heard = gq; return gr; }
     }
+    return unsure();
+  }
+  function unsure() {
     return { icon: 'question', title: 'مش متأكد فهمت', note: 'جرّب تسأل بشكل تاني، أو اختار من دول:', follow: ['ملخص النهارده', 'مبيعات الشهر ده', 'مين أكتر مركز عليه فلوس؟', 'إيه اللي قرب يخلص؟', 'بتعرف تعمل إيه؟'] };
   }
 
@@ -884,16 +1447,16 @@
     if (!B || !B.items || !B.items.length) return '';
     return '<div class="axa-block">' + (B.title ? '<h4>' + esc(B.title) + '</h4>' : '') + '<ol class="axa-bars">' + B.items.map(function (x) {
       var inner = '<span class="l">' + esc(x.l) + '</span><span class="v">' + esc(x.txt) + '</span>' +
-        '<span class="b' + (x.tone ? ' t-' + x.tone : '') + '"><u style="width:' + Math.max(2, Math.round((x.w || 0) * 100)) + '%"></u></span>' +
+        '<span class="b' + (x.tone ? ' t-' + x.tone : '') + '"><u style="width:' + Math.max(2, Math.round(Math.max(0, x.w || 0) * 100)) + '%"></u></span>' +
         (x.sub ? '<small>' + esc(x.sub) + '</small>' : '');
       return '<li>' + (x.on ? '<button type="button" onclick="' + x.on + '">' + inner + '</button>' : '<div>' + inner + '</div>') + '</li>';
     }).join('') + '</ol></div>';
   }
   function sparkHtml(sp) {
     if (!sp || !sp.items || sp.items.length < 2) return '';
-    var mx = Math.max.apply(null, sp.items.map(function (x) { return x.v; })) || 1, n = sp.items.length;
+    var mx = Math.max.apply(null, sp.items.map(function (x) { return Math.max(0, x.v); })) || 1, n = sp.items.length;
     return '<div class="axa-block"><div class="axa-spark" role="img" aria-label="' + esc(sp.label || 'المبيعات يوم بيوم') + '">' + sp.items.map(function (x, i) {
-      return '<span class="' + (i === n - 1 ? 'now' : '') + (x.v ? '' : ' zero') + '" style="height:' + Math.max(3, Math.round(x.v / mx * 100)) + '%" title="' + esc(x.l + ': ' + (sp.fmt ? sp.fmt(x.v) : num(x.v))) + '"></span>';
+      return '<span class="' + (i === n - 1 ? 'now' : '') + (x.v ? '' : ' zero') + '" style="height:' + Math.max(3, Math.round(Math.max(0, x.v) / mx * 100)) + '%" title="' + esc(x.l + ': ' + (sp.fmt ? sp.fmt(x.v) : num(x.v))) + '"></span>';
     }).join('') + '</div><div class="axa-spark-x"><span>' + esc(sp.items[0].l) + '</span><span>' + esc(sp.items[n - 1].l) + '</span></div></div>';
   }
   function rowsHtml(R, ordered) {
@@ -920,6 +1483,7 @@
     (r.ledger || []).forEach(function (x) { L.push('• ' + x.l + ': ' + x.v + (x.d ? ' (' + x.d.replace(/<[^>]+>/g, '') + ')' : '')); });
     [r.bars, r.bars2].forEach(function (B) { if (B && B.items) { if (B.title) L.push('', B.title + ':'); B.items.forEach(function (x, i) { L.push((i + 1) + '. ' + x.l + ' — ' + x.txt); }); } });
     (r.rows || []).forEach(function (x, i) { L.push((r.ordered ? (i + 1) + '. ' : '• ') + x.l + (x.v ? ' — ' + x.v : '') + (x.sub ? ' (' + x.sub + ')' : '')); });
+    (r.groups || []).forEach(function (g) { L.push('', g[0] + ':'); (g[1] || []).forEach(function (qq) { L.push('• ' + qq); }); });
     if (r.note) L.push('', String(r.note).replace(/<[^>]+>/g, ''));
     return L.join('\n');
   }
@@ -985,21 +1549,26 @@
       scrollEnd();
     }
     var r;
-    try { r = understand(q, force); } catch (e) { console.error(e); r = { icon: 'question', title: 'حصلت مشكلة وأنا بحسب', note: 'جرّب تاني، ولو اتكررت قول للمدير.', tone: 'bad', failed: true }; }
-    setTimeout(function () {
-      var th = document.getElementById('axa-thinking'); if (th) th.remove();
-      var at = clock(), m = { who: 'bot', html: slip(r, at), follow: r.follow, q2: { q: q, f: force }, at: at };
-      st.msgs.push(m);
-      if (st.msgs.length > 60) st.msgs.splice(0, st.msgs.length - 60);
-      if (box) {
-        box.insertAdjacentHTML('beforeend', msgHtml(m) + followHtml(r.follow));
-        var slips = box.querySelectorAll('.axa-msg.bot .axa-slip'), fol = box.querySelector('.axa-follow:last-child');
-        typeIn(slips[slips.length - 1], fol);
-        scrollEnd(true);
-      }
-      st.busy = false;
-      faceMood(moodOf(r));
-    }, 420 + Math.random() * 260);
+    try { r = understand(q, force); } catch (e) { console.error(e); r = null; }
+    if (r && typeof r.then === 'function') r.then(function (ans) { deliver(ans); }, function (e) { console.error(e); deliver(null); });
+    else deliver(r);
+    function deliver(ans) {
+      if (!ans || !ans.title) ans = { icon: 'question', title: 'حصلت مشكلة وأنا بحسب', note: 'جرّب تاني، ولو اتكررت قول للمدير.', tone: 'bad', failed: true };
+      setTimeout(function () {
+        var th = document.getElementById('axa-thinking'); if (th) th.remove();
+        var at = clock(), m = { who: 'bot', html: slip(ans, at), follow: ans.follow, q2: { q: q, f: force }, at: at };
+        st.msgs.push(m);
+        if (st.msgs.length > 60) st.msgs.splice(0, st.msgs.length - 60);
+        if (box) {
+          box.insertAdjacentHTML('beforeend', msgHtml(m) + followHtml(ans.follow));
+          var slips = box.querySelectorAll('.axa-msg.bot .axa-slip'), fol = box.querySelector('.axa-follow:last-child');
+          typeIn(slips[slips.length - 1], fol);
+          scrollEnd(true);
+        }
+        st.busy = false;
+        faceMood(moodOf(ans));
+      }, 420 + Math.random() * 260);
+    }
   }
   /* the answer types itself in fast — same typewriter + colors as «مساعدك الذكي» over the floating robot */
   function typeIn(slip, follow) {
@@ -1078,10 +1647,10 @@
   }
   /* the quick questions, pinned at the top of the chat — each topic has its own color */
   var CATS = [
-    { k: 'money', name: 'الفلوس', icon: 'cash', qs: function () { return ['مبيعات الشهر ده', 'اتحصّل كام الأسبوع ده؟', 'مين أكتر مركز عليه فلوس؟'].concat(allowed('profit') ? ['الأرباح الشهر ده'] : []); } },
-    { k: 'centers', name: 'المراكز', icon: 'building', qs: function () { return ['مين متأخر في الدفع؟', 'مين هيسحب الأسبوع ده؟', 'أكتر المراكز شراءً الشهر ده', 'مراكز وقفت سحب']; } },
-    { k: 'stock', name: 'المخزن', icon: 'box', qs: function () { return ['إيه اللي قرب يخلص؟', 'طلعنا قد إيه ورق الشهر ده؟', 'أكتر صنف بيتباع']; } },
-    { k: 'decide', name: 'قرارات', icon: 'scale', qs: function () { return ['أعمل إيه النهارده؟', 'قارن الشهر ده بالشهر اللي فات'].concat(allowed('suppliers') ? ['عليا كام للموردين؟'] : []); } }
+    { k: 'money', name: 'الفلوس', icon: 'cash', qs: function () { var x = moreQs(); return ['مبيعات الشهر ده', 'اتحصّل كام الأسبوع ده؟', 'مين أكتر مركز عليه فلوس؟'].concat(x.money).concat(allowed('profit') ? ['الأرباح الشهر ده'] : []); } },
+    { k: 'centers', name: 'المراكز', icon: 'building', qs: function () { return ['مين متأخر في الدفع؟', 'مين هيسحب الأسبوع ده؟', 'أكتر المراكز شراءً الشهر ده', 'مراكز وقفت سحب'].concat(moreQs().centers); } },
+    { k: 'stock', name: 'المخزن', icon: 'box', qs: function () { return ['إيه اللي قرب يخلص؟', 'طلعنا قد إيه ورق الشهر ده؟', 'أكتر صنف بيتباع'].concat(moreQs().stock); } },
+    { k: 'decide', name: 'قرارات', icon: 'scale', qs: function () { return ['أعمل إيه النهارده؟', 'قارن الشهر ده بالشهر اللي فات'].concat(allowed('suppliers') ? ['عليا كام للموردين؟'] : []).concat(moreQs().decide); } }
   ];
   function quickHtml() {
     if (!st.cat) st.cat = 'money';
@@ -1104,6 +1673,43 @@
     return { ch: ch, pr: pr };
   }
 
+  /* network answers (branch compare, transfers) settle after the first paint */
+  function refreshMsg(m) {
+    var r0;
+    try { r0 = understand(m.q2.q, m.q2.f); } catch (e) { return; }
+    if (r0 && typeof r0.then === 'function') {
+      if (!m.html) m.html = slip({ icon: 'spark', title: 'بحسبها…', plainOnly: true }, m.at || clock());
+      if (m._wait) return;
+      m._wait = true;
+      r0.then(function (ans) {
+        m._wait = false;
+        if (!ans || !ans.title || st.msgs.indexOf(m) < 0) return;
+        m.follow = ans.follow;
+        m.html = slip(ans, m.at || clock());
+        var box = document.getElementById('axa-msgs');
+        if (!box) return;
+        var idx = 0, i;
+        for (i = 0; i < st.msgs.length; i++) { if (st.msgs[i] === m) break; if (st.msgs[i].who === 'bot') idx++; }
+        var kids = box.children, bi = 0, found = null, c;
+        for (c = 0; c < kids.length; c++) {
+          var el = kids[c];
+          if (!(el.classList && el.classList.contains('axa-msg') && el.classList.contains('bot') && !el.classList.contains('axa-thinking'))) continue;
+          if (bi === idx) { found = el; break; }
+          bi++;
+        }
+        if (found) found.innerHTML = mark() + m.html;
+        var last = null;
+        for (i = st.msgs.length - 1; i >= 0; i--) if (st.msgs[i].who === 'bot') { last = st.msgs[i]; break; }
+        if (last === m) {
+          var old = box.querySelector('.axa-follow'); if (old) old.remove();
+          if (m.follow && m.follow.length) box.insertAdjacentHTML('beforeend', followHtml(m.follow));
+        }
+      }, function () { m._wait = false; });
+      return;
+    }
+    m.html = slip(r0, m.at || clock());
+    m.follow = r0.follow;
+  }
   function render() {
     var root = document.getElementById('page-content'); if (!root) return;
     st.fns = {}; st.fid = 0;
@@ -1124,7 +1730,7 @@
       '</nav>';
     if (st.tab === 'chat') {
       /* answers are rebuilt from their questions: fresh numbers and live buttons after coming back */
-      var body = st.msgs.map(function (m) { if (m.who === 'bot' && m.q2) { try { var r0 = understand(m.q2.q, m.q2.f); m.html = slip(r0, m.at || clock()); m.follow = r0.follow; } catch (e) {} } return msgHtml(m); }).join('');
+      var body = st.msgs.map(function (m) { if (m.who === 'bot' && m.q2) refreshMsg(m); return msgHtml(m); }).join('');
       var lastBot = null; for (var i = st.msgs.length - 1; i >= 0; i--) if (st.msgs[i].who === 'bot') { lastBot = st.msgs[i]; break; }
       html += '<section class="axa-chat">' + quickHtml() +
         '<div class="axa-msgs" id="axa-msgs" aria-live="polite">' + (body || '<div class="axa-empty">' + mark() + '<p>أنا جاهز. اختار سؤال من فوق، أو اكتب سؤالك — بفهم العامية، والفترة («الشهر اللي فات»)، واسم المركز أو الصنف.</p></div>') + (lastBot ? followHtml(lastBot.follow) : '') + '</div>' +
@@ -1178,7 +1784,10 @@
 
   window.renderAIAssistant = render;
   window.askAI = function (q) { var inp = document.getElementById('axa-q'); ask(q || (inp ? inp.value : '')); };
-  window.aiAnswer = function (q) { return plain(understand(q)).replace(/\n/g, '<br>'); };
+  window.aiAnswer = function (q) {
+    var r = understand(q), done = function (ans) { return plain(ans).replace(/\n/g, '<br>'); };
+    return r && typeof r.then === 'function' ? r.then(done) : done(r);
+  };
   window.AXA = {
     ask: function (q, f) { ask(q, f); }, understand: understand, plain: plain, period: period, N: N,
     run: function (id) { var f = st.fns[id]; if (f) f(); },
