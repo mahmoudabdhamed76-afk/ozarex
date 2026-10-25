@@ -6127,12 +6127,13 @@ html[data-theme="light"] .axface-orb {
    drains in ~700ms. Text and icon stay above it. The active pill is unchanged.
    Light mode keeps the dark plate. Dark mode uses a white plate with dark
    text, so the fill stays visible on the dark sidebar.
+   The same two colors are shared with the page toolbars and inner tabs (4.57).
 ════════════════════════════════════════════════════════════════════ */
-html.aurum #sidebar-nav {
+html.aurum {
   --nav-rise-plate: #14161c;
   --nav-rise-ink: #f4f6f8;
 }
-html.aurum[data-theme="dark"] #sidebar-nav {
+html.aurum[data-theme="dark"] {
   --nav-rise-plate: #ffffff;
   --nav-rise-ink: #1a1214;
 }
@@ -6201,4 +6202,368 @@ html.aurum #sidebar-nav .nav-item:is(:focus-visible, :active):not(.active) .icon
 }
 @media (prefers-reduced-motion: reduce) {
   html.aurum #sidebar-nav .nav-item::before { transition: none !important; }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   4.57 · The same flat plate on page toolbars and inner menus.
+   Header action buttons (every section) and unselected tabs / sub-menus.
+   The plate is ::before at z-index -1 inside an isolated control, so it
+   covers the button's own fill from the bottom and stays under the label,
+   icon, and badge. Selected tabs (.active / .on) keep their selected look.
+   Size, padding, and radius are untouched. Rise 650ms, drain 700ms.
+════════════════════════════════════════════════════════════════════ */
+html.aurum #page-content :is(
+  .section-action-bar,
+  .page-actions,
+  .rq-head-a,
+  .mr-acts,
+  .axs-lock,
+  .axu-ha,
+  .report-toolbar-controls
+) > .btn,
+html.aurum #page-content :is(.page-header, .pi-head) > .btn,
+html.aurum #page-content .sl-head > .sl-new,
+html.aurum #page-content .sl-tools > .sl-tool:not(.on),
+html.aurum #page-content :is(
+  .tabs,
+  .sup-tabs,
+  .cf-row-tabs,
+  .reports-tabs-sidebar,
+  .skh-tabs,
+  .skh-chips,
+  .pi-chips,
+  .axs-tabs,
+  .rq-tabs,
+  .axa-tabs,
+  .axa-qt,
+  .axn-tabs,
+  .axad-tabs,
+  .axo-per,
+  .axst-chips,
+  .pfx-views,
+  .pfx-seg,
+  .fc-chips,
+  .cus-who,
+  .axr-tabs,
+  .axu-chips
+) > button:not(.active):not(.on):not([aria-selected="true"]),
+html.aurum #page-content .ax-seg:not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"]),
+html.aurum #page-content [role="tablist"]:not(.pxs-tiles):not(.fc-cal):not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"]) {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transform: none !important;
+  transition: none !important;
+}
+html.aurum #page-content :is(
+  .section-action-bar,
+  .page-actions,
+  .rq-head-a,
+  .mr-acts,
+  .axs-lock,
+  .axu-ha,
+  .report-toolbar-controls
+) > .btn > *,
+html.aurum #page-content :is(.page-header, .pi-head) > .btn > *,
+html.aurum #page-content .sl-head > .sl-new > *,
+html.aurum #page-content .sl-tools > .sl-tool:not(.on) > *,
+html.aurum #page-content :is(
+  .tabs,
+  .sup-tabs,
+  .cf-row-tabs,
+  .reports-tabs-sidebar,
+  .skh-tabs,
+  .skh-chips,
+  .pi-chips,
+  .axs-tabs,
+  .rq-tabs,
+  .axa-tabs,
+  .axa-qt,
+  .axn-tabs,
+  .axad-tabs,
+  .axo-per,
+  .axst-chips,
+  .pfx-views,
+  .pfx-seg,
+  .fc-chips,
+  .cus-who,
+  .axr-tabs,
+  .axu-chips
+) > button:not(.active):not(.on):not([aria-selected="true"]) > *,
+html.aurum #page-content .ax-seg:not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"]) > *,
+html.aurum #page-content [role="tablist"]:not(.pxs-tiles):not(.fc-cal):not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"]) > * {
+  z-index: 1;
+}
+html.aurum #page-content :is(
+  .section-action-bar,
+  .page-actions,
+  .rq-head-a,
+  .mr-acts,
+  .axs-lock,
+  .axu-ha,
+  .report-toolbar-controls
+) > .btn::before,
+html.aurum #page-content :is(.page-header, .pi-head) > .btn::before,
+html.aurum #page-content .sl-head > .sl-new::before,
+html.aurum #page-content .sl-tools > .sl-tool:not(.on)::before,
+html.aurum #page-content :is(
+  .tabs,
+  .sup-tabs,
+  .cf-row-tabs,
+  .reports-tabs-sidebar,
+  .skh-tabs,
+  .skh-chips,
+  .pi-chips,
+  .axs-tabs,
+  .rq-tabs,
+  .axa-tabs,
+  .axa-qt,
+  .axn-tabs,
+  .axad-tabs,
+  .axo-per,
+  .axst-chips,
+  .pfx-views,
+  .pfx-seg,
+  .fc-chips,
+  .cus-who,
+  .axr-tabs,
+  .axu-chips
+) > button:not(.active):not(.on):not([aria-selected="true"])::before,
+html.aurum #page-content .ax-seg:not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"])::before,
+html.aurum #page-content [role="tablist"]:not(.pxs-tiles):not(.fc-cal):not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"])::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: auto !important;
+  height: auto !important;
+  margin: 0;
+  border-radius: inherit;
+  background: var(--nav-rise-plate);
+  transform: scaleY(0);
+  transform-origin: bottom center;
+  transition: transform 700ms cubic-bezier(0.65, 0, 0.35, 1) !important;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 1;
+}
+@media (hover: hover) {
+  html.aurum #page-content :is(
+    .section-action-bar,
+    .page-actions,
+    .rq-head-a,
+    .mr-acts,
+    .axs-lock,
+    .axu-ha,
+    .report-toolbar-controls
+  ) > .btn:hover,
+  html.aurum #page-content :is(.page-header, .pi-head) > .btn:hover,
+  html.aurum #page-content .sl-head > .sl-new:hover,
+  html.aurum #page-content .sl-tools > .sl-tool:not(.on):hover,
+  html.aurum #page-content :is(
+    .tabs,
+    .sup-tabs,
+    .cf-row-tabs,
+    .reports-tabs-sidebar,
+    .skh-tabs,
+    .skh-chips,
+    .pi-chips,
+    .axs-tabs,
+    .rq-tabs,
+    .axa-tabs,
+    .axa-qt,
+    .axn-tabs,
+    .axad-tabs,
+    .axo-per,
+    .axst-chips,
+    .pfx-views,
+    .pfx-seg,
+    .fc-chips,
+    .cus-who,
+    .axr-tabs,
+    .axu-chips
+  ) > button:not(.active):not(.on):not([aria-selected="true"]):hover,
+  html.aurum #page-content .ax-seg:not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"]):hover,
+  html.aurum #page-content [role="tablist"]:not(.pxs-tiles):not(.fc-cal):not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"]):hover {
+    color: var(--nav-rise-ink) !important;
+    transform: none !important;
+    filter: none !important;
+    box-shadow: none !important;
+  }
+  html.aurum #page-content :is(
+    .section-action-bar,
+    .page-actions,
+    .rq-head-a,
+    .mr-acts,
+    .axs-lock,
+    .axu-ha,
+    .report-toolbar-controls
+  ) > .btn:hover::before,
+  html.aurum #page-content :is(.page-header, .pi-head) > .btn:hover::before,
+  html.aurum #page-content .sl-head > .sl-new:hover::before,
+  html.aurum #page-content .sl-tools > .sl-tool:not(.on):hover::before,
+  html.aurum #page-content :is(
+    .tabs,
+    .sup-tabs,
+    .cf-row-tabs,
+    .reports-tabs-sidebar,
+    .skh-tabs,
+    .skh-chips,
+    .pi-chips,
+    .axs-tabs,
+    .rq-tabs,
+    .axa-tabs,
+    .axa-qt,
+    .axn-tabs,
+    .axad-tabs,
+    .axo-per,
+    .axst-chips,
+    .pfx-views,
+    .pfx-seg,
+    .fc-chips,
+    .cus-who,
+    .axr-tabs,
+    .axu-chips
+  ) > button:not(.active):not(.on):not([aria-selected="true"]):hover::before,
+  html.aurum #page-content .ax-seg:not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"]):hover::before,
+  html.aurum #page-content [role="tablist"]:not(.pxs-tiles):not(.fc-cal):not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"]):hover::before {
+    transform: scaleY(1);
+    transition-duration: 650ms !important;
+  }
+  html.aurum #page-content :is(
+    .section-action-bar,
+    .page-actions,
+    .rq-head-a,
+    .mr-acts,
+    .axs-lock,
+    .axu-ha,
+    .report-toolbar-controls
+  ) > .btn:hover :is(svg, .icon),
+  html.aurum #page-content :is(.page-header, .pi-head) > .btn:hover :is(svg, .icon),
+  html.aurum #page-content .sl-head > .sl-new:hover :is(svg, .icon),
+  html.aurum #page-content .sl-tools > .sl-tool:not(.on):hover :is(svg, .icon) {
+    color: var(--nav-rise-ink) !important;
+  }
+}
+html.aurum #page-content :is(
+  .section-action-bar,
+  .page-actions,
+  .rq-head-a,
+  .mr-acts,
+  .axs-lock,
+  .axu-ha,
+  .report-toolbar-controls
+) > .btn:is(:focus-visible, :active),
+html.aurum #page-content :is(.page-header, .pi-head) > .btn:is(:focus-visible, :active),
+html.aurum #page-content .sl-head > .sl-new:is(:focus-visible, :active),
+html.aurum #page-content .sl-tools > .sl-tool:not(.on):is(:focus-visible, :active),
+html.aurum #page-content :is(
+  .tabs,
+  .sup-tabs,
+  .cf-row-tabs,
+  .reports-tabs-sidebar,
+  .skh-tabs,
+  .skh-chips,
+  .pi-chips,
+  .axs-tabs,
+  .rq-tabs,
+  .axa-tabs,
+  .axa-qt,
+  .axn-tabs,
+  .axad-tabs,
+  .axo-per,
+  .axst-chips,
+  .pfx-views,
+  .pfx-seg,
+  .fc-chips,
+  .cus-who,
+  .axr-tabs,
+  .axu-chips
+) > button:not(.active):not(.on):not([aria-selected="true"]):is(:focus-visible, :active),
+html.aurum #page-content .ax-seg:not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"]):is(:focus-visible, :active),
+html.aurum #page-content [role="tablist"]:not(.pxs-tiles):not(.fc-cal):not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"]):is(:focus-visible, :active) {
+  color: var(--nav-rise-ink) !important;
+  transform: none !important;
+  filter: none !important;
+  box-shadow: none !important;
+}
+html.aurum #page-content :is(
+  .section-action-bar,
+  .page-actions,
+  .rq-head-a,
+  .mr-acts,
+  .axs-lock,
+  .axu-ha,
+  .report-toolbar-controls
+) > .btn:is(:focus-visible, :active)::before,
+html.aurum #page-content :is(.page-header, .pi-head) > .btn:is(:focus-visible, :active)::before,
+html.aurum #page-content .sl-head > .sl-new:is(:focus-visible, :active)::before,
+html.aurum #page-content .sl-tools > .sl-tool:not(.on):is(:focus-visible, :active)::before,
+html.aurum #page-content :is(
+  .tabs,
+  .sup-tabs,
+  .cf-row-tabs,
+  .reports-tabs-sidebar,
+  .skh-tabs,
+  .skh-chips,
+  .pi-chips,
+  .axs-tabs,
+  .rq-tabs,
+  .axa-tabs,
+  .axa-qt,
+  .axn-tabs,
+  .axad-tabs,
+  .axo-per,
+  .axst-chips,
+  .pfx-views,
+  .pfx-seg,
+  .fc-chips,
+  .cus-who,
+  .axr-tabs,
+  .axu-chips
+) > button:not(.active):not(.on):not([aria-selected="true"]):is(:focus-visible, :active)::before,
+html.aurum #page-content .ax-seg:not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"]):is(:focus-visible, :active)::before,
+html.aurum #page-content [role="tablist"]:not(.pxs-tiles):not(.fc-cal):not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"]):is(:focus-visible, :active)::before {
+  transform: scaleY(1);
+  transition-duration: 650ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.aurum #page-content :is(
+    .section-action-bar,
+    .page-actions,
+    .rq-head-a,
+    .mr-acts,
+    .axs-lock,
+    .axu-ha,
+    .report-toolbar-controls
+  ) > .btn::before,
+  html.aurum #page-content :is(.page-header, .pi-head) > .btn::before,
+  html.aurum #page-content .sl-head > .sl-new::before,
+  html.aurum #page-content .sl-tools > .sl-tool:not(.on)::before,
+  html.aurum #page-content :is(
+    .tabs,
+    .sup-tabs,
+    .cf-row-tabs,
+    .reports-tabs-sidebar,
+    .skh-tabs,
+    .skh-chips,
+    .pi-chips,
+    .axs-tabs,
+    .rq-tabs,
+    .axa-tabs,
+    .axa-qt,
+    .axn-tabs,
+    .axad-tabs,
+    .axo-per,
+    .axst-chips,
+    .pfx-views,
+    .pfx-seg,
+    .fc-chips,
+    .cus-who,
+    .axr-tabs,
+    .axu-chips
+  ) > button:not(.active):not(.on):not([aria-selected="true"])::before,
+  html.aurum #page-content .ax-seg:not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"])::before,
+  html.aurum #page-content [role="tablist"]:not(.pxs-tiles):not(.fc-cal):not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"])::before {
+    transition: none !important;
+  }
 }
