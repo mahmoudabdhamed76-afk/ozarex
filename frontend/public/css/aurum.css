@@ -6122,27 +6122,11 @@ html[data-theme="light"] .axface-orb {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   4.53 · Water fill on two sidebar items only:
+   4.54 · Flat bottom-to-top plate on two sidebar items only:
    لوحة التحكم (dashboard) and صرف الورق (issuances). Other items are untouched.
-   The fill is ::before. It rises from the bottom (~900ms) and drains back
-   (~1000ms). A repeating mask gives the top edge a low wave; translating the
-   fill sideways slides that crest while the water is visible. Scale and slide
-   share one transform, so nothing about the row's layout changes.
+   The fill is ::before, scaled from the bottom edge. It rises in ~650ms and
+   drains in ~700ms. Text and icon stay above it.
 ════════════════════════════════════════════════════════════════════ */
-@property --rise {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
-}
-@property --wave-x {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
-}
-@keyframes navWaterSlide {
-  from { --wave-x: 0px; }
-  to { --wave-x: -48px; }
-}
 html.aurum .nav-item.nav-rise:not(.active) {
   background: transparent !important;
   background-image: none !important;
@@ -6158,32 +6142,16 @@ html.aurum .nav-item.nav-rise > span {
 }
 html.aurum .nav-item.nav-rise .icon { transition: none !important; }
 html.aurum .nav-item.nav-rise::before {
-  --rise: 0;
-  --wave-x: 0px;
   content: '';
   position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -64px;
-  right: auto;
-  width: calc(100% + 128px) !important;
+  inset: 0;
+  width: auto !important;
   height: auto !important;
-  border-radius: 0;
+  border-radius: inherit;
   background: #14161c;
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2218%22%20viewBox%3D%220%200%2048%2018%22%3E%3Cpath%20fill%3D%22%23fff%22%20d%3D%22M0%208C4%208%208%2014%2012%2014C16%2014%2020%208%2024%208C28%208%2032%202%2036%202C40%202%2044%208%2048%208V18H0Z%22%2F%3E%3C%2Fsvg%3E"), linear-gradient(#000, #000);
-  mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2218%22%20viewBox%3D%220%200%2048%2018%22%3E%3Cpath%20fill%3D%22%23fff%22%20d%3D%22M0%208C4%208%208%2014%2012%2014C16%2014%2020%208%2024%208C28%208%2032%202%2036%202C40%202%2044%208%2048%208V18H0Z%22%2F%3E%3C%2Fsvg%3E"), linear-gradient(#000, #000);
-  -webkit-mask-size: 48px 18px, 100% calc(100% - 18px);
-  mask-size: 48px 18px, 100% calc(100% - 18px);
-  -webkit-mask-position: left top, left bottom;
-  mask-position: left top, left bottom;
-  -webkit-mask-repeat: repeat-x, no-repeat;
-  mask-repeat: repeat-x, no-repeat;
-  -webkit-mask-composite: source-over;
-  mask-composite: add;
-  transform: translate3d(var(--wave-x), 0, 0) scaleY(var(--rise));
+  transform: scaleY(0);
   transform-origin: bottom center;
-  transition: --rise 1000ms cubic-bezier(0.45, 0, 0.2, 1) !important;
-  animation: navWaterSlide 3.2s linear infinite;
+  transition: transform 700ms cubic-bezier(0.65, 0, 0.35, 1) !important;
   z-index: 0;
   pointer-events: none;
   opacity: 1;
@@ -6198,8 +6166,8 @@ html.aurum .nav-item.nav-rise::before {
     box-shadow: none !important;
   }
   html.aurum .nav-item.nav-rise:hover:not(.active)::before {
-    --rise: 1;
-    transition-duration: 900ms !important;
+    transform: scaleY(1);
+    transition-duration: 650ms !important;
   }
   html.aurum .nav-item.nav-rise:hover:not(.active) .icon {
     color: #f4f6f8 !important;
@@ -6215,16 +6183,13 @@ html.aurum .nav-item.nav-rise:is(:focus-visible, :active):not(.active) {
   box-shadow: none !important;
 }
 html.aurum .nav-item.nav-rise:is(:focus-visible, :active):not(.active)::before {
-  --rise: 1;
-  transition-duration: 900ms !important;
+  transform: scaleY(1);
+  transition-duration: 650ms !important;
 }
 html.aurum .nav-item.nav-rise:is(:focus-visible, :active):not(.active) .icon {
   color: #f4f6f8 !important;
   background: transparent !important;
 }
 @media (prefers-reduced-motion: reduce) {
-  html.aurum .nav-item.nav-rise::before {
-    transition: none !important;
-    animation: none !important;
-  }
+  html.aurum .nav-item.nav-rise::before { transition: none !important; }
 }
