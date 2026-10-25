@@ -11495,8 +11495,7 @@ function renderSidebar() {
       if (unread > 0) badge = `<span class="badge badge-audit">${unread > 99 ? '99+' : unread}</span>`;
     }
     const isActive = currentPage === it.key;
-    const rise = it.key === 'dashboard' || it.key === 'issuances';
-    html += `<div class="nav-item${rise ? ' nav-rise' : ''} ${isActive?'active':''}" ${rise ? 'tabindex="0"' : ''} style="--nav-color:${it.color}" onclick="navigate('${it.key}')">
+    html += `<div class="nav-item${isActive ? ' active' : ''}" tabindex="0" style="--nav-color:${it.color}" onclick="navigate('${it.key}')">
       <span class="icon nav-icon-colored" style="background:${hexToRgba(it.color,0.15)};color:${it.color};border:1px solid ${hexToRgba(it.color,0.3)}">${it.icon}</span>
       <span>${it.label}</span>
       ${badge}
