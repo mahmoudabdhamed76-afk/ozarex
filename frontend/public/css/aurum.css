@@ -6125,25 +6125,16 @@ html[data-theme="light"] .axface-orb {
    4.56 · Flat bottom-to-top plate on every sidebar nav item.
    The fill is ::before, scaled from the bottom edge. It rises in ~650ms and
    drains in ~700ms. Text and icon stay above it. The active pill is unchanged.
-   Light mode keeps the dark plate. Dark mode picks its plate with one line:
-   --nav-rise-look: red;    softer brand red, white text
-   --nav-rise-look: white;  white plate, dark text
+   Light mode keeps the dark plate. Dark mode uses a white plate with dark
+   text, so the fill stays visible on the dark sidebar.
 ════════════════════════════════════════════════════════════════════ */
 html.aurum #sidebar-nav {
   --nav-rise-plate: #14161c;
   --nav-rise-ink: #f4f6f8;
 }
 html.aurum[data-theme="dark"] #sidebar-nav {
-  container-name: navrise;
-  --nav-rise-look: red;
-  --nav-rise-plate: #C44750;
-  --nav-rise-ink: #ffffff;
-}
-@container navrise style(--nav-rise-look: white) {
-  .nav-item {
-    --nav-rise-plate: #ffffff;
-    --nav-rise-ink: #1a1214;
-  }
+  --nav-rise-plate: #ffffff;
+  --nav-rise-ink: #1a1214;
 }
 html.aurum #sidebar-nav .nav-item:not(.active) {
   background: transparent !important;
