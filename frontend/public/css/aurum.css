@@ -6122,12 +6122,11 @@ html[data-theme="light"] .axface-orb {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   4.54 · Flat bottom-to-top plate on two sidebar items only:
-   لوحة التحكم (dashboard) and صرف الورق (issuances). Other items are untouched.
+   4.55 · Flat bottom-to-top plate on every sidebar nav item.
    The fill is ::before, scaled from the bottom edge. It rises in ~650ms and
-   drains in ~700ms. Text and icon stay above it.
+   drains in ~700ms. Text and icon stay above it. The active pill is unchanged.
 ════════════════════════════════════════════════════════════════════ */
-html.aurum .nav-item.nav-rise:not(.active) {
+html.aurum #sidebar-nav .nav-item:not(.active) {
   background: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
@@ -6136,12 +6135,12 @@ html.aurum .nav-item.nav-rise:not(.active) {
   overflow: hidden;
   transition: none !important;
 }
-html.aurum .nav-item.nav-rise > span {
+html.aurum #sidebar-nav .nav-item > span {
   position: relative;
   z-index: 1;
 }
-html.aurum .nav-item.nav-rise .icon { transition: none !important; }
-html.aurum .nav-item.nav-rise::before {
+html.aurum #sidebar-nav .nav-item .icon { transition: none !important; }
+html.aurum #sidebar-nav .nav-item::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -6157,7 +6156,7 @@ html.aurum .nav-item.nav-rise::before {
   opacity: 1;
 }
 @media (hover: hover) {
-  html.aurum .nav-item.nav-rise:hover:not(.active) {
+  html.aurum #sidebar-nav .nav-item:hover:not(.active) {
     background: transparent !important;
     background-image: none !important;
     color: #f4f6f8 !important;
@@ -6165,16 +6164,16 @@ html.aurum .nav-item.nav-rise::before {
     filter: none !important;
     box-shadow: none !important;
   }
-  html.aurum .nav-item.nav-rise:hover:not(.active)::before {
+  html.aurum #sidebar-nav .nav-item:hover:not(.active)::before {
     transform: scaleY(1);
     transition-duration: 650ms !important;
   }
-  html.aurum .nav-item.nav-rise:hover:not(.active) .icon {
+  html.aurum #sidebar-nav .nav-item:hover:not(.active) .icon {
     color: #f4f6f8 !important;
     background: transparent !important;
   }
 }
-html.aurum .nav-item.nav-rise:is(:focus-visible, :active):not(.active) {
+html.aurum #sidebar-nav .nav-item:is(:focus-visible, :active):not(.active) {
   background: transparent !important;
   background-image: none !important;
   color: #f4f6f8 !important;
@@ -6182,14 +6181,14 @@ html.aurum .nav-item.nav-rise:is(:focus-visible, :active):not(.active) {
   filter: none !important;
   box-shadow: none !important;
 }
-html.aurum .nav-item.nav-rise:is(:focus-visible, :active):not(.active)::before {
+html.aurum #sidebar-nav .nav-item:is(:focus-visible, :active):not(.active)::before {
   transform: scaleY(1);
   transition-duration: 650ms !important;
 }
-html.aurum .nav-item.nav-rise:is(:focus-visible, :active):not(.active) .icon {
+html.aurum #sidebar-nav .nav-item:is(:focus-visible, :active):not(.active) .icon {
   color: #f4f6f8 !important;
   background: transparent !important;
 }
 @media (prefers-reduced-motion: reduce) {
-  html.aurum .nav-item.nav-rise::before { transition: none !important; }
+  html.aurum #sidebar-nav .nav-item::before { transition: none !important; }
 }
