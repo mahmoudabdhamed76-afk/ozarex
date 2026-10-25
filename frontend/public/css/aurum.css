@@ -6122,10 +6122,29 @@ html[data-theme="light"] .axface-orb {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   4.55 · Flat bottom-to-top plate on every sidebar nav item.
+   4.56 · Flat bottom-to-top plate on every sidebar nav item.
    The fill is ::before, scaled from the bottom edge. It rises in ~650ms and
    drains in ~700ms. Text and icon stay above it. The active pill is unchanged.
+   Light mode keeps the dark plate. Dark mode picks its plate with one line:
+   --nav-rise-look: red;    softer brand red, white text
+   --nav-rise-look: white;  white plate, dark text
 ════════════════════════════════════════════════════════════════════ */
+html.aurum #sidebar-nav {
+  --nav-rise-plate: #14161c;
+  --nav-rise-ink: #f4f6f8;
+}
+html.aurum[data-theme="dark"] #sidebar-nav {
+  container-name: navrise;
+  --nav-rise-look: red;
+  --nav-rise-plate: #C44750;
+  --nav-rise-ink: #ffffff;
+}
+@container navrise style(--nav-rise-look: white) {
+  .nav-item {
+    --nav-rise-plate: #ffffff;
+    --nav-rise-ink: #1a1214;
+  }
+}
 html.aurum #sidebar-nav .nav-item:not(.active) {
   background: transparent !important;
   background-image: none !important;
@@ -6147,7 +6166,7 @@ html.aurum #sidebar-nav .nav-item::before {
   width: auto !important;
   height: auto !important;
   border-radius: inherit;
-  background: #14161c;
+  background: var(--nav-rise-plate);
   transform: scaleY(0);
   transform-origin: bottom center;
   transition: transform 700ms cubic-bezier(0.65, 0, 0.35, 1) !important;
@@ -6159,7 +6178,7 @@ html.aurum #sidebar-nav .nav-item::before {
   html.aurum #sidebar-nav .nav-item:hover:not(.active) {
     background: transparent !important;
     background-image: none !important;
-    color: #f4f6f8 !important;
+    color: var(--nav-rise-ink) !important;
     transform: none !important;
     filter: none !important;
     box-shadow: none !important;
@@ -6169,14 +6188,14 @@ html.aurum #sidebar-nav .nav-item::before {
     transition-duration: 650ms !important;
   }
   html.aurum #sidebar-nav .nav-item:hover:not(.active) .icon {
-    color: #f4f6f8 !important;
+    color: var(--nav-rise-ink) !important;
     background: transparent !important;
   }
 }
 html.aurum #sidebar-nav .nav-item:is(:focus-visible, :active):not(.active) {
   background: transparent !important;
   background-image: none !important;
-  color: #f4f6f8 !important;
+  color: var(--nav-rise-ink) !important;
   transform: none !important;
   filter: none !important;
   box-shadow: none !important;
@@ -6186,7 +6205,7 @@ html.aurum #sidebar-nav .nav-item:is(:focus-visible, :active):not(.active)::befo
   transition-duration: 650ms !important;
 }
 html.aurum #sidebar-nav .nav-item:is(:focus-visible, :active):not(.active) .icon {
-  color: #f4f6f8 !important;
+  color: var(--nav-rise-ink) !important;
   background: transparent !important;
 }
 @media (prefers-reduced-motion: reduce) {
