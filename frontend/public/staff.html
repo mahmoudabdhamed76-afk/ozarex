@@ -13,6 +13,10 @@
 <title>حضور وانصراف</title>
 <link rel="stylesheet" href="fonts/fonts.css">
 <style>
+.mq{border:2px solid #F97316!important;background:linear-gradient(180deg,#FFF7ED,#fff 70%)!important;animation:mqIn .5s cubic-bezier(.2,1.4,.4,1) both}.mq.ur{border-color:#DC2626!important;background:linear-gradient(180deg,#FEF2F2,#fff 70%)!important}
+.mq .big{display:block;font-size:18px;color:#1F2937}.mqp{background:#fff;border:1px solid #FED7AA;border-radius:14px;padding:10px 12px;margin-top:10px;font-size:15px;line-height:1.6;color:#7C2D12}
+.mqb{width:100%;margin-top:12px;background:linear-gradient(135deg,#F97316,#EA580C)!important;color:#fff!important;font-size:16px!important;font-weight:800!important;border:0!important;border-radius:14px!important;padding:14px!important;box-shadow:0 10px 24px -12px rgba(234,88,12,.8)}
+@keyframes mqIn{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
 .tph{display:flex;gap:8px;margin-top:10px}.tph img{width:86px;height:86px;object-fit:cover;border-radius:14px;display:block;border:2px solid rgba(249,115,22,.5)}
 /* 4.75 · no zoom on the phone */
 html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}@supports (-webkit-touch-callout:none){input,select,textarea{font-size:16px!important}}
@@ -294,7 +298,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   function dur(m) { m = Math.max(0, Math.round(m)); return p2(Math.floor(m / 60)) + ':' + p2(m % 60); }
   function tsMs(ts) { return Date.parse(ts.replace(' ', 'T') + 'Z'); }
 
-  function stop() { clearInterval(pingTimer); clearInterval(clockTimer); clearInterval(taskTimer); pingTimer = clockTimer = taskTimer = 0; }
+  function stop() { clearInterval(mrqTimer); clearInterval(pingTimer); clearInterval(clockTimer); clearInterval(taskTimer); pingTimer = clockTimer = taskTimer = 0; }
 
   /* ── location ── */
   function dist(a, b, c, d) { var R = 6371000, r = function (x) { return x * Math.PI / 180; }, dla = r(c - a), dlo = r(d - b); var h = Math.sin(dla / 2) * Math.sin(dla / 2) + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(dlo / 2) * Math.sin(dlo / 2); return 2 * R * Math.asin(Math.sqrt(h)); }
@@ -358,7 +362,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   }
 
   function load() {
-    return api('GET', '/home').then(function (h) { H = h; syncClock(h.now.ts); month = h.month.month; hist = h.month; renderHome(); startPings(); startTaskPings(); }).catch(function (e) { if (e.message) toast(e.message, true); });
+    return api('GET', '/home').then(function (h) { H = h; syncClock(h.now.ts); month = h.month.month; hist = h.month; renderHome(); startPings(); startTaskPings(); startMaintPoll(); }).catch(function (e) { if (e.message) toast(e.message, true); });
   }
 
   function stateChip() {
@@ -383,7 +387,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       '<div class="st">' + stateChip() + '</div>' + bigBtn() +
       '<div class="wk"><div><span>ميعاد الشغل</span><b class="wkt">' + t12(H.rules.start) + ' ← ' + t12(H.rules.end) + '</b></div><div><span>مدة الشغل النهارده</span><b id="wk">' + (H.rec ? dur(H.rec.worked) : '00:00') + '</b></div></div></section>' +
       '<div class="loc" id="loc">' + ICON.pin + '<span>بنحدد موقعك…</span></div>' +
-      '<div id="rwc"></div><div id="tsk"></div><div id="vis"></div><div class="qa" id="qa"></div><div id="pushb"></div>' +
+      '<div id="rwc"></div><div id="mrq"></div><div id="tsk"></div><div id="vis"></div><div class="qa" id="qa"></div><div id="pushb"></div>' +
       (H.track ? '<p class="hint" style="margin:10px 6px 0;text-align:right">موقعك بيتبعت للإدارة كل ' + H.ping_min + ' دقيقة <b>وإنت في الشغل بس</b> (من تسجيل الحضور لحد الانصراف). سيب الصفحة مفتوحة، وبعد الانصراف مفيش أي تتبع.</p>' : '') +
       '<h2>الشهر ده</h2><div class="mn" id="mn"></div>' +
       '<h2>السجل <span class="sp"><button class="nv" id="mp">' + ICON.prev + '</button><b id="ml" style="font-size:13px;min-width:92px;text-align:center"></b><button class="nv" id="mnx">' + ICON.next + '</button></span></h2><div id="hl"></div>';
@@ -533,8 +537,41 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       return '<div class="' + (i < cur || done ? 'ok' : '') + (i === cur ? ' cur s-' + x[0] + (ch ? ' pop' : '') : '') + '"><i>' + x[1] + '</i><span>' + x[2] + '</span><em>' + (i <= cur && at[i] ? hm(at[i]) : '') + '</em></div>'; }).join('') + '</div>';
   }
   function animSteps(root) { setTimeout(function () { [].forEach.call((root || document).querySelectorAll('.stq-t b[data-to]'), function (b) { b.style.width = b.dataset.to + '%'; }); }, 40); }
+  /* 4.84 · طلبات صيانة من المراكز — بتيجي لكل موظفين الصيانة، وأول واحد يدوس «أنا هاخدها» بياخدها ويبدأ المسار */
+  var MRQ = [], mrqTimer = null, mrqSeen = {};
+  function loadMaint() {
+    if (!H) return;
+    api('GET', '/maint').then(function (r) {
+      var L = r.list || [], fresh = L.some(function (x) { return !mrqSeen[x.id]; });
+      L.forEach(function (x) { mrqSeen[x.id] = 1; });
+      if (fresh && MRQ.length !== undefined && L.length) sfx('task');
+      MRQ = L; paintMaint();
+    }).catch(function () {});
+  }
+  function paintMaint() {
+    var el = $('mrq'); if (!el) return;
+    el.innerHTML = MRQ.map(function (x) {
+      var pb = API + '/maint/photo?req=' + x.id + '&i=';
+      return '<div class="vc mq' + (x.urgent ? ' ur' : '') + '"><div class="row1"><span class="ic">' + (x.urgent ? '🚨' : '🛠') + '</span><div style="flex:1;min-width:0"><div class="sub">طلب صيانة جديد · ' + hm(x.created_at) + '</div><b class="big">' + esc(x.center) + '</b></div></div>' +
+        '<div class="mqp">' + (x.device ? '<b>' + esc(x.device) + ':</b> ' : '') + esc(x.problem) + '</div>' +
+        (x.urgent ? '<div class="sub" style="color:#DC2626;font-weight:800;margin-top:6px">🚨 مستعجل — الشغل واقف</div>' : '') + (x.contact ? '<div class="sub" style="margin-top:4px">👤 ' + esc(x.contact) + '</div>' : '') +
+        (x.photos ? '<div class="tph">' + Array.apply(null, Array(Math.min(3, x.photos))).map(function (_, k) { return '<a href="' + pb + k + '" target="_blank"><img src="' + pb + k + '" alt="" loading="lazy"></a>'; }).join('') + '</div>' : '') +
+        '<button class="btn mqb" data-mq="' + x.id + '">✋ أنا هاخدها</button></div>';
+    }).join('');
+    [].forEach.call(el.querySelectorAll('[data-mq]'), function (b) { b.onclick = function () { acceptMaint(b); }; });
+  }
+  function acceptMaint(b) {
+    if (busy) return; busy = true; b.disabled = true; b.textContent = 'لحظة…';
+    var fin = function () { busy = false; b.disabled = false; b.textContent = '✋ أنا هاخدها'; };
+    getPos(true).catch(function () { return null; }).then(function (p) { return api('POST', '/maint/accept', { id: Number(b.dataset.mq), lat: p && p.lat, lng: p && p.lng, acc: p && p.acc }); })
+      .then(function (r) { sfx('step'); fin(); MRQ = MRQ.filter(function (x) { return String(x.id) !== b.dataset.mq; }); paintMaint(); H = r.home; syncClock(H.now.ts); paintTasks(); paintLoc(); startTaskPings();
+        toast(r.started ? '🚗 الطلب بقى عندك والمسار اشتغل — المدير والمركز عرفوا' : '✅ الطلب بقى عندك — سجّل حضورك ودوس «أنا في الطريق»'); })
+      .catch(function (e) { fin(); if (e.message) toast(e.message, true); loadMaint(); });
+  }
+  function startMaintPoll() { clearInterval(mrqTimer); loadMaint(); mrqTimer = setInterval(function () { if (document.visibilityState === 'visible') loadMaint(); }, 30000); }
   function paintTasks() {
     var el = $('tsk'); if (!el || !H) return;
+    paintMaint();
     paintQuick();
     el.innerHTML = (H.tasks || []).map(function (t) {
       var nx = NEXT[t.status];

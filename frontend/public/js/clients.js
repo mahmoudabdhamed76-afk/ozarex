@@ -163,7 +163,7 @@
   }
   var EMPS = null;
   function loadEmps(cb) { if (EMPS) return cb(EMPS); api('GET', '/emps').then(function (r) { EMPS = r.list || []; cb(EMPS); }).catch(function () { cb([]); }); }
-  function empSel(id) { return '<select class="form-control cl-emp" data-rq="' + id + '" style="flex:1;min-width:150px">' + '<option value="">اختار الموظف…</option>' + (EMPS || []).map(function (e) { return '<option value="' + esc(e.id) + '">' + esc(e.name) + (e.job ? ' — ' + esc(e.job) : '') + '</option>'; }).join('') + '</select>'; }
+  function empSel(id) { return '<select class="form-control cl-emp" data-rq="' + id + '" style="flex:1;min-width:150px;background:var(--ax-input,#1c0d10);color:inherit">' + '<option value="">اختار الموظف…</option>' + (EMPS || []).map(function (e) { return '<option value="' + esc(e.id) + '">' + esc(e.name) + (e.job ? ' — ' + esc(e.job) : '') + '</option>'; }).join('') + '</select>'; }
   function assign(id, sel) {
     var v = sel && sel.value; if (!v) return T('اختار الموظف الأول', 'error');
     api('POST', '/assign', { id: id, emp_id: v }).then(function (r) {
@@ -259,7 +259,9 @@
       '.clp-ph{display:flex;gap:8px;justify-content:center;margin:8px 0 2px;animation:clpRow .45s .75s both}.clp-ph img{width:92px;height:92px;object-fit:cover;border-radius:14px;border:2px solid #FED7AA;display:block}',
       '.cl-ph{display:flex;gap:8px;margin-top:10px}.cl-ph img{width:84px;height:84px;object-fit:cover;border-radius:12px;display:block;border:1px solid rgba(255,255,255,.15)}',
       '.clp-sel{flex:1.4;border:1px solid #CDEBD1!important;border-radius:14px!important;padding:11px 12px!important;font-family:inherit;font-size:15px!important;background:#fff!important;color:#1F2937!important;-webkit-text-fill-color:#1F2937}.clp-wait{flex:1;font-size:13px;color:#64748B;padding:10px}',
-      '.clp-as{margin-top:2px}',
+      '.clp-as{margin-top:2px;flex-wrap:wrap;justify-content:center}',
+      '.clp-emp{display:inline-flex;align-items:center;gap:8px;border:1px solid #CDEBD1;background:#F1FBF3;color:#1F2937;border-radius:999px;padding:7px 14px 7px 8px;font-family:inherit;font-size:14.5px;font-weight:700;cursor:pointer;transition:transform .15s,background .15s}',
+      '.clp-emp:hover{background:#DCF3E0;transform:translateY(-1px)}.clp-emp b{width:28px;height:28px;border-radius:50%;background:#58A85E;color:#fff;display:grid;place-items:center;font-size:13px}.clp-emp small{font-size:11.5px;color:#64748B;font-weight:500}',
       '.clp-more{display:inline-block;margin-top:4px;font-size:13px;color:#fff;background:#ef4444;border-radius:999px;padding:3px 10px}'
     ].join('\n');
     document.head.appendChild(s);
@@ -283,8 +285,8 @@
     if (mnt) loadEmps(function (L) {
       var box = ov.querySelector('.clp-as'); if (!box) return;
       if (!L.length) { box.innerHTML = '<span class="clp-wait">مفيش موظفين نشطين — ضيفهم من «الموظفين»</span>'; return; }
-      box.innerHTML = '<select class="clp-sel"><option value="">اختار الموظف…</option>' + L.map(function (e) { return '<option value="' + esc(e.id) + '">' + esc(e.name) + '</option>'; }).join('') + '</select><button class="clp-b2" data-x="assign" type="button">👷 حوّله</button>';
-      box.querySelector('[data-x=assign]').onclick = function () { var sl = box.querySelector('.clp-sel'); if (!sl.value) { sl.focus(); return T('اختار الموظف الأول', 'error'); } assign(m.id, sl); close(); };
+      box.innerHTML = L.map(function (e) { return '<button class="clp-emp" data-e="' + esc(e.id) + '" type="button"><b>' + esc(String(e.name || '?').trim().charAt(0)) + '</b>' + esc(e.name) + (e.job ? '<small>' + esc(e.job) + '</small>' : '') + '</button>'; }).join('');
+      [].forEach.call(box.querySelectorAll('.clp-emp'), function (b) { b.onclick = function () { assign(m.id, { value: b.dataset.e }); close(); }; });
     });
     var close = function (then) {
       ov.classList.add('out'); setTimeout(function () { ov.remove(); if (then) then(); else if (POPQ.length) showPop(POPQ.shift()); }, 220);
@@ -345,7 +347,7 @@
     return '<h3>' + (m.urgent ? '🚨' : '🛠') + ' طلب صيانة</h3><p class="ctr">' + esc(m.center || '') + '</p>' +
       (m.device ? '<span class="late" style="background:#FFF7ED;color:#C2410C">' + esc(m.device) + '</span>' : '') + (m.urgent ? ' <span class="late hot">مستعجل — الشغل واقف</span>' : '') +
       '<div class="clp-pr">' + esc(m.problem || '') + '</div>' + phStrip(m.id, m.photos, 'clp-ph') + (m.contact ? '<p class="mt2">👤 ' + esc(m.contact) + '</p>' : '') +
-      '<p class="mt2" style="margin-top:8px">وصل إشعار لكل الموظفين — حوّله لموظف معيّن يتسجّل عنده مهمة:</p>';
+      '<p class="mt2" style="margin-top:8px">📣 اتبعت لكل موظفين الصيانة — أول واحد يدوس «أنا هاخدها» بياخده ويبدأ المسار.</p><p class="mt2" style="font-weight:700;color:#334155">أو حوّله بنفسك لموظف:</p>';
   }
   function dueTick(force) {
     if (!canDue() || (!dueOn() && !force)) return;

@@ -50,7 +50,7 @@ portal.setNotify({
   admins: () => ((store.data() || {}).users || []).filter(u => u && u.role === 'admin' && !u.disabled).map(u => u.id),
   event: (name, payload) => { try { broadcast(name, payload); } catch (e) {} },
   push: webpush,
-  staff: { createTask: (b, who) => staff.createTask(b, who), activeEmps: () => staff.activeEmps(), toEmps: (ids, msg) => staff.toEmps(ids, msg) }
+  staff: { createTask: (b, who) => staff.createTask(b, who), activeEmps: () => staff.activeEmps(), techs: () => staff.techs(), toEmps: (ids, msg) => staff.toEmps(ids, msg) }
 });
 const digest = require('./src/digest');
 /* 4.39 · the daily summary + instant alerts read every active branch */

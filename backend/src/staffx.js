@@ -155,6 +155,35 @@ module.exports = function init(H) {
   const faultOfTask = id => { const f = db.prepare('SELECT f.code, f.title, f.solution FROM staff_fault f JOIN staff_visit v ON v.id = f.visit_id WHERE v.task_id = ? ORDER BY f.id DESC LIMIT 1').get(id); return f ? { code: f.code || '', title: f.title, solution: f.solution } : null; };
   /* 4.83 · photos of the fault the center sent (portal_photo, made by portal.js) */
   const photosOf = t => { if (!t || !t.portal_req) return 0; try { return db.prepare('SELECT COUNT(*) AS n FROM portal_photo WHERE req_id = ?').get(t.portal_req).n; } catch (e) { return 0; } };
+  /* 4.84 · طلبات الصيانة من المراكز بتروح لكل موظفين الصيانة، وأول واحد يقبل بياخدها */
+  const isTech = e => /صيان|فني|تقني|maint|tech/i.test(String((e && e.job) || ''));
+  function techs() { const all = db.prepare('SELECT * FROM staff_emp WHERE active = 1').all(), t = all.filter(isTech); return t.length ? t : all; }
+  const canMaint = e => techs().some(x => x.id === e.id);
+  function openMaint(e) {
+    if (!canMaint(e)) return [];
+    let rows = []; try { rows = db.prepare("SELECT * FROM portal_req WHERE kind = 'maint' AND status = 'new' ORDER BY id DESC LIMIT 20").all(); } catch (er) { return []; }
+    return rows.filter(r => !e.branch_id || !r.branch || r.branch === e.branch_id || r.branch === 'main').map(r => {
+      let it = {}; try { it = JSON.parse(r.items) || {}; } catch (er) {}
+      let n = 0; try { n = db.prepare('SELECT COUNT(*) AS n FROM portal_photo WHERE req_id = ?').get(r.id).n; } catch (er) {}
+      return { id: r.id, center: r.customer_name, device: it.device || '', urgent: !!it.urgent, problem: r.note || '', contact: r.contact || '', created_at: r.created_at, photos: n };
+    });
+  }
+  function acceptMaint(e, b) {
+    if (!canMaint(e)) fail(403, 'الطلبات دي لموظفين الصيانة بس');
+    const r = (() => { try { return db.prepare("SELECT * FROM portal_req WHERE id = ? AND kind = 'maint'").get(Number(b.id)); } catch (er) { return null; } })();
+    if (!r) fail(404, 'الطلب مش موجود');
+    const won = db.prepare("UPDATE portal_req SET status = 'ok', reply = ?, done_at = ?, done_by = ? WHERE id = ? AND status = 'new'").run('اتقبل بواسطة ' + e.name, nowLocal().ts, e.name, r.id).changes;
+    if (!won) fail(409, 'زميلك سبقك وقبل الطلب ده 🙂');
+    let it = {}; try { it = JSON.parse(r.items) || {}; } catch (er) {}
+    const t = createTask({ emp_id: e.id, center: (r.branch || 'main') + ':' + r.customer_id, title: '🛠 صيانة' + (it.device ? ' — ' + it.device : '') + (it.urgent ? ' (مستعجل)' : ''), note: r.note, portal_req: r.id }, 'emp:' + e.id);
+    let started = false;
+    try { if (num(b.lat) !== null) { startTask(e, { id: t.id, lat: b.lat, lng: b.lng, acc: b.acc }); started = true; } } catch (er) {}
+    try { NT.event('portal', { kind: 'status', id: r.id }); } catch (er) {}
+    toAdmins({ kind: 'in', title: '👷 ' + e.name + ' قبل طلب صيانة', body: r.customer_name + (it.device ? ' — ' + it.device : ''), tag: 'pmt-' + r.id });
+    const others = techs().map(x => x.id).filter(id => id !== e.id);
+    if (others.length) toEmps(others, { title: '✅ طلب صيانة ' + r.customer_name + ' اتاخد', body: e.name + ' هيروح', tag: 'pmt-' + r.id });
+    return { task: t.id, started };
+  }
   const taskOut = t => {
     const c = centerByKey(t.center_key), known = !!(c && c.lat != null);
     const pct = t.status === 'arrived' || t.status === 'done' ? 100 : (t.d0 && t.dist != null ? Math.max(0, Math.min(99, Math.round((1 - t.dist / Math.max(t.d0, 1)) * 100))) : 0);
@@ -377,6 +406,15 @@ module.exports = function init(H) {
     if (pathname === '/staff/api/push/key' && req.method === 'GET') return send(200, { key: webpush.publicKey(), devices: webpush.countFor('emp:' + e.id) }), true;
     if (pathname === '/staff/api/push/subscribe' && post) { const b = await body(); try { webpush.subscribe({ id: 'emp:' + e.id }, b.subscription, req.headers['user-agent']); } catch (er) { return send(400, { error: 'bad', message: 'الاشتراك ده مش صالح' }), true; } return send(200, { ok: true }), true; }
     if (pathname === '/staff/api/push/off' && post) { const b = await body(); webpush.unsubscribe(b.endpoint); return send(200, { ok: true }), true; }
+    if (pathname === '/staff/api/maint' && req.method === 'GET') return send(200, { list: openMaint(e) }), true;
+    if (pathname === '/staff/api/maint/accept' && post) { const r = acceptMaint(e, await body()); return send(200, Object.assign({ ok: true, home: H.home(e) }, r)), true; }
+    if (pathname === '/staff/api/maint/photo' && req.method === 'GET') {
+      const rid = Number(q.get('req')); let ok = false;
+      try { ok = (canMaint(e) && !!db.prepare("SELECT 1 FROM portal_req WHERE id = ? AND status = 'new'").get(rid)) || !!db.prepare('SELECT 1 FROM staff_task WHERE portal_req = ? AND emp_id = ?').get(rid, e.id); } catch (er) {}
+      let ph = null; try { ph = ok ? db.prepare('SELECT * FROM portal_photo WHERE req_id = ? ORDER BY id LIMIT 1 OFFSET ?').get(rid, Math.max(0, Number(q.get('i')) || 0)) : null; } catch (er) {}
+      if (!ph) { res.writeHead(404); res.end(); return true; }
+      res.writeHead(200, { 'Content-Type': ph.mime || 'image/jpeg', 'Content-Length': ph.data.length, 'Cache-Control': 'private, max-age=86400' }); res.end(ph.data); return true;
+    }
     if (pathname === '/staff/api/task/photo' && req.method === 'GET') {   // 4.83 · the fault photos, only for the employee the job belongs to
       const t = db.prepare('SELECT * FROM staff_task WHERE id = ? AND emp_id = ?').get(Number(q.get('id')), e.id);
       let ph = null; try { ph = t && t.portal_req ? db.prepare('SELECT * FROM portal_photo WHERE req_id = ? ORDER BY id LIMIT 1 OFFSET ?').get(t.portal_req, Math.max(0, Number(q.get('i')) || 0)) : null; } catch (er) {}
@@ -417,5 +455,5 @@ module.exports = function init(H) {
     }
     return false;
   }
-  return { createTask, taskOut, rewardsFor, stepTask, setNotify, onPunch, onVisit, addFault, tasksOf, board, visitStarted, visitEnded, publicRoute, adminRoute, recurring, searchFaults, toAdmins, toEmps };
+  return { createTask, techs, taskOut, rewardsFor, stepTask, setNotify, onPunch, onVisit, addFault, tasksOf, board, visitStarted, visitEnded, publicRoute, adminRoute, recurring, searchFaults, toAdmins, toEmps };
 };

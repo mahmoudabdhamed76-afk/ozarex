@@ -341,7 +341,7 @@ function takeMaint(req, res, stores, tok) {
     photos.forEach(p => { try { db.prepare('INSERT INTO portal_photo (req_id, mime, data, created_at) VALUES (?,?,?,?)').run(id, p.mime, p.buf, nowTs()); } catch (e) {} });
     try { NT.event('portal', { kind: 'maint', id, photos: photos.length, cid: found.c.id, branch: found.st.id || 'main', center: String(found.c.name || ''), device, problem, urgent, contact, text: head + ': ' + problem }); } catch (e) {}
     try { const ids = (NT.admins() || []).slice(0, 50); if (ids.length && NT.push) NT.push.send(ids, { title: head, body: (device ? device + ': ' : '') + problem, url: './?go=clients', tag: 'pmt-' + id, urgent: true }).catch(() => {}); } catch (e) {}
-    try { if (NT.staff) { const emps = NT.staff.activeEmps().map(e => e.id); if (emps.length) NT.staff.toEmps(emps, { title: head, body: (device ? device + ': ' : '') + problem + ' — لو هتروح سجّل مهمة للمركز ده', tag: 'pmt-' + id, urgent }); } } catch (e) {}
+    try { if (NT.staff) { const emps = NT.staff.techs ? NT.staff.techs() : NT.staff.activeEmps().map(e => e.id); if (emps.length) NT.staff.toEmps(emps, { title: head, body: (device ? device + ': ' : '') + problem + ' — افتح البرنامج ودوس «أنا هاخدها»', tag: 'pmt-' + id, urgent }); } } catch (e) {}
     send(200, { ok: true });
   });
 }
