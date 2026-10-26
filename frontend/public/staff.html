@@ -157,6 +157,20 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
 .fi .vt{margin-inline-start:auto;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer}.fi .vt.on{background:rgba(30,154,76,.14);border-color:var(--ok);color:var(--ok);font-weight:700}
 .bell{position:relative}.bell.on::after{content:"";position:absolute;top:7px;inset-inline-end:7px;width:8px;height:8px;border-radius:50%;background:var(--ok)}
 .pushb{display:flex;gap:10px;align-items:center;margin-top:12px;padding:12px 14px;border-radius:16px;border:1px dashed var(--line);background:var(--card);font-size:13px}.pushb .btn{width:auto;height:38px;padding:0 14px;font-size:13px;flex:none}
+/* 4.67 · his photo + the round «مهمة» button */
+.top .me{position:relative;width:48px;height:48px;border-radius:16px;border:0;padding:0;background:var(--red);display:grid;place-items:center;flex:none;cursor:pointer;box-shadow:0 8px 20px -10px var(--red)}
+.top .me img{width:100%;height:100%;object-fit:cover;border-radius:16px}.top .me b{font:900 22px/1 'Zain','IBM Plex Sans Arabic',sans-serif;color:#fff}
+.top .me i{position:absolute;bottom:-4px;inset-inline-start:-4px;width:20px;height:20px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-style:normal;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.fab{position:fixed;z-index:60;bottom:calc(22px + env(safe-area-inset-bottom));inset-inline-start:18px;width:64px;height:64px;border-radius:50%;border:0;background:linear-gradient(145deg,#ff3b2f,#c8100b);color:#fff;cursor:pointer;box-shadow:0 14px 30px -8px rgba(224,27,15,.65);display:grid;place-items:center;animation:fabIn .6s cubic-bezier(.2,1.5,.4,1) backwards}
+.fab b{font-size:24px;line-height:1;animation:fabWig 3.2s ease-in-out 1s infinite}
+.fab em{position:absolute;top:2px;inset-inline-end:2px;width:20px;height:20px;border-radius:50%;background:#fff;color:#c8100b;font:900 15px/20px sans-serif;font-style:normal}
+.fab small{position:absolute;bottom:-18px;font-size:11px;font-weight:800;color:var(--ink);white-space:nowrap}
+.fab .fr{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(224,27,15,.55);animation:fabRing 2.2s ease-out infinite}.fab .fr.b{animation-delay:1.1s}
+.fab:active{transform:scale(.92)}
+@keyframes fabIn{from{transform:scale(0) rotate(-90deg)}}
+@keyframes fabRing{from{transform:scale(1);opacity:.9}to{transform:scale(1.7);opacity:0}}
+@keyframes fabWig{0%,80%,100%{transform:rotate(0)}85%{transform:rotate(-14deg)}90%{transform:rotate(12deg)}95%{transform:rotate(-6deg)}}
+.w{padding-bottom:110px}
 /* 4.65 · المكافآت */
 .vc.rwd{border-color:rgba(247,193,45,.5);background:linear-gradient(180deg,rgba(247,193,45,.12),transparent 70%),var(--card)}.vc.rwd .ic{background:rgba(247,193,45,.2);font-size:18px}
 .rst{font-size:14px;color:#b7860b}
@@ -314,7 +328,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   /* ── screens ── */
   function logoHtml(big) { return brand.logo ? '<img src="' + esc(brand.logo) + '" alt="">' : '<b>' + esc((brand.name || 'O').trim().charAt(0).toUpperCase()) + '</b>'; }
   function renderLogin(msg) {
-    stop();
+    stop(); var fb = $('fab'); if (fb) fb.remove();
     var u = new URLSearchParams(location.search).get('u') || ls.get('ozs_u') || '';
     $('app').innerHTML = '<div class="lgn"><div class="brand"><div class="lg">' + logoHtml() + '</div><h1>' + esc(brand.name || 'Ozarex') + '</h1><p>تسجيل الحضور والانصراف</p></div>' +
       '<div class="card"><div class="err' + (msg ? ' on' : '') + '" id="lerr">' + esc(msg || '') + '</div>' +
@@ -343,16 +357,16 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   }
   function bigBtn() {
     var inn = H.state === 'in', done = H.state === 'done';
-    var label = inn ? 'سجّل انصراف' : (done ? 'رجوع للشغل' : 'سجّل حضور');
-    var sub = inn ? 'خلّصت شغل' : (done ? 'لو سجّلت بالغلط' : 'ابدأ يومك');
-    return '<div class="pbw' + (inn ? '' : ' off') + '"><span class="rg"></span><span class="rg b"></span><button class="pb' + (inn ? ' out' : '') + '" id="pb" ' + (done && !canResume() ? 'disabled' : '') + '>' + label + '<small>' + sub + '</small></button><div class="ok" id="okm"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7"/></svg></div></div>';
+    var label = inn ? 'سجّل انصراف' : (done ? 'حضور' : 'سجّل حضور');
+    var sub = inn ? 'خلّصت شغل' : (done ? 'رجعت الشغل تاني' : 'ابدأ يومك');
+    return '<div class="pbw' + (inn ? '' : ' off') + '"><span class="rg"></span><span class="rg b"></span><button class="pb' + (inn ? ' out' : '') + '" id="pb">' + label + '<small>' + sub + '</small></button><div class="ok" id="okm"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7"/></svg></div></div>';
   }
   function canResume() { return H.state === 'done' && H.rec && H.rec.out_at && (srvNow().getTime() - tsMs(H.rec.out_at)) <= 10 * 60000; }
 
   function renderHome() {
     var d = srvNow(), dd = H.now.date.split('-');
     var wd = DAYS[new Date(H.now.date + 'T00:00:00Z').getUTCDay()];
-    $('app').innerHTML = '<div class="top"><div class="lg">' + logoHtml() + '</div><div class="nm"><b>أهلاً ' + esc(H.emp.name) + '</b><span>' + esc(H.emp.job || brand.name || '') + '</span></div>' +
+    $('app').innerHTML = '<div class="top"><button class="me" id="bme" title="صورتك — دوس علشان تغيّرها">' + meFace() + '<i>📷</i></button><input type="file" id="mef" accept="image/*" class="hide"><div class="nm"><b>أهلاً ' + esc(H.emp.name) + '</b><span>' + esc(H.emp.job || brand.name || '') + '</span></div>' +
       '<button class="ib bell' + (pushOn ? ' on' : '') + '" id="bbl" title="الإشعارات">🔔</button><button class="ib" id="bth" title="الوضع">' + ICON.sun + '</button><button class="ib" id="bpw" title="كلمة السر">' + ICON.key + '</button><button class="ib" id="bout" title="خروج">' + ICON.out + '</button></div>' +
       '<section class="hero"><div class="clk" id="clk">--:--:--</div><div class="dt">' + wd + ' ' + (+dd[2]) + ' ' + MONTHS[+dd[1] - 1] + ' ' + dd[0] + '</div>' +
       '<div class="st">' + stateChip() + '</div>' + bigBtn() +
@@ -368,6 +382,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     $('pb').onclick = punch;
     $('mp').onclick = function () { shift(-1); }; $('mnx').onclick = function () { shift(1); };
     $('bbl').onclick = askPush; $('fbk').onclick = openFaults;
+    $('bme').onclick = function () { $('mef').click(); }; $('mef').onchange = function () { if (this.files && this.files[0]) upPhoto(this.files[0]); this.value = ''; };
     paintHist(); paintLoc(true); paintVisit(); paintTasks(); paintPushBanner(); paintRewards(); showReward();
     clearInterval(clockTimer); tick(); clockTimer = setInterval(tick, 1000);
   }
@@ -402,7 +417,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     getPos(true).catch(function (e) { if (H.need_location) throw e; return null; }).then(function (p) {
       return battery().then(function (bt) { return api('POST', '/punch', { type: type, lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt }); });
     }).then(function (r) {
-      var ok = $('okm'); if (ok) { ok.classList.add('on'); }
+      var ok = $('okm'); if (ok) { ok.classList.add('on'); } sfx(type === 'in' ? 'in' : 'out');
       H = r.home; syncClock(H.now.ts); hist = H.month; month = H.month.month;
       ls.set('ozs_lp', String(Date.now()));
       setTimeout(function () { renderHome(); startPings(); startTaskPings(); toast(type === 'in' ? (r.resumed ? 'تمام — كمّلت شغلك' : 'اتسجّل حضورك ' + hm(H.rec.in_at) + ' ✅') : 'اتسجّل انصرافك ' + hm(H.rec.out_at) + ' — تعيش 👋'); fin(); }, 900);
@@ -472,8 +487,8 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     getPos(true).catch(function (e) { if (H.need_location) throw e; return null; }).then(function (p) {
       return battery().then(function (bt) { return api('POST', CS.mode === 'task' ? '/task/self' : '/visit', CS.mode === 'task' ? { center: CS.pick, title: CS.purpose, note: $('csn').value.trim(), lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt } : { center: CS.pick, purpose: CS.purpose, note: $('csn').value.trim(), lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt }); });
     }).then(function (r) {
-      if (CS.mode === 'task') { fin(); $('csh').classList.remove('on'); $('csn').value = ''; H = r.home; syncClock(H.now.ts); paintTasks(); startTaskPings(); toast('📌 اتسجّلت المهمة — المدير اتبلّغ، ودوس «أنا في الطريق» لما تتحرك'); return; }
-      fin(); $('csh').classList.remove('on'); $('csn').value = '';
+      if (CS.mode === 'task') { sfx('task'); fin(); $('csh').classList.remove('on'); $('csn').value = ''; H = r.home; syncClock(H.now.ts); paintTasks(); startTaskPings(); toast('📌 اتسجّلت المهمة — المدير اتبلّغ، ودوس «أنا في الطريق» لما تتحرك'); return; }
+      sfx('step'); fin(); $('csh').classList.remove('on'); $('csn').value = '';
       H = r.home; syncClock(H.now.ts); paintVisit(); paintLoc();
       toast(r.far ? 'اتسجّل — بس إنت بعيد ' + r.dist + ' م عن مكان المركز المعروف' : 'اتسجّل إنك في ' + (H.visit ? H.visit.center : 'المركز') + ' ✅', !!r.far);
     }).catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
@@ -492,7 +507,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     var fin = function () { busy = false; b.disabled = false; };
     var tk = ESH.task, fault = t && s ? { code: c, title: t, solution: s } : null;
     getPos(true).catch(function () { return null; }).then(function (p) { return tk ? api('POST', '/task/step', { id: tk.id, step: 'done', fault: fault, note: $('enote').value.trim(), lat: p && p.lat, lng: p && p.lng }) : api('POST', '/visit/end', { lat: p && p.lat, lng: p && p.lng, fault: fault }); })
-      .then(function (r) { fin(); $('esh').classList.remove('on'); if (tk) { r.fault = !!fault; toast(fault ? '✅ خلّصت — والحل اتسجّل في بنك الأعطال 🛠' : '✅ خلّصت — المدير اتبلّغ'); } H = r.home; paintVisit(); paintTasks(); paintLoc(); if (!tk) toast(r.fault ? 'خلّصت — والحل اتسجّل في بنك الأعطال 🛠' : 'تمام — خلّصت في المركز'); startTaskPings(); }).catch(function (e) { fin(); if (e.message) toast(e.message, true); });
+      .then(function (r) { sfx('done'); fin(); $('esh').classList.remove('on'); if (tk) { r.fault = !!fault; toast(fault ? '✅ خلّصت — والحل اتسجّل في بنك الأعطال 🛠' : '✅ خلّصت — المدير اتبلّغ'); } H = r.home; paintVisit(); paintTasks(); paintLoc(); if (!tk) toast(r.fault ? 'خلّصت — والحل اتسجّل في بنك الأعطال 🛠' : 'تمام — خلّصت في المركز'); startTaskPings(); }).catch(function (e) { fin(); if (e.message) toast(e.message, true); });
   };
 
   /* ── 4.63 · المهام: «ابدأ الطريق» → الموقع كل 30 ثانية → وصلت ── */
@@ -509,8 +524,9 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   function animSteps(root) { setTimeout(function () { [].forEach.call((root || document).querySelectorAll('.stq-t b[data-to]'), function (b) { b.style.width = b.dataset.to + '%'; }); }, 40); }
   function paintTasks() {
     var el = $('tsk'); if (!el || !H) return;
-    var add = H.state === 'in' && H.has_centers ? '<button class="fbk" id="tself" style="margin-top:12px;border-style:dashed"><span class="ic">📌</span><span><b>سجّل مهمة هتعملها</b><small>اختار المركز والمطلوب — المدير بيتبلّغ وبيتابع مسارك لحد ما تخلّص</small></span></button>' : '';
-    el.innerHTML = add + (H.tasks || []).map(function (t) {
+    var fab = $('fab'); if (fab) fab.remove();
+    if (H.state === 'in' && H.has_centers) { var f = document.createElement('button'); f.id = 'fab'; f.className = 'fab'; f.title = 'سجّل مهمة هتعملها'; f.innerHTML = '<span class="fr"></span><span class="fr b"></span><b>📌</b><em>＋</em><small>مهمة</small>'; f.onclick = function () { sfx('tap'); openCenters('task'); }; document.body.appendChild(f); }
+    el.innerHTML = (H.tasks || []).map(function (t) {
       var nx = NEXT[t.status];
       var head = '<div class="row1"><span class="ic">📌</span><div style="flex:1;min-width:0"><div class="sub">' + (String(t.created_by || '').indexOf('emp:') === 0 ? 'مهمة سجّلتها' : 'مهمة من الإدارة') + '</div><div class="big">' + esc(t.center) + '</div></div></div>';
       var info = '<div class="sub">' + esc(t.title) + (t.note ? ' · ' + esc(t.note) : '') + (t.status === 'going' && t.dist != null ? ' · <b>باقي ' + kmText(t.dist) + '</b>' : '') + '</div>';
@@ -519,7 +535,6 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     }).join('');
     animSteps(el); (H.tasks || []).forEach(function (t) { PREV[t.id] = t.status; });
     [].forEach.call(el.querySelectorAll('[data-st]'), function (b) { b.onclick = function () { taskStep(b); }; });
-    var ts = $('tself'); if (ts) ts.onclick = function () { openCenters('task'); };
   }
   function taskById(id) { return (H.tasks || []).filter(function (t) { return String(t.id) === String(id); })[0]; }
   var ESH = { task: null };
@@ -529,7 +544,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     busy = true; b.disabled = true;
     var fin = function () { busy = false; b.disabled = false; };
     getPos(true).catch(function (e) { if (H.need_location) throw e; return null; }).then(function (p) { return battery().then(function (bt) { return api('POST', '/task/step', { id: t.id, step: b.dataset.st, lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt }); }); })
-      .then(function (r) { fin(); H = r.home; syncClock(H.now.ts); paintTasks(); paintVisit(); paintLoc(); startTaskPings(); toast({ going: 'ماشي — المدير عارف إنك في الطريق 🚗', arrived: 'تمام — اتسجّل إنك وصلت 📍', working: 'بالتوفيق 🔧 — لما تخلّص دوس «خلّصت»' }[b.dataset.st] || 'تمام'); })
+      .then(function (r) { sfx('step'); fin(); H = r.home; syncClock(H.now.ts); paintTasks(); paintVisit(); paintLoc(); startTaskPings(); toast({ going: 'ماشي — المدير عارف إنك في الطريق 🚗', arrived: 'تمام — اتسجّل إنك وصلت 📍', working: 'بالتوفيق 🔧 — لما تخلّص دوس «خلّصت»' }[b.dataset.st] || 'تمام'); })
       .catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
   }
   function goingTask() { return (H && H.state === 'in' && ((H.tasks || []).filter(function (t) { return t.status === 'going'; })[0] || (H.tasks || [])[0])) || null; }
@@ -551,6 +566,39 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     send(); taskTimer = setInterval(send, every);
   }
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && H && goingTask() && !taskTimer) startTaskPings(); });
+
+  /* ── 4.67 · sounds (made here, no files) ── */
+  var AC = null;
+  function sfx(kind) {
+    try {
+      var Ac = window.AudioContext || window.webkitAudioContext; if (!Ac) return;
+      AC = AC || new Ac(); if (AC.state === 'suspended') AC.resume();
+      var N = { in: [[523, 0], [659, .1], [784, .2], [1047, .32]], out: [[784, 0], [659, .12], [523, .24], [392, .38]], task: [[880, 0], [1175, .12]], step: [[660, 0], [990, .09]], done: [[523, 0], [659, .1], [784, .2], [1047, .3], [1319, .42]], tap: [[1200, 0]] }[kind] || [[700, 0]];
+      var t0 = AC.currentTime;
+      N.forEach(function (n) { var o = AC.createOscillator(), g = AC.createGain(); o.type = kind === 'out' ? 'sine' : 'triangle'; o.frequency.value = n[0]; g.gain.setValueAtTime(.0001, t0 + n[1]); g.gain.exponentialRampToValueAtTime(kind === 'tap' ? .08 : .22, t0 + n[1] + .02); g.gain.exponentialRampToValueAtTime(.0001, t0 + n[1] + (kind === 'tap' ? .08 : .4)); o.connect(g); g.connect(AC.destination); o.start(t0 + n[1]); o.stop(t0 + n[1] + .45); });
+      if (navigator.vibrate) navigator.vibrate(kind === 'out' ? [60, 40, 60] : kind === 'tap' ? 15 : [40]);
+    } catch (e) {}
+  }
+  /* ── 4.67 · his own photo ── */
+  function meFace() { return H && H.emp && H.emp.photo ? '<img src="' + API + '/photo?v=' + H.emp.photo + '" alt="">' : '<b>' + esc(((H && H.emp && H.emp.name) || '?').trim().charAt(0)) + '</b>'; }
+  function upPhoto(file) {
+    if (!/^image\//.test(file.type)) return toast('اختار صورة', true);
+    toast('بنجهّز الصورة…');
+    var rd = new FileReader();
+    rd.onload = function () {
+      var im = new Image();
+      im.onload = function () {
+        var S2 = 320, c = document.createElement('canvas'); c.width = c.height = S2;
+        var k = Math.min(im.width, im.height), sx = (im.width - k) / 2, sy = (im.height - k) / 2;
+        c.getContext('2d').drawImage(im, sx, sy, k, k, 0, 0, S2, S2);
+        var data = c.toDataURL('image/jpeg', .82);
+        api('POST', '/photo', { data: data }).then(function (r) { H.emp.photo = r.photo; var b = $('bme'); if (b) b.innerHTML = meFace() + '<i>📷</i>'; sfx('step'); toast('اتحطّت صورتك ✅ — المدير هيشوفها'); }).catch(function (e) { toast(e.message, true); });
+      };
+      im.onerror = function () { toast('مقدرتش أفتح الصورة دي', true); };
+      im.src = rd.result;
+    };
+    rd.readAsDataURL(file);
+  }
 
   /* ── 4.65 · المكافآت والتقدير ── */
   function money(n) { return (Math.round(n * 100) / 100).toLocaleString('en-US'); }

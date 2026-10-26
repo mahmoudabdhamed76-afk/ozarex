@@ -27,6 +27,7 @@
   function hm(ts) { if (!ts) return '—'; var t = String(ts).slice(11, 16).split(':'); if (t.length < 2) return '—'; var h = +t[0]; return '\u2066' + ((h % 12) || 12) + ':' + t[1] + (h < 12 ? ' AM' : ' PM') + '\u2069'; }
   function t12(hhmm) { return hhmm ? hm('0000-00-00 ' + hhmm) : '—'; }
   function dur(m) { m = Math.max(0, Math.round(Number(m) || 0)); return p2(Math.floor(m / 60)) + ':' + p2(m % 60); }
+  function face(id, name, v) { return v ? '<img src="' + API + '/api/staff/photo?id=' + encodeURIComponent(id) + '&v=' + v + '" alt="" loading="lazy">' : esc(String(name || '?').trim().charAt(0)); }
   function dowOf(d) { return new Date(d + 'T00:00:00Z').getUTCDay(); }
   function dmy(d) { var p = String(d).split('-'); return (+p[2]) + '/' + (+p[1]); }
   function api(method, path, body) {
@@ -138,13 +139,13 @@
   }
   function empBubble(L, x, st) {
     var nm = String(x.name || '').trim().split(/\s+/).slice(0, 2).join(' ');
-    return L.divIcon({ className: 'emk-w', html: '<div class="emk ' + st + '"><b class="emk-av">' + esc(String(x.name || '?').trim().charAt(0)) + '</b><span>' + esc(nm) + '</span></div>', iconSize: [120, 68], iconAnchor: [60, 24], popupAnchor: [0, -22] });
+    return L.divIcon({ className: 'emk-w', html: '<div class="emk ' + st + '"><b class="emk-av">' + face(x.id, x.name, x.photo) + '</b><span>' + esc(nm) + '</span></div>', iconSize: [120, 68], iconAnchor: [60, 24], popupAnchor: [0, -22] });
   }
   function empPop(x) {
     var u = empById(x.id) || {};
-    return '<div dir="rtl" class="lm-pop"><div class="pop-h"><b class="emk-av sm">' + esc(String(x.name || '?').trim().charAt(0)) + '</b><div><b>' + esc(x.name) + '</b><span>' + esc(u.job || '') + '</span></div></div>' +
+    return '<div dir="rtl" class="lm-pop"><div class="pop-h"><b class="emk-av sm">' + face(x.id, x.name, x.photo) + '</b><div><b>' + esc(x.name) + '</b><span>' + esc(u.job || '') + '</span></div></div>' +
       '<div class="pop-k"><span>الحالة</span><b>' + esc(x.stText) + '</b><span>آخر تحديث</span><b>' + hm(x.at) + ' (' + ago(x.age) + ')</b>' + (x.in_at ? '<span>الحضور</span><b>' + hm(x.in_at) + '</b>' : '') + (x.place ? '<span>المكان</span><b>' + esc(x.place) + '</b>' : '') + (x.battery != null ? '<span>البطارية</span><b>' + x.battery + '%</b>' : '') + (x.visit ? '<span>في مركز</span><b>' + esc(x.visit.center) + ' من ' + hm(x.visit.start_at) + '</b>' : '') + '</div>' +
-      '<div class="pop-a"><button class="btn btn-sm btn-primary" data-a="day" data-id="' + esc(x.id) + '">🛣 مسار اليوم</button>' + (u.phone ? '<a class="btn btn-sm btn-secondary" href="tel:' + esc(u.phone) + '">📞</a><a class="btn btn-sm btn-secondary" target="_blank" rel="noopener" href="' + wa(u.phone, 'أهلاً ' + x.name) + '">💬</a>' : '') + '<a class="btn btn-sm btn-secondary" target="_blank" rel="noopener" href="' + maps(x.lat, x.lng) + '">↗</a></div></div>';
+      '<div class="pop-a"><button class="btn btn-sm btn-primary" data-a="day" data-id="' + esc(x.id) + '">📋 يوم ' + esc(String(x.name).split(' ')[0]) + '</button>' + (u.phone ? '<a class="btn btn-sm btn-secondary" href="tel:' + esc(u.phone) + '">📞</a><a class="btn btn-sm btn-secondary" target="_blank" rel="noopener" href="' + wa(u.phone, 'أهلاً ' + x.name) + '">💬</a>' : '') + '<a class="btn btn-sm btn-secondary" target="_blank" rel="noopener" href="' + maps(x.lat, x.lng) + '">↗</a></div></div>';
   }
   /* layers: { sites, centers, emps, route, visits } — keep: keep the view the user zoomed to (live refresh) */
   function drawMap(id, layers, keep) {
@@ -175,7 +176,7 @@
       var seen = {};
       (layers.emps || []).forEach(function (x) {
         seen[x.id] = 1; pts.push([x.lat, x.lng]);
-        var key = x.st + '|' + x.name, mk = m._mk[x.id];
+        var key = x.st + '|' + x.name + '|' + (x.photo || ''), mk = m._mk[x.id];
         if (!mk) { mk = m._mk[x.id] = L.marker([x.lat, x.lng], { icon: empBubble(L, x, x.st), zIndexOffset: x.st === 'off' || x.st === 'none' ? 0 : 500 }).bindPopup(empPop(x), { maxWidth: 290 }).addTo(m._live); mk._k = key; }
         else { mk.setLatLng([x.lat, x.lng]); if (mk._k !== key) { mk.setIcon(empBubble(L, x, x.st)); mk._k = key; } mk.setPopupContent(empPop(x)); mk.setZIndexOffset(x.st === 'off' || x.st === 'none' ? 0 : 500); }
       });
@@ -230,22 +231,24 @@
     var h = '<div class="card stf-road ax-hl-off" id="stf-road"><div class="card-header"><h3 class="card-title">📌 المهام النهارده</h3><button class="btn btn-sm btn-primary" data-a="newtask">＋ مهمة لموظف</button></div>';
     if (!list.length) return h + '<p class="stf-note" style="margin:6px 4px 2px">مفيش مهام النهارده — اضغط «＋ مهمة لموظف» واختار المركز. الموظف بيدوس على كل مرحلة (في الطريق ← وصل ← بيشتغل ← خلّص) وانت بتشوفها هنا وبيوصلك إشعار.</p></div>';
     var prev = S.tprev || {};
-    return h + '<div class="tk-list">' + list.map(function (t) {
+    return h + '<div class="tk-list">' + list.map(function (t) { return taskCard(t, prev, true); }).join('') + '</div></div>';
+  }
+  function taskCard(t, prev, admin) {
       var keys = TSTEPS.map(function (x) { return x[0]; }), cur = keys.indexOf(t.status), pv = prev[t.id] != null ? keys.indexOf(prev[t.id]) : cur, ch = pv !== cur, done = t.status === 'done';
       var at = [t.created_at, t.started_at, t.arrived_at, t.working_at, t.done_at];
+      if (t.status === 'cancel') return '<div class="tkc ax-hl-off st-cancel"><div class="tkc-h"><span class="ic">🚫</span><div class="t"><div class="lb">مهمة اتلغت · ' + hm(t.done_at) + '</div><div class="big">' + esc(t.center) + '</div></div></div></div>';
       var steps = '<div class="stq"><span class="stq-t"><b data-to="' + (cur / 4 * 100) + '" style="width:' + (prev[t.id] == null ? 0 : Math.max(0, pv) / 4 * 100) + '%"></b></span>' + TSTEPS.map(function (x, i) {
         return '<div class="' + (i < cur || done ? 'ok' : '') + (i === cur ? ' cur s-' + x[0] + (ch ? ' pop' : '') : '') + '"><i>' + x[1] + '</i><span>' + x[2] + '</span><em>' + (i <= cur && at[i] ? hm(at[i]) : '') + '</em></div>'; }).join('') + '</div>';
       var self = String(t.created_by || '').indexOf('emp:') === 0;
-      var sub = [t.title && t.title.indexOf('زيارة ') !== 0 ? esc(t.title) : '', t.note ? esc(t.note) : '', t.status === 'going' && t.dist != null ? '<b>باقي ' + kmT(t.dist) + (t.eta ? ' · حوالي ' + t.eta + ' د' : '') + '</b>' : ''].filter(Boolean).join(' · ');
+      var sub = [t.title && t.title.indexOf('زيارة ') !== 0 ? esc(t.title) : '', t.note ? esc(t.note) : '', t.status === 'going' && t.dist != null ? '<b>باقي ' + kmT(t.dist) + (t.eta ? ' · حوالي ' + t.eta + ' د' : '') + '</b>' : '', done && t.started_at ? 'خلّصها في ' + dur((Date.parse(t.done_at.replace(' ', 'T')) - Date.parse((t.started_at || t.created_at).replace(' ', 'T'))) / 60000) + ' ساعة' : ''].filter(Boolean).join(' · ');
       var extra = '';
       if (t.fault) extra += '<div class="tkc-x ok">🛠 ' + (t.fault.code ? '<code>' + esc(t.fault.code) + '</code> ' : '') + esc(t.fault.title) + ' ← ' + esc(t.fault.solution) + '</div>';
       if (t.result) extra += '<div class="tkc-x">📝 ' + esc(t.result) + '</div>';
-      return '<div class="tkc ax-hl-off st-' + t.status + (ch ? ' chg' : '') + '"><div class="tkc-h"><span class="ic">' + (done ? '✅' : '📌') + '</span><div class="t"><div class="lb">' + (self ? 'مهمة سجّلها ' : 'مهمة إلى ') + '<b>' + esc(t.emp) + '</b></div><div class="big">' + esc(t.center) + '</div></div></div>' +
+      return '<div class="tkc ax-hl-off st-' + t.status + (ch ? ' chg' : '') + '"><div class="tkc-h"><span class="ic">' + (done ? '✅' : '📌') + '</span><div class="t"><div class="lb">' + (self ? 'مهمة سجّلها ' : 'مهمة إلى ') + '<b>' + esc(t.emp || '') + '</b></div><div class="big">' + esc(t.center) + '</div></div></div>' +
         (sub ? '<div class="tkc-s">' + sub + '</div>' : '') + steps + extra +
-        '<div class="tkc-a"><button class="tkc-b" data-a="troute" data-id="' + t.id + '">🗺️ المسار</button>' + (t.status !== 'done' ? '<button class="tkc-b x" data-a="tcancel" data-id="' + t.id + '">✕ إلغاء</button>' : '') + '</div></div>';
-    }).join('') + '</div></div>';
+        '<div class="tkc-a"><button class="tkc-b" data-a="troute" data-id="' + t.id + '">🗺️ المسار</button>' + (admin && t.status !== 'done' ? '<button class="tkc-b x" data-a="tcancel" data-id="' + t.id + '">✕ إلغاء</button>' : '') + '</div></div>';
   }
-  function animSteps() { setTimeout(function () { [].forEach.call(document.querySelectorAll('#stf-road .stq-t b[data-to]'), function (b) { b.style.width = b.dataset.to + '%'; }); }, 40); }
+  function animSteps() { setTimeout(function () { [].forEach.call(document.querySelectorAll('#stf-road .stq-t b[data-to], .stf-dayv .stq-t b[data-to]'), function (b) { b.style.width = b.dataset.to + '%'; }); }, 40); }
   function keepPrev(l) { S.tprev = {}; (l.tasks || []).forEach(function (t) { S.tprev[t.id] = t.status; }); }
   function routeModal(id) {
     api('GET', '/task/route?id=' + encodeURIComponent(id)).then(function (r) {
@@ -427,7 +430,7 @@
     var L = S.live;
     var emps = L.list.filter(function (x) { return x.last; }).map(function (x) {
       var st = lst(x, L);
-      return { id: x.id, name: x.name, st: st, stText: STT[st], state: x.state, lat: x.last.lat, lng: x.last.lng, at: x.last.at, age: x.age_min, battery: x.last.battery, in_at: x.in_at, visit: x.visit, place: placeOf(x) };
+      return { id: x.id, name: x.name, photo: x.photo, st: st, stText: STT[st], state: x.state, lat: x.last.lat, lng: x.last.lng, at: x.last.at, age: x.age_min, battery: x.last.battery, in_at: x.in_at, visit: x.visit, place: placeOf(x) };
     });
     drawMap('stf-map', { sites: L.sites, centers: L.centers, emps: emps }, keep);
   }
@@ -454,9 +457,9 @@
       if (x.in_far) tags += '<span class="stf-tag ax-hl-off o" title="سجّل الحضور بعيد عن مكان الشغل">حضور برّه المكان</span>';
       var vis = x.visit && x.state === 'in' ? '<span class="lv-vis ax-hl-off' + (x.visit.far ? ' far' : '') + '">🏥 ' + esc(x.visit.center) + ' · من ' + hm(x.visit.start_at) + (x.visit.far ? ' · بعيد ' + x.visit.dist + ' م' : '') + '</span>' : '';
       var sub = x.state === 'out' && !x.in_at ? 'لسه ما سجّلش حضور' : (x.in_at ? 'حضور ' + hm(x.in_at) + (x.out_at ? ' ← ' + hm(x.out_at) : '') + ' · ' + dur(x.worked) : '');
-      return '<div class="lv-it ax-hl-off' + (String(S.sel) === String(x.id) ? ' on' : '') + (x.last ? '' : ' nolast') + '" data-a="focus" data-id="' + x.id + '"><b class="emk-av ' + st + '">' + esc(x.name.trim().charAt(0)) + '</b>' +
+      return '<div class="lv-it ax-hl-off' + (String(S.sel) === String(x.id) ? ' on' : '') + (x.last ? '' : ' nolast') + '" data-a="day" data-id="' + x.id + '"><b class="emk-av ' + st + '">' + face(x.id, x.name, x.photo) + '</b>' +
         '<div class="t"><b>' + esc(x.name) + '</b><div class="sub"><span class="lvs ax-hl-off ' + st + '"><i></i>' + (x.state === 'out' ? (x.in_at ? 'انصرف' : 'لسه') : STT[st]) + '</span>' + (pl && !vis ? '<span>📍 ' + esc(pl) + '</span>' : '') + (sub ? '<span>' + sub + '</span>' : '') + '</div>' + (vis ? '<div class="sub">' + vis + '</div>' : (x.visits ? '<div class="sub"><span>🏥 زار ' + x.visits + ' ' + (x.visits === 1 ? 'مركز' : 'مراكز') + '</span></div>' : '')) + (tags ? '<div class="sub">' + tags + '</div>' : '') + '</div>' +
-        '<div class="end"><span>' + (x.last ? ago(x.age_min) : '') + '</span>' + (x.last && x.last.battery != null ? '<span>🔋 ' + x.last.battery + '%</span>' : '') + '<button class="lv-day" data-a="day" data-id="' + x.id + '" title="مسار اليوم">🛣</button></div></div>';
+        '<div class="end"><span>' + (x.last ? ago(x.age_min) : '') + '</span>' + (x.last && x.last.battery != null ? '<span>🔋 ' + x.last.battery + '%</span>' : '') + '<button class="lv-day" data-a="focus" data-id="' + x.id + '" title="وريني مكانه على الخريطة">📍</button></div></div>';
     }).join('');
   }
   function centersHtml() {
@@ -524,7 +527,7 @@
     if (!list.length) return '<div class="card stf-empty"><div class="stf-ill">👥</div><h3>مفيش موظفين لسه</h3><p>ضيف موظف وهيطلعلك لينك واسم مستخدم وكلمة سر تبعتهم له على واتساب.</p><button class="btn btn-primary" data-a="new">＋ موظف جديد</button></div>';
     return rewardsHtml() + '<div class="stf-cards">' + list.map(function (e) {
       var rest = e.rules.rest.map(function (d) { return DAYN[+d]; }).join('، ');
-      return '<div class="card stf-card' + (e.active ? '' : ' off') + '"><div class="stf-av">' + esc(e.name.trim().charAt(0)) + '</div><div class="stf-ci"><div class="stf-top"><b>' + esc(e.name) + '</b>' + (e.active ? '' : '<span class="stf-chip ax-hl-off"><i></i>موقوف</span>') + '</div>' +
+      return '<div class="card stf-card' + (e.active ? '' : ' off') + '"><div class="stf-av">' + face(e.id, e.name, e.photo) + '</div><div class="stf-ci"><div class="stf-top"><b>' + esc(e.name) + '</b>' + (e.active ? '' : '<span class="stf-chip ax-hl-off"><i></i>موقوف</span>') + '</div>' +
         '<div class="stf-meta">' + esc(e.job || '—') + ' · <code>' + esc(e.username) + '</code></div>' +
         '<div class="stf-meta">شغل من ' + t12(e.rules.start) + ' لـ ' + t12(e.rules.end) + ' · إجازة ' + esc(rest || 'مفيش') + (e.track ? '' : ' · من غير تتبع') + '</div>' +
         '<div class="stf-meta faint">' + (e.last_login_at ? 'آخر دخول ' + dmy(e.last_login_at.slice(0, 10)) + ' ' + hm(e.last_login_at) : 'لسه ما دخلش') + '</div></div>' +
@@ -711,11 +714,18 @@
   /* ─ a day: the records, the route, manual fixes ─ */
   function dayModal(empId, date, name) {
     api('GET', '/track?emp=' + encodeURIComponent(empId) + '&date=' + encodeURIComponent(date)).then(function (t) {
-      var d = new Date(date + 'T00:00:00Z');
-      /* the day as a timeline: in → each center → out */
+      var d = new Date(date + 'T00:00:00Z'), first = t.att[0], lastR = t.att[t.att.length - 1];
+      /* the day as a timeline: in → the jobs and their stages → each center → out */
       var ev = [];
-      t.att.forEach(function (a) { ev.push({ at: a.in_at, k: 'in', html: '🟢 <b>حضور</b>' + (a.in_dist != null ? ' · على بعد ' + a.in_dist + ' م من المكان' : '') + (a.source === 'manager' ? ' · ✍ يدوي' : '') }); if (a.out_at) ev.push({ at: a.out_at, k: 'out', html: '🔴 <b>انصراف</b>' }); });
+      t.att.forEach(function (a, i) { ev.push({ at: a.in_at, k: 'in', html: '🟢 <b>' + (i ? 'حضور تاني' : 'حضور') + '</b>' + (a.in_dist != null ? ' · على بعد ' + a.in_dist + ' م من المكان' : '') + (a.source === 'manager' ? ' · ✍ يدوي' : '') }); if (a.out_at) ev.push({ at: a.out_at, k: 'out', html: '🔴 <b>انصراف</b>' }); });
       (t.visits || []).forEach(function (v) { ev.push({ at: v.start_at, k: 'v', html: '🏥 <b>' + esc(v.center) + '</b>' + (v.purpose ? ' · ' + esc(v.purpose) : '') + ' · ' + hm(v.start_at) + ' ← ' + (v.end_at ? hm(v.end_at) : 'لسه هناك') + ' · <b>' + dur(v.mins) + '</b>' + (v.far ? ' <span class="stf-tag ax-hl-off o">بعيد ' + v.dist + ' م عن المركز</span>' : '') + (v.note ? '<div class="stf-meta">📝 ' + esc(v.note) + '</div>' : '') }); });
+      (t.tasks || []).forEach(function (k) {
+        var nm = esc(k.center);
+        if (k.created_at && k.created_at.slice(0, 10) === date) ev.push({ at: k.created_at, k: 't', html: '📌 <b>' + (String(k.created_by || '').indexOf('emp:') === 0 ? 'سجّل مهمة' : 'استلم مهمة') + '</b> · ' + nm + (k.title && k.title.indexOf('زيارة ') !== 0 ? ' · ' + esc(k.title) : '') });
+        if (k.started_at) ev.push({ at: k.started_at, k: 't', html: '🚗 في الطريق إلى ' + nm });
+        if (k.done_at && k.status === 'done') ev.push({ at: k.done_at, k: 'v', html: '✅ <b>خلّص المهمة</b> · ' + nm + (k.fault ? '<div class="stf-meta">🛠 ' + esc(k.fault.title) + ' ← ' + esc(k.fault.solution) + '</div>' : '') + (k.result ? '<div class="stf-meta">📝 ' + esc(k.result) + '</div>' : '') });
+      });
+      (t.rewards || []).forEach(function (r) { ev.push({ at: r.at, k: 'v', html: '🏆 <b>مكافأة</b>' + (r.stars ? ' ' + '⭐'.repeat(r.stars) : '') + (r.amount ? ' · ' + r.amount + ' ج' : '') + (r.message ? ' · ' + esc(r.message) : '') }); });
       var P = t.points || [], iv = (S.live && S.live.ping_min) || Number(cfg().ping_min) || 15, dist = 0;
       for (var q = 1; q < P.length; q++) {
         dist += km(P[q - 1], P[q]);
@@ -723,18 +733,38 @@
         if (gap > iv * 2.5 && P[q].kind !== 'in') ev.push({ at: P[q - 1].at, k: 'g', html: '📡 <b>التحديث وقف ' + dur(gap) + '</b><div class="stf-meta">غالبًا البرنامج كان مقفول على موبايله</div>' });
       }
       ev.sort(function (a, b) { return a.at < b.at ? -1 : a.at > b.at ? 1 : 0; });
-      var sum = P.length ? '<div class="stf-trksum"><div><b>' + (Math.round(dist * 10) / 10) + '</b><span>كم تقريبًا</span></div><div><b>' + P.length + '</b><span>نقطة موقع</span></div><div><b>' + (t.visits || []).length + '</b><span>زيارة</span></div></div>' : '';
-      var tl = ev.length ? '<div class="stf-tl">' + ev.map(function (e) { return '<div class="' + e.k + '"><span>' + hm(e.at) + '</span><div>' + e.html + '</div></div>'; }).join('') + '</div>' : '<p class="stf-note">مفيش حضور مسجّل في اليوم ده.</p>';
+      var doneN = (t.tasks || []).filter(function (k) { return k.status === 'done'; }).length;
+      var tiles = '<div class="dy-tiles">' +
+        '<div><b>' + (first ? hm(first.in_at) : '—') + '</b><span>حضور</span></div>' +
+        '<div><b>' + (lastR && lastR.out_at ? hm(lastR.out_at) : (lastR ? 'لسه شغّال' : '—')) + '</b><span>انصراف</span></div>' +
+        '<div><b>' + dur(t.worked || 0) + '</b><span>ساعات الشغل</span></div>' +
+        '<div class="' + (t.late ? 'late' : '') + '"><b>' + (t.late ? t.late + ' د' : '✓') + '</b><span>' + (t.late ? 'تأخير' : 'في الميعاد') + '</span></div>' +
+        '<div class="g"><b>' + doneN + '<small>/' + (t.tasks || []).filter(function (k) { return k.status !== 'cancel'; }).length + '</small></b><span>مهام خلّصها</span></div>' +
+        '<div class="g"><b>' + (t.faults || []).length + '</b><span>أعطال صلّحها</span></div>' +
+        '<div><b>' + (t.visits || []).length + '</b><span>زيارة مركز</span></div>' +
+        '<div><b>' + (Math.round(dist * 10) / 10) + '</b><span>كم مشي</span></div></div>';
+      var tasksH = (t.tasks || []).length ? '<h4 class="dy-h4">📌 المهام</h4><div class="tk-list">' + t.tasks.map(function (k) { return taskCard(Object.assign({ emp: t.emp.name }, k), {}, false); }).join('') + '</div>' : '';
+      var faultsH = (t.faults || []).length ? '<h4 class="dy-h4">🛠 صلّح إيه</h4><div class="dy-fl">' + t.faults.map(function (f) { return '<div class="dy-f ax-hl-off"><div><b>' + (f.code ? '<code>' + esc(f.code) + '</code> ' : '') + esc(f.title) + '</b><small>' + (f.center ? '🏥 ' + esc(f.center) + ' · ' : '') + hm(f.at) + (f.votes ? ' · 👍 ' + f.votes : '') + '</small></div><p>' + esc(f.solution) + '</p></div>'; }).join('') + '</div>' : '';
+      var tl = ev.length ? '<h4 class="dy-h4">🕒 اليوم بالتفصيل</h4><div class="stf-tl">' + ev.map(function (e) { return '<div class="' + e.k + '"><span>' + hm(e.at) + '</span><div>' + e.html + '</div></div>'; }).join('') + '</div>' : '<div class="dy-empty">😴 مفيش أي حاجة متسجّلة لـ ' + esc(t.emp.name) + ' في اليوم ده</div>';
       var edit = (t.att.length ? t.att.map(function (a) {
           return '<div class="stf-att" data-id="' + a.id + '"><div class="stf-grid2"><div class="form-group"><label>حضور</label><input type="time" class="form-control a-in" value="' + hm24(a.in_at) + '"></div><div class="form-group"><label>انصراف</label><input type="time" class="form-control a-out" value="' + (a.out_at ? hm24(a.out_at) : '') + '"></div></div>' +
             '<div class="stf-meta">' + (a.source === 'manager' ? '✍ يدوي من الإدارة' : '📱 من الموبايل') + (a.note ? ' · ' + esc(a.note) : '') + '</div>' +
             '<div class="stf-acts"><button class="btn btn-sm btn-primary a-sv">حفظ التعديل</button><button class="btn btn-sm btn-ghost a-dl">🗑 مسح</button></div></div>'; }).join('') : '') +
         '<div class="stf-att add"><b>＋ إضافة حضور يدوي</b><div class="stf-grid2"><div class="form-group"><label>حضور</label><input type="time" class="form-control n-in"></div><div class="form-group"><label>انصراف</label><input type="time" class="form-control n-out"></div></div><button class="btn btn-sm btn-secondary n-sv">إضافة</button></div>';
-      openModal(esc(name || t.emp.name) + ' — ' + DAYN[d.getUTCDay()] + ' ' + dmy(date),
-        '<div class="stf-daybar"><input type="date" class="form-control" id="stf-dd" value="' + esc(date) + '"><button class="btn btn-secondary btn-sm" id="stf-ddg">عرض</button></div>' + tl +
-        (t.points.length || (t.centers || []).length ? sum + '<div class="stf-mapcard lt in-modal">' + mapBox('stf-dmap', 340) + '</div>' : '<p class="stf-note">مفيش مواقع متسجّلة في اليوم ده.</p>') +
-        '<details class="stf-edit"' + (t.att.length ? '' : ' open') + '><summary>✍ تعديل أو إضافة حضور يدوي</summary>' + edit + '</details>',
-        '<button class="btn btn-ghost" onclick="closeModal()">إغلاق</button>');
+      var isToday = date === today();
+      openModal('📋 يوم ' + esc(name || t.emp.name),
+        '<div class="stf-dayv ax-hl-off"><div class="dy-top"><span class="stf-av">' + face(t.emp.id, t.emp.name, t.emp.photo) + '</span><div><b>' + esc(t.emp.name) + '</b><span>' + esc(t.emp.job || '') + '</span></div>' + (t.emp.phone ? '<a class="btn btn-sm btn-secondary" href="' + wa(t.emp.phone, 'أهلاً ' + t.emp.name) + '" target="_blank" rel="noopener">💬</a>' : '') + '</div>' +
+        '<div class="dy-bar"><button class="btn btn-secondary btn-sm" id="stf-dprev" title="اليوم اللي قبله">›</button><div class="dy-date"><b>' + DAYN[d.getUTCDay()] + ' ' + dmy(date) + (isToday ? ' · النهارده' : '') + '</b><input type="date" class="form-control" id="stf-dd" value="' + esc(date) + '" max="' + today() + '"></div><button class="btn btn-secondary btn-sm" id="stf-dnext" title="اليوم اللي بعده"' + (isToday ? ' disabled' : '') + '>‹</button></div>' +
+        tiles + tasksH + faultsH + tl +
+        (P.length || (t.centers || []).length ? '<h4 class="dy-h4">🗺️ مساره</h4><div class="stf-mapcard lt in-modal">' + mapBox('stf-dmap', 340) + '</div>' : '') +
+        '<details class="stf-edit"' + (t.att.length ? '' : '') + '><summary>✍ تعديل أو إضافة حضور يدوي</summary>' + edit + '</details><button class="hide" id="stf-ddg"></button></div>',
+        '<button class="btn btn-ghost" onclick="closeModal()">إغلاق</button>', 'lg');
+      var go = function (v) { if (v && v <= today()) { closeModal(); dayModal(empId, v, name); } };
+      var shiftD = function (n) { var x = new Date(Date.parse(date + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10); go(x); };
+      document.getElementById('stf-dd').onchange = function () { go(this.value); };
+      document.getElementById('stf-dprev').onclick = function () { shiftD(-1); };
+      document.getElementById('stf-dnext').onclick = function () { shiftD(1); };
+      animSteps();
       document.getElementById('stf-ddg').onclick = function () { var v = document.getElementById('stf-dd').value; if (v) { closeModal(); dayModal(empId, v, name); } };
       if (document.getElementById('stf-dmap')) drawMap('stf-dmap', { sites: sites(), centers: (t.centers || []).map(function (c) { return { key: c.key, name: c.name, lat: c.lat, lng: c.lng, label: true }; }), route: t.points, visits: t.visits || [] });
       var again = function () { closeModal(); dayModal(empId, date, name); if (S.tab === 'report') { api('GET', '/report?month=' + S.month).then(function (r) { S.report = r; }); } };

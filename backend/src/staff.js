@@ -53,6 +53,9 @@ CREATE TABLE IF NOT EXISTS staff_center (key TEXT PRIMARY KEY, name TEXT, lat RE
 /* 4.61 · an employee may belong to one branch (he then sees that branch's centers only) */
 try { if (!db.prepare('PRAGMA table_info(staff_emp)').all().some(c => c.name === 'branch_id')) db.exec('ALTER TABLE staff_emp ADD COLUMN branch_id TEXT'); } catch (e) { console.error('[staff] branch_id', e.message); }
 
+try { if (!db.prepare('PRAGMA table_info(staff_emp)').all().some(c => c.name === 'photo')) db.exec('ALTER TABLE staff_emp ADD COLUMN photo TEXT'); } catch (e) { console.error('[staff] photo', e.message); }
+const photoV = e => e && e.photo ? crypto.createHash('md5').update(e.photo).digest('hex').slice(0, 8) : '';
+
 /* ── the ERP's own data, handed in by server.js: the centers (customers of every branch) + the branches ── */
 let SRC = { centers: () => [], branches: () => [] };
 let _cc = null, _ccAt = 0;
@@ -186,7 +189,7 @@ function empOf(req) {
   if (now - (seen.get(id) || 0) > 600e3) { seen.set(id, now); db.prepare('UPDATE staff_sess SET last_seen = ? WHERE id = ?').run(now, id); }
   return { emp: e, token: t };
 }
-const publicEmp = e => ({ id: e.id, name: e.name, job: e.job || '', username: e.username });
+const publicEmp = e => ({ id: e.id, name: e.name, job: e.job || '', username: e.username, photo: photoV(e) });
 
 /* ── what the employee sees on his home screen ── */
 function monthRange(m) { const a = m + '-01', y = +m.slice(0, 4), mo = +m.slice(5, 7); const b = new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10); return [a, b]; }
@@ -321,15 +324,16 @@ function punch(e, b) {
     if (last && last.out_at && tsMin(now.ts) - tsMin(last.out_at) <= 10) {                       // tapped «انصراف» by mistake → carry on, same record
       db.prepare('UPDATE staff_att SET out_at = NULL, out_lat = NULL, out_lng = NULL, out_acc = NULL, out_dist = NULL, note = ? WHERE id = ?').run('رجع بعد انصراف بالغلط', last.id);
       if (has) logLoc(e, last.id, now, lat, lng, acc, b.battery, 'in');
+      try { X.onPunch(e, 'in', now, { again: true, resumed: true }); } catch (er) {}
       return { ok: true, type, resumed: true, home: home(e) };
     }
-    if (last) fail(409, 'سجّلت حضورك وانصرافك النهارده بالفعل');
+    /* 4.67 · a second «حضور» the same day (back after a break / a second shift) is a new record */
     const r = db.prepare('INSERT INTO staff_att (emp_id, date, in_at, in_lat, in_lng, in_acc, in_dist, in_site, source) VALUES (?,?,?,?,?,?,?,?,?)')
       .run(e.id, now.date, now.ts, has ? lat : null, has ? lng : null, acc, near ? near.dist : null, near ? near.id : null, 'phone');
     if (has) logLoc(e, Number(r.lastInsertRowid), now, lat, lng, acc, b.battery, 'in');
     try {
       const rec = db.prepare('SELECT * FROM staff_att WHERE id = ?').get(Number(r.lastInsertRowid));
-      X.onPunch(e, 'in', now, { late: calc(rec, e, now.ts).late, dist: near ? near.dist : null, far: !!(near && near.dist > near.radius), site: near ? near.name : '' });
+      X.onPunch(e, 'in', now, { again: !!last, late: last ? 0 : calc(rec, e, now.ts).late, dist: near ? near.dist : null, far: !!(near && near.dist > near.radius), site: near ? near.name : '' });
     } catch (er) { console.error('[staff] notify', er.message); }
   } else {
     const open = openRecord(e.id, now);
@@ -369,7 +373,7 @@ const adminEmp = (e, now) => {
   return {
     id: e.id, name: e.name, job: e.job || '', phone: e.phone || '', username: e.username, active: !!e.active, track: !!e.track,
     shift_start: e.shift_start || '', shift_end: e.shift_end || '', rest_days: e.rest_days == null ? '' : e.rest_days, site_id: e.site_id || '', note: e.note || '',
-    created_at: e.created_at, last_login_at: e.last_login_at, branch_id: e.branch_id || '',
+    created_at: e.created_at, last_login_at: e.last_login_at, branch_id: e.branch_id || '', photo: photoV(e),
     rules: { start: R.start, end: R.end, rest: R.rest },
     state: open ? 'in' : (today ? 'done' : 'out'),
     in_at: today ? today.in_at : null, out_at: today ? today.out_at : null
@@ -474,10 +478,11 @@ function live() {
   const sites = new Map(sitesAll().map(s => [s.id, s]));
   for (const e of db.prepare('SELECT * FROM staff_emp WHERE active = 1 ORDER BY name').all()) {
     const open = openRecord(e.id, now);
-    const today = db.prepare('SELECT * FROM staff_att WHERE emp_id = ? AND date = ? ORDER BY id DESC LIMIT 1').get(e.id, now.date);
+    const recs = db.prepare('SELECT * FROM staff_att WHERE emp_id = ? AND date = ? ORDER BY id').all(e.id, now.date);
+    const today = recs.length ? recs[recs.length - 1] : null, first = recs[0] || null;
     const l = db.prepare('SELECT * FROM staff_loc WHERE emp_id = ? AND at >= ? ORDER BY id DESC LIMIT 1').get(e.id, now.date + ' 00:00:00');
-    const item = { id: e.id, name: e.name, job: e.job || '', phone: e.phone || '', state: open ? 'in' : (today ? 'done' : 'out'), in_at: today ? today.in_at : null, out_at: today ? today.out_at : null, tracking: !!e.track };
-    if (today) { const c = calc(today, e, now.ts); item.late = c.late; item.worked = c.worked; item.over = c.over; item.early = c.early; item.in_dist = today.in_dist; const ss = today.in_site && sites.get(today.in_site); item.in_far = today.in_dist != null && !!ss && today.in_dist > (ss.radius || 250); }
+    const item = { id: e.id, name: e.name, job: e.job || '', phone: e.phone || '', photo: photoV(e), state: open ? 'in' : (today ? 'done' : 'out'), in_at: first ? first.in_at : null, out_at: today ? today.out_at : null, tracking: !!e.track, shifts: recs.length };
+    if (today) { const c = calc(today, e, now.ts); item.late = calc(first, e, now.ts).late; item.worked = recs.reduce((t, r) => t + calc(r, e, now.ts).worked, 0); item.over = c.over; item.early = c.early; item.in_dist = today.in_dist; const ss = today.in_site && sites.get(today.in_site); item.in_far = today.in_dist != null && !!ss && today.in_dist > (ss.radius || 250); }
     if (l) {
       item.last = { lat: l.lat, lng: l.lng, acc: l.acc, at: l.at, battery: l.battery, kind: l.kind };
       item.age_min = Math.max(0, Math.round(nowM - tsMin(l.at)));
@@ -507,7 +512,11 @@ function track(empId, date) {
   const visits = db.prepare('SELECT * FROM staff_visit WHERE emp_id = ? AND date = ? ORDER BY start_at').all(e.id, d).map(v => visitOut(v, now));
   const keys = new Set(visits.map(v => v.center_key));
   const centers = centersAll().filter(c => keys.has(c.key) && c.lat != null).map(c => ({ key: c.key, name: c.name, lat: c.lat, lng: c.lng }));
-  return { date: d, emp: { id: e.id, name: e.name }, att, points, visits, centers, radius: centerRadius() };
+  const tasks = db.prepare("SELECT * FROM staff_task WHERE emp_id = ? AND (substr(created_at, 1, 10) = ? OR substr(done_at, 1, 10) = ? OR substr(started_at, 1, 10) = ?) ORDER BY id").all(e.id, d, d, d).map(t => X.taskOut(t));
+  const faults = db.prepare("SELECT * FROM staff_fault WHERE emp_id = ? AND substr(at, 1, 10) = ? ORDER BY id").all(e.id, d).map(f => ({ id: f.id, code: f.code || '', title: f.title, solution: f.solution, center: f.center_name || '', at: f.at, votes: f.votes }));
+  const worked = att.reduce((t, r) => t + calc(r, e, now.ts).worked, 0), late = att.length ? calc(att[0], e, now.ts).late : 0;
+  const rewards = db.prepare("SELECT * FROM staff_reward WHERE emp_id = ? AND substr(created_at, 1, 10) = ? ORDER BY id").all(e.id, d).map(r => ({ stars: r.stars, amount: r.amount, message: r.message || '', at: r.created_at, seen_at: r.seen_at }));
+  return { date: d, emp: { id: e.id, name: e.name, job: e.job || '', phone: e.phone || '', photo: photoV(e) }, att, points, visits, centers, tasks, faults, rewards, worked, late, radius: centerRadius() };
 }
 function report(month) {
   const now = nowLocal();
@@ -614,6 +623,15 @@ sweep(); setInterval(sweep, 6 * 3600e3).unref();
 /* 4.63 · notifications + بنك الأعطال + المهام */
 X = require('./staffx')({ db, nowLocal, tsMin, haversine, num, str, fail, centerByKey, centersAll, centerRadius, cfg, openRecord, log, logLoc, startVisit, endVisit, home });
 
+/* the employee's photo as an image (the admin's list, the map, his own header) */
+function sendPhoto(res, e) {
+  const m = e && e.photo ? /^data:(image\/[a-z]+);base64,(.+)$/.exec(e.photo) : null;
+  if (!m) { res.writeHead(404, { 'Content-Type': 'text/plain' }); return res.end('no photo'); }
+  const buf = Buffer.from(m[2], 'base64');
+  res.writeHead(200, { 'Content-Type': m[1], 'Content-Length': buf.length, 'Cache-Control': 'private, max-age=604800' });
+  return res.end(buf);
+}
+
 /* ═════════════ HTTP ═════════════ */
 /* /staff/api/* — the employee's own endpoints (no ERP session; his own) */
 async function handlePublic(req, res, pathname, h) {
@@ -672,6 +690,15 @@ async function handlePublic(req, res, pathname, h) {
       db.prepare('DELETE FROM staff_sess WHERE emp_id = ? AND id != ?').run(e.id, auth.sha(me.token));
       return send(200, { ok: true });
     }
+    if (pathname === '/staff/api/photo' && req.method === 'GET') return sendPhoto(res, e);
+    if (pathname === '/staff/api/photo' && req.method === 'POST') {
+      const b = (await readBody(req, 0.6)) || {};
+      if (b.clear) { db.prepare('UPDATE staff_emp SET photo = NULL WHERE id = ?').run(e.id); return send(200, { ok: true, photo: '' }); }
+      const dta = String(b.data || '');
+      if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(dta) || dta.length > 400000) return send(400, { error: 'bad', message: 'الصورة دي مش مناسبة — جرّب صورة تانية' });
+      db.prepare('UPDATE staff_emp SET photo = ? WHERE id = ?').run(dta, e.id);
+      return send(200, { ok: true, photo: photoV({ photo: dta }) });
+    }
     if (await X.publicRoute(req, res, pathname, e, send, readBody)) return;
     return send(404, { error: 'not_found' });
   } catch (er) {
@@ -691,6 +718,7 @@ async function handleAdmin(req, res, pathname, me, h) {
     const body = async () => (await readBody(req, 0.05)) || {};
     if (get && p === '/bootstrap') return sendJSON(res, 200, bootstrap());
     if (get && p === '/live') return sendJSON(res, 200, live());
+    if (get && p === '/photo') return sendPhoto(res, db.prepare('SELECT * FROM staff_emp WHERE id = ?').get(str(q.get('id'), 20)));
     if (get && p === '/track') return sendJSON(res, 200, track(q.get('emp'), q.get('date')));
     if (get && p === '/report') return sendJSON(res, 200, report(q.get('month')));
     if (get && p === '/visits') return sendJSON(res, 200, visitsReport(q.get('month')));

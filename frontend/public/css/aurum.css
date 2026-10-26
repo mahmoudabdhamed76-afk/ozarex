@@ -6912,3 +6912,27 @@ html[dir=rtl] .rd-man { transform: translateX(50%); }
 @keyframes stqDrive { from { transform: translateX(3px); } to { transform: translateX(-4px); } }
 @keyframes stqSpin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .tkc, .tkc .stq i, .tkc .stq i::after { animation: none !important; } .tkc .stq-t b { transition: none; } }
+/* 4.67 · «يوم فلان» + photos */
+.emk-av, .stf-av { overflow: hidden; }
+.emk-av img, .stf-av img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
+.stf-dayv .dy-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.stf-dayv .dy-top > div { flex: 1; min-width: 0; } .stf-day .dy-top b { display: block; font-size: 17px; } .stf-day .dy-top span:not(.stf-av) { color: var(--ax-muted); font-size: 12.5px; }
+.stf-dayv .dy-top .stf-av { width: 54px; height: 54px; border-radius: 18px; }
+.dy-bar { display: flex; align-items: center; gap: 8px; background: var(--ax-surface-2, rgba(128,128,128,.08)); border-radius: 16px; padding: 8px; margin-bottom: 12px; }
+.dy-bar .btn { font-size: 20px !important; line-height: 1; padding: 6px 14px !important; margin: 0 !important; }
+.dy-date { flex: 1; display: flex; align-items: center; gap: 8px; justify-content: center; flex-wrap: wrap; } .dy-date b { font-size: 14.5px; } .dy-date input { width: auto !important; max-width: 170px; }
+.dy-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
+.dy-tiles > div { background: var(--ax-surface-2, rgba(128,128,128,.08)); border-radius: 14px; padding: 10px 4px; text-align: center; animation: tkcIn .4s ease backwards; }
+.dy-tiles > div:nth-child(2) { animation-delay: .04s; } .dy-tiles > div:nth-child(3) { animation-delay: .08s; } .dy-tiles > div:nth-child(4) { animation-delay: .12s; } .dy-tiles > div:nth-child(5) { animation-delay: .16s; } .dy-tiles > div:nth-child(6) { animation-delay: .2s; } .dy-tiles > div:nth-child(7) { animation-delay: .24s; } .dy-tiles > div:nth-child(8) { animation-delay: .28s; }
+.dy-tiles b { display: block; font: 800 17px/1.3 var(--ax-display, inherit); } .dy-tiles b small { font-size: 12px; opacity: .6; } .dy-tiles span { font-size: 11px; color: var(--ax-muted); font-weight: 700; }
+.dy-tiles .g b { color: #2fbf71; } .dy-tiles .late b { color: #e8a21a; }
+.dy-h4 { margin: 16px 2px 8px; font-size: 14.5px; }
+.dy-fl { display: flex; flex-direction: column; gap: 8px; }
+.dy-f { border-radius: 14px; padding: 10px 12px; background: rgba(30,154,76,.08); border: 1px solid rgba(30,154,76,.25); }
+.dy-f b { font-size: 14px; } .dy-f code { font: 700 11px monospace; background: rgba(128,128,128,.2); border-radius: 6px; padding: 1px 6px; direction: ltr; display: inline-block; }
+.dy-f small { display: block; color: var(--ax-muted); font-size: 11.5px; } .dy-f p { margin: 6px 0 0; line-height: 1.8; font-size: 13.5px; }
+.dy-empty { text-align: center; padding: 26px 10px; color: var(--ax-muted); font-size: 14px; }
+.stf-tl > div.t > div { background: rgba(229,35,47,.08); }
+.tkc.st-cancel { background: #f4f1f0; border-color: #ddd; opacity: .75; }
+@media (max-width: 600px) { .dy-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.stf-tl > div > span { width: 66px !important; white-space: nowrap; font-size: 12px; }

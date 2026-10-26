@@ -58,6 +58,10 @@ module.exports = function init(H) {
   /* called by staff.js after a real punch */
   function onPunch(e, type, now, info) {
     info = info || {};
+    if (type === 'in' && on('notify_in') && info.again) {
+      toAdmins({ kind: 'in', title: (info.resumed ? '↩️ ' + e.name + ' رجع للشغل ' : '✅ ' + e.name + ' سجّل حضور تاني ') + hm(now.ts), body: info.resumed ? 'بعد ما سجّل انصراف بالغلط' : 'بعد ما كان سجّل انصراف النهارده', tag: 'sp-in-' + e.id });
+      return;
+    }
     if (type === 'in' && on('notify_in')) {
       const bits = [];
       if (info.late > 0) bits.push('متأخر ' + info.late + ' د');
@@ -385,5 +389,5 @@ module.exports = function init(H) {
     }
     return false;
   }
-  return { rewardsFor, stepTask, setNotify, onPunch, onVisit, addFault, tasksOf, board, visitStarted, visitEnded, publicRoute, adminRoute, recurring, searchFaults, toAdmins, toEmps };
+  return { taskOut, rewardsFor, stepTask, setNotify, onPunch, onVisit, addFault, tasksOf, board, visitStarted, visitEnded, publicRoute, adminRoute, recurring, searchFaults, toAdmins, toEmps };
 };
