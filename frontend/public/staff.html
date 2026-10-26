@@ -146,8 +146,6 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
 .trk b{position:absolute;inset-inline-end:-6px;top:-17px;font-size:20px;line-height:1}
 .tk .nums{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut);margin:0 6px}
 .tk .nums b{color:var(--ink)}
-.fbk{display:flex;align-items:center;gap:12px;width:100%;margin-top:12px;padding:13px 14px;border-radius:18px;border:1px solid var(--line);background:var(--card);cursor:pointer;text-align:right}
-.fbk .ic{font-size:22px}.fbk b{display:block;font-size:14.5px}.fbk small{color:var(--mut);font-size:12px}
 .fres{max-height:min(56vh,480px);overflow:auto;margin:10px -4px 0;padding:0 4px}
 .fi{border:1px solid var(--line);background:var(--card);border-radius:15px;padding:12px;margin-bottom:8px}
 .fi h4{margin:0 0 4px;font-size:14.5px}.fi .sol{font-size:13.5px;line-height:1.8;background:rgba(30,154,76,.09);border-radius:10px;padding:8px 10px;margin:6px 0}
@@ -161,18 +159,23 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
 .top .me{position:relative;width:48px;height:48px;border-radius:16px;border:0;padding:0;background:var(--red);display:grid;place-items:center;flex:none;cursor:pointer;box-shadow:0 8px 20px -10px var(--red)}
 .top .me img{width:100%;height:100%;object-fit:cover;border-radius:16px}.top .me b{font:900 22px/1 'Zain','IBM Plex Sans Arabic',sans-serif;color:#fff}
 .top .me i{position:absolute;bottom:-4px;inset-inline-start:-4px;width:20px;height:20px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-style:normal;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,.25)}
-.fab{position:fixed;z-index:60;bottom:calc(26px + env(safe-area-inset-bottom));left:16px;right:auto;width:58px;height:58px;border-radius:50%;cursor:pointer;display:grid;place-items:center;
-  background:rgba(255,255,255,.28);border:1.5px solid rgba(224,27,15,.45);-webkit-backdrop-filter:blur(14px) saturate(1.6);backdrop-filter:blur(14px) saturate(1.6);
-  box-shadow:0 10px 26px -10px rgba(224,27,15,.55),inset 0 1px 0 rgba(255,255,255,.6);animation:fabIn .6s cubic-bezier(.2,1.5,.4,1) backwards}
-[data-t=dark] .fab{background:rgba(30,20,20,.35)}
-.fab svg{width:27px;height:27px;stroke:var(--red);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;animation:fabBob 3s ease-in-out 1s infinite}
-.fab small{position:absolute;bottom:-17px;font-size:10.5px;font-weight:800;color:var(--red);white-space:nowrap;background:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);padding:0 7px;border-radius:99px}
-.fab .fr{position:absolute;inset:-1px;border-radius:50%;border:1.5px solid rgba(224,27,15,.4);animation:fabRing 2.6s ease-out infinite}
-.fab:active{transform:scale(.92)}
-@keyframes fabIn{from{transform:scale(0) rotate(-90deg);opacity:0}}
-@keyframes fabRing{from{transform:scale(1);opacity:.8}to{transform:scale(1.55);opacity:0}}
-@keyframes fabBob{0%,78%,100%{transform:translateY(0) rotate(0)}84%{transform:translateY(-3px) rotate(-8deg)}90%{transform:translateY(0) rotate(6deg)}}
-.w{padding-bottom:110px}
+
+.qa{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.qi{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 10px 14px;border-radius:22px;border:1px solid var(--line);background:var(--card);cursor:pointer;text-align:center;color:var(--ink);animation:qiIn .8s cubic-bezier(.2,1.6,.4,1) backwards}
+.qi.task{animation-delay:.12s}
+.qi .ib2{position:relative;width:58px;height:58px;border-radius:19px;display:grid;place-items:center;animation:qiWob 4.5s ease-in-out 1.4s infinite}
+.qi.task .ib2{animation-delay:3.6s}
+.qi.bank .ib2{background:linear-gradient(145deg,#ffb347,#f08a00);box-shadow:0 10px 22px -10px #f08a00}
+.qi.task .ib2{background:linear-gradient(145deg,#ff4d3d,#c8100b);box-shadow:0 10px 22px -10px #c8100b}
+.qi svg{width:30px;height:30px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.qi em{position:absolute;top:-6px;inset-inline-end:-6px;width:22px;height:22px;border-radius:50%;background:#fff;color:#c8100b;font:900 16px/22px sans-serif;font-style:normal;box-shadow:0 3px 8px rgba(0,0,0,.2);animation:qiPing 2.4s ease-in-out infinite}
+.qi b{font-size:14.5px}.qi small{font-size:11.5px;color:var(--mut)}
+.qi.off{opacity:.62}.qi.off .ib2{filter:grayscale(.6);animation:none}.qi.off em{display:none}
+.qi.tap .ib2{animation:qiBounce .55s cubic-bezier(.2,1.6,.4,1)}
+@keyframes qiIn{0%{transform:scale(.4) translateY(20px);opacity:0}60%{transform:scale(1.06) translateY(-4px);opacity:1}100%{transform:none}}
+@keyframes qiWob{0%,70%,100%{transform:rotate(0) scale(1)}74%{transform:rotate(-12deg) scale(1.08)}78%{transform:rotate(10deg) scale(1.08)}82%{transform:rotate(-7deg)}86%{transform:rotate(4deg)}90%{transform:rotate(0) translateY(-6px)}95%{transform:translateY(0)}}
+@keyframes qiBounce{0%{transform:scale(1)}30%{transform:scale(.82)}60%{transform:scale(1.15)}80%{transform:scale(.96)}100%{transform:scale(1)}}
+@keyframes qiPing{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
 /* 4.65 · المكافآت */
 .vc.rwd{border-color:rgba(247,193,45,.5);background:linear-gradient(180deg,rgba(247,193,45,.12),transparent 70%),var(--card)}.vc.rwd .ic{background:rgba(247,193,45,.2);font-size:18px}
 .rst{font-size:14px;color:#b7860b}
@@ -330,7 +333,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   /* ── screens ── */
   function logoHtml(big) { return brand.logo ? '<img src="' + esc(brand.logo) + '" alt="">' : '<b>' + esc((brand.name || 'O').trim().charAt(0).toUpperCase()) + '</b>'; }
   function renderLogin(msg) {
-    stop(); var fb = $('fab'); if (fb) fb.remove();
+    stop();
     var u = new URLSearchParams(location.search).get('u') || ls.get('ozs_u') || '';
     $('app').innerHTML = '<div class="lgn"><div class="brand"><div class="lg">' + logoHtml() + '</div><h1>' + esc(brand.name || 'Ozarex') + '</h1><p>تسجيل الحضور والانصراف</p></div>' +
       '<div class="card"><div class="err' + (msg ? ' on' : '') + '" id="lerr">' + esc(msg || '') + '</div>' +
@@ -374,7 +377,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       '<div class="st">' + stateChip() + '</div>' + bigBtn() +
       '<div class="wk"><div><span>ميعاد الشغل</span><b class="wkt">' + t12(H.rules.start) + ' ← ' + t12(H.rules.end) + '</b></div><div><span>مدة الشغل النهارده</span><b id="wk">' + (H.rec ? dur(H.rec.worked) : '00:00') + '</b></div></div></section>' +
       '<div class="loc" id="loc">' + ICON.pin + '<span>بنحدد موقعك…</span></div>' +
-      '<div id="rwc"></div><div id="tsk"></div><div id="vis"></div><button class="fbk" id="fbk"><span class="ic">🛠</span><span><b>بنك الأعطال</b><small>' + (H.faults ? H.faults + ' حل متسجّل — دوّر بالكود أو بالوصف' : 'سجّل أول حل واتشاركه مع زمايلك') + '</small></span></button><div id="pushb"></div>' +
+      '<div id="rwc"></div><div id="tsk"></div><div id="vis"></div><div class="qa" id="qa"></div><div id="pushb"></div>' +
       (H.track ? '<p class="hint" style="margin:10px 6px 0;text-align:right">موقعك بيتبعت للإدارة كل ' + H.ping_min + ' دقيقة <b>وإنت في الشغل بس</b> (من تسجيل الحضور لحد الانصراف). سيب الصفحة مفتوحة، وبعد الانصراف مفيش أي تتبع.</p>' : '') +
       '<h2>الشهر ده</h2><div class="mn" id="mn"></div>' +
       '<h2>السجل <span class="sp"><button class="nv" id="mp">' + ICON.prev + '</button><b id="ml" style="font-size:13px;min-width:92px;text-align:center"></b><button class="nv" id="mnx">' + ICON.next + '</button></span></h2><div id="hl"></div>';
@@ -383,7 +386,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     $('bth').onclick = function () { theme(dark() ? 'light' : 'dark'); };
     $('pb').onclick = punch;
     $('mp').onclick = function () { shift(-1); }; $('mnx').onclick = function () { shift(1); };
-    $('bbl').onclick = askPush; $('fbk').onclick = openFaults;
+    $('bbl').onclick = askPush;
     $('bme').onclick = function () { $('mef').click(); }; $('mef').onchange = function () { if (this.files && this.files[0]) upPhoto(this.files[0]); this.value = ''; };
     paintHist(); paintLoc(true); paintVisit(); paintTasks(); paintPushBanner(); paintRewards(); showReward();
     clearInterval(clockTimer); tick(); clockTimer = setInterval(tick, 1000);
@@ -526,8 +529,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   function animSteps(root) { setTimeout(function () { [].forEach.call((root || document).querySelectorAll('.stq-t b[data-to]'), function (b) { b.style.width = b.dataset.to + '%'; }); }, 40); }
   function paintTasks() {
     var el = $('tsk'); if (!el || !H) return;
-    var fab = $('fab'); if (fab) fab.remove();
-    if (H.state === 'in' && H.has_centers) { var f = document.createElement('button'); f.id = 'fab'; f.className = 'fab'; f.title = 'سجّل مهمة هتعملها'; f.innerHTML = '<span class="fr"></span><svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="3"/><path d="M9 4.5V3h6v1.5"/><path d="M12 9.5v7M8.5 13h7"/></svg><small>مهمة</small>'; f.onclick = function () { sfx('tap'); openCenters('task'); }; document.body.appendChild(f); }
+    paintQuick();
     el.innerHTML = (H.tasks || []).map(function (t) {
       var nx = NEXT[t.status];
       var head = '<div class="row1"><span class="ic">📌</span><div style="flex:1;min-width:0"><div class="sub">' + (String(t.created_by || '').indexOf('emp:') === 0 ? 'مهمة سجّلتها' : 'مهمة من الإدارة') + '</div><div class="big">' + esc(t.center) + '</div></div></div>';
@@ -537,6 +539,20 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     }).join('');
     animSteps(el); (H.tasks || []).forEach(function (t) { PREV[t.id] = t.status; });
     [].forEach.call(el.querySelectorAll('[data-st]'), function (b) { b.onclick = function () { taskStep(b); }; });
+  }
+  /* 4.69 · two icons side by side — بنك الأعطال + مهمة جديدة — bounce in, wobble now and then, bounce on tap */
+  var IC_BANK = '<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.6 17.2a1.9 1.9 0 0 0 2.7 2.7l5.7-5.7a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>';
+  var IC_TASK = '<svg viewBox="0 0 24 24"><rect x="4.5" y="4" width="15" height="17" rx="3.2"/><path d="M9 4.4V3h6v1.4"/><path d="M8.6 11h6.8M8.6 15h4.2"/></svg>';
+  function paintQuick() {
+    var el = $('qa'); if (!el || !H) return;
+    var canTask = H.state === 'in' && H.has_centers;
+    if (el.dataset.k === String(canTask) + (H.faults || 0)) return;            // don't replay the entrance on every refresh
+    el.dataset.k = String(canTask) + (H.faults || 0);
+    el.innerHTML = '<button class="qi bank" id="qbank"><span class="ib2">' + IC_BANK + '</span><b>بنك الأعطال</b><small>' + (H.faults ? H.faults + ' حل' : 'دوّر بالكود') + '</small></button>' +
+      '<button class="qi task' + (canTask ? '' : ' off') + '" id="qtask"><span class="ib2">' + IC_TASK + '<em>＋</em></span><b>مهمة جديدة</b><small>' + (canTask ? 'سجّل اللي هتعمله' : 'بعد الحضور') + '</small></button>';
+    var tap = function (b, fn) { b.onclick = function () { b.classList.remove('tap'); void b.offsetWidth; b.classList.add('tap'); sfx('tap'); setTimeout(fn, 180); }; };
+    tap($('qbank'), openFaults);
+    tap($('qtask'), function () { if (!(H.state === 'in' && H.has_centers)) return toast(H.has_centers ? 'سجّل حضورك الأول وبعدين سجّل المهمة' : 'مفيش مراكز متسجّلة', true); openCenters('task'); });
   }
   function taskById(id) { return (H.tasks || []).filter(function (t) { return String(t.id) === String(id); })[0]; }
   var ESH = { task: null };
