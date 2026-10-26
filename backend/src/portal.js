@@ -20,6 +20,9 @@ db.exec(`CREATE TABLE IF NOT EXISTS portal_req (
 );
 CREATE INDEX IF NOT EXISTS ix_portal_req ON portal_req (customer_id, id);
 CREATE INDEX IF NOT EXISTS ix_portal_req_st ON portal_req (status, id);`);
+try { if (!db.prepare('PRAGMA table_info(portal_req)').all().some(c => c.name === 'kind')) db.exec("ALTER TABLE portal_req ADD COLUMN kind TEXT NOT NULL DEFAULT 'order'"); } catch (e) { console.error('[portal] kind', e.message); }
+const MSTATUS = { new: 'اتبعت — مستني فني', ok: 'اتحوّل لفني — جاي', sent: 'اتصلحت ✓', no: 'اتلغى' };
+const DEVICES = ['طابعة', 'جهاز الأشعة', 'كمبيوتر / سيستم', 'حاجة تانية'];
 const STATUS = { new: 'اتبعت — مستني التأكيد', ok: 'اتأكد — بيتجهز', sent: 'اتسلّم ✓', no: 'اتلغى' };
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -174,6 +177,8 @@ details.stm>summary{cursor:pointer;font-weight:700;font-size:15px;display:flex;a
 .go{margin-top:12px;width:100%;border:0;border-radius:14px;padding:14px;background:linear-gradient(135deg,var(--pri),#22C1B8);color:#fff;font-weight:800;font-size:15.5px;font-family:inherit;cursor:pointer;box-shadow:0 10px 24px -12px rgba(14,159,154,.8)}
 .go:disabled{opacity:.6}.omsg{margin-top:10px;font-size:14px;text-align:center}
 .or{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}.or:last-child{border-bottom:0}.or .dt{flex:1;font-size:13.5px}.or .dt small{display:block;color:var(--mut);font-size:12px}
+.dv{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}.dvb{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:9px 14px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}.dvb.on{background:#FFF7ED;border-color:#F97316;color:#C2410C}
+.urg{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;font-weight:700;color:#B91C1C}.urg input{width:20px;height:20px;accent-color:#DC2626}
 .btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:14px;padding:11px 16px;background:var(--ink);color:#fff;font-weight:700;font-size:14px;font-family:inherit;cursor:pointer}
 .acts{display:flex;justify-content:center;margin-top:16px}.foot{margin-top:14px;font-size:12px;color:var(--faint);text-align:center}
 .done{position:fixed;inset:0;display:grid;place-items:center;background:rgba(244,246,250,.85);backdrop-filter:blur(6px);z-index:9;animation:up .3s both}.done div{background:#fff;border-radius:24px;padding:26px 30px;text-align:center;box-shadow:var(--sh)}.done i{font-style:normal;font-size:48px;display:block;animation:pop .6s cubic-bezier(.2,1.6,.4,1) both}
@@ -187,7 +192,8 @@ details.stm>summary{cursor:pointer;font-weight:700;font-size:15px;display:flex;a
 <small>${due > 0.5 ? (a.oldestDays > 0 ? 'أقدم مبلغ مستحق من ' + a.oldestDays + ' يوم' : 'مستحق حديثاً') : 'الحساب مسدد بالكامل — شكراً لكم 🙏'}${a.lastPay ? ' · آخر دفعة ' + n0(a.lastPay.amount) + ' يوم ' + dmy(a.lastPay.date) : ''}</small>
 ${due > 0.5 ? `<div class="bar">${a.buckets.map((v, i) => v > 0 ? `<i style="width:${(v / total * 100).toFixed(2)}%;background:${colors[i]}"></i>` : '').join('')}</div>
 <ul class="leg">${a.buckets.map((v, i) => `<li><i style="background:${colors[i]}"></i><span>${labels[i]}</span><b class="n">${n0(v)}</b></li>`).join('')}</ul>` : ''}
-<div class="hq"><button class="a1" type="button" onclick="openOrder()">📦 اطلب ورق</button><a class="a2" href="#mon">📊 حساب الشهر</a></div>
+<div class="hq"><button class="a1" type="button" onclick="openOrder()">📦 اطلب ورق</button><button class="a1" type="button" onclick="openMaint()">🛠 طلب صيانة</button></div>
+<div class="hq" style="margin-top:8px"><a class="a2" href="#mon">📊 حساب الشهر</a></div>
 </section>
 
 <section class="card" id="order"><h2>📦 اطلب ورق</h2>
@@ -200,7 +206,19 @@ ${due > 0.5 ? `<div class="bar">${a.buckets.map((v, i) => v > 0 ? `<i style="wid
 <button class="go" id="o-go" type="button" onclick="sendOrder()">ابعت الطلب</button><div class="omsg" id="o-msg"></div>
 </div>
 <button class="go" id="o-open" type="button" onclick="openOrder()">اطلب دلوقتي</button>
-${orders.length ? `<div style="margin-top:14px"><h2 style="font-size:14px">طلباتكم الأخيرة</h2>${orders.map(o => { let it = []; try { it = JSON.parse(o.items); } catch (e) {} return `<div class="or"><div class="dt"><b>${it.map(x => esc(x.qty) + ' ' + esc(x.unit || '') + ' ' + esc(x.name)).join(' · ')}</b><small>${dmy(o.created_at)} ${hm(o.created_at)}${o.reply ? ' · ' + esc(o.reply) : ''}</small></div><span class="tg ${o.status === 'sent' ? 'ok' : o.status === 'no' ? 'no' : o.status === 'ok' ? 'pt' : 'nw'}">${STATUS[o.status] || o.status}</span></div>`; }).join('')}</div>` : ''}
+${orders.length ? `<div style="margin-top:14px"><h2 style="font-size:14px">طلباتكم الأخيرة</h2>${orders.map(o => { let it = []; try { it = JSON.parse(o.items); } catch (e) {} const mt = o.kind === 'maint'; return `<div class="or"><div class="dt"><b>${mt ? '🛠 صيانة' + (it && it.device ? ' — ' + esc(it.device) : '') + (o.note ? ': ' + esc(String(o.note).slice(0, 60)) : '') : (Array.isArray(it) ? it : []).map(x => esc(x.qty) + ' ' + esc(x.unit || '') + ' ' + esc(x.name)).join(' · ')}</b><small>${dmy(o.created_at)} ${hm(o.created_at)}${o.reply ? ' · ' + esc(o.reply) : ''}</small></div><span class="tg ${o.status === 'sent' ? 'ok' : o.status === 'no' ? 'no' : o.status === 'ok' ? 'pt' : 'nw'}">${(mt ? MSTATUS : STATUS)[o.status] || o.status}</span></div>`; }).join('')}</div>` : ''}
+</section>
+
+<section class="card" id="maint"><h2>🛠 طلب صيانة</h2>
+<p class="mt">عندكم عطل؟ اكتبوا المشكلة والفني هيتواصل معاكم.</p>
+<div class="oform" id="mform">
+<div class="dv">${DEVICES.map((x, i) => `<button type="button" class="dvb${i === 0 ? ' on' : ''}" onclick="pickDev(this)">${esc(x)}</button>`).join('')}</div>
+<textarea class="fld" id="m-pr" rows="3" maxlength="400" placeholder="اكتب المشكلة — مثلاً: الطابعة بتطلع الفيلم فاضي / بتسحب ورقتين"></textarea>
+<label class="urg"><input type="checkbox" id="m-ur"> <span>🚨 مستعجل — الشغل واقف</span></label>
+<input class="fld" id="m-who" maxlength="60" placeholder="اسم اللي طالب ورقم تليفونه (اختياري)">
+<button class="go" id="m-go" type="button" onclick="sendMaint()">ابعت طلب الصيانة</button><div class="omsg" id="m-msg"></div>
+</div>
+<button class="go" id="m-open" type="button" onclick="openMaint()" style="background:linear-gradient(135deg,#F59E0B,#F97316);box-shadow:0 10px 24px -12px rgba(249,115,22,.8)">🛠 اطلب صيانة</button>
 </section>
 
 <section class="card"><h2>📊 السحب والتحصيل ${esc(y)}</h2>
@@ -233,6 +251,13 @@ try{var mo=document.querySelector('.mh a.on');if(mo)mo.parentNode.scrollLeft=mo.
 var P=${JSON.stringify(prods).replace(/</g, '\\u003c')},U=${JSON.stringify(self + '/order')};
 function opts(){return '<option value="">اختار الصنف…</option>'+P.map(function(p,i){return '<option value="'+i+'">'+p.name.replace(/[<&]/g,'')+(p.unit?' ('+p.unit.replace(/[<&]/g,'')+')':'')+'</option>'}).join('')}
 function addLine(){var d=document.createElement('div');d.className='ol';d.innerHTML='<select>'+opts()+'</select><input type="number" inputmode="numeric" min="1" placeholder="الكمية"><button class="x" type="button" aria-label="شيل" onclick="this.parentNode.remove()">×</button>';document.getElementById('olines').appendChild(d);}
+function pickDev(b){[].forEach.call(document.querySelectorAll('.dvb'),function(x){x.classList.toggle('on',x===b)});}
+function openMaint(){var f=document.getElementById('mform');if(!f.classList.contains('on')){f.classList.add('on');document.getElementById('m-open').style.display='none';}document.getElementById('maint').scrollIntoView({behavior:'smooth',block:'start'});setTimeout(function(){var t=document.getElementById('m-pr');if(t)t.focus()},400);}
+function sendMaint(){var pr=document.getElementById('m-pr').value.trim(),m=document.getElementById('m-msg');if(pr.length<3){m.textContent='اكتب المشكلة';m.style.color='#DC2626';return;}
+var d=document.querySelector('.dvb.on'),b=document.getElementById('m-go');b.disabled=true;b.textContent='بنبعت…';
+fetch(U.slice(0,-6)+'/maint',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device:d?d.textContent:'',problem:pr,urgent:document.getElementById('m-ur').checked,contact:document.getElementById('m-who').value})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.message||'محصلش');return j})})
+.then(function(){var o=document.createElement('div');o.className='done';o.innerHTML='<div><i>🛠</i><b>طلب الصيانة وصلنا</b><p class="mt">الفني هيتواصل معاكم في أقرب وقت</p></div>';document.body.appendChild(o);setTimeout(function(){location.reload()},1800);})
+.catch(function(e){m.textContent=e.message;m.style.color='#DC2626';b.disabled=false;b.textContent='ابعت طلب الصيانة';});}
 function openOrder(){var f=document.getElementById('oform');if(!f.classList.contains('on')){f.classList.add('on');document.getElementById('o-open').style.display='none';if(!document.querySelector('.ol'))addLine();}document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});}
 function sendOrder(){var items=[].map.call(document.querySelectorAll('.ol'),function(l){var s=l.querySelector('select'),t=l.querySelector('.fld'),q=Number(l.querySelector('input[type=number]').value);var p=s&&s.value!==''&&s.value!=='x'?P[+s.value]:null;var name=p?p.name:(t?t.value.trim():'');return name&&q>0?{name:name,unit:p?p.unit:'',qty:q}:null}).filter(Boolean);
 var m=document.getElementById('o-msg');if(!items.length){m.textContent='اختار صنف واكتب الكمية';m.style.color='#DC2626';return;}
@@ -281,6 +306,33 @@ function takeOrder(req, res, stores, tok) {
   });
 }
 
+/* 4.82 · a center asks for maintenance → stored, admins hear it (green card), employees get a push */
+function takeMaint(req, res, stores, tok) {
+  let found = null;
+  for (const x of stores) { const k = findCenter(x.data, tok); if (k) { found = { st: x, c: k }; break; } }
+  const send = (s, o) => { res.writeHead(s, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); };
+  if (!found) return send(404, { message: 'اللينك ده مش شغال' });
+  const now = Date.now(), times = (ORD.get(tok) || []).filter(t => now - t < 3600e3);
+  if (times.length >= 8) return send(429, { message: 'بعتّوا طلبات كتير — كلمونا لو مستعجلين' });
+  let raw = '', size = 0;
+  req.on('data', ch => { size += ch.length; if (size > 20000) { req.destroy(); return; } raw += ch; });
+  req.on('end', () => {
+    let b = {}; try { b = JSON.parse(raw || '{}'); } catch (e) { return send(400, { message: 'الطلب مش مفهوم' }); }
+    const clean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
+    const problem = clean(b.problem, 400); if (problem.length < 3) return send(400, { message: 'اكتب المشكلة' });
+    const device = DEVICES.includes(clean(b.device, 40)) ? clean(b.device, 40) : '';
+    const urgent = !!b.urgent, contact = clean(b.contact, 60);
+    times.push(now); ORD.set(tok, times);
+    const r = db.prepare("INSERT INTO portal_req (branch, branch_name, customer_id, customer_name, items, note, contact, status, created_at, kind) VALUES (?,?,?,?,?,?,?,?,?, 'maint')")
+      .run(found.st.id || 'main', found.st.name || '', found.c.id, String(found.c.name || '').slice(0, 120), JSON.stringify({ device, urgent }), problem, contact, 'new', nowTs());
+    const id = Number(r.lastInsertRowid), head = (urgent ? '🚨 ' : '🛠 ') + 'طلب صيانة — ' + found.c.name;
+    try { NT.event('portal', { kind: 'maint', id, cid: found.c.id, branch: found.st.id || 'main', center: String(found.c.name || ''), device, problem, urgent, contact, text: head + ': ' + problem }); } catch (e) {}
+    try { const ids = (NT.admins() || []).slice(0, 50); if (ids.length && NT.push) NT.push.send(ids, { title: head, body: (device ? device + ': ' : '') + problem, url: './?go=clients', tag: 'pmt-' + id, urgent: true }).catch(() => {}); } catch (e) {}
+    try { if (NT.staff) { const emps = NT.staff.activeEmps().map(e => e.id); if (emps.length) NT.staff.toEmps(emps, { title: head, body: (device ? device + ': ' : '') + problem + ' — لو هتروح سجّل مهمة للمركز ده', tag: 'pmt-' + id, urgent }); } } catch (e) {}
+    send(200, { ok: true });
+  });
+}
+
 /* ── the admin side: /api/portal/* (server.js checks admin) ── */
 function rowOut(r) { let items = []; try { items = JSON.parse(r.items); } catch (e) {} return Object.assign({}, r, { items }); }
 function adminApi(req, res, pathname, me, h) {
@@ -289,6 +341,23 @@ function adminApi(req, res, pathname, me, h) {
     const st = q.get('status');
     const rows = (st === 'open' ? db.prepare("SELECT * FROM portal_req WHERE status IN ('new','ok') ORDER BY id DESC LIMIT 200").all() : db.prepare('SELECT * FROM portal_req ORDER BY id DESC LIMIT 200').all()).map(rowOut);
     return sendJSON(res, 200, { list: rows, newCount: db.prepare("SELECT COUNT(*) AS n FROM portal_req WHERE status = 'new'").get().n });
+  }
+  if (req.method === 'GET' && pathname === '/api/portal/emps') return sendJSON(res, 200, { list: NT.staff ? NT.staff.activeEmps() : [] });
+  if (req.method === 'POST' && pathname === '/api/portal/assign') {
+    return readBody(req, 0.02).then(b => {
+      b = b || {}; const r = db.prepare('SELECT * FROM portal_req WHERE id = ?').get(Number(b.id));
+      if (!r) return sendJSON(res, 404, { error: 'not_found', message: 'الطلب مش موجود' });
+      if (!NT.staff) return sendJSON(res, 400, { error: 'bad', message: 'قسم الموظفين مش شغال' });
+      let it = {}; try { it = JSON.parse(r.items) || {}; } catch (e) {}
+      const who = me.name || me.username || 'admin';
+      try {
+        NT.staff.createTask({ emp_id: b.emp_id, center: (r.branch || 'main') + ':' + r.customer_id, title: '🛠 صيانة' + (it.device ? ' — ' + it.device : '') + (it.urgent ? ' (مستعجل)' : ''), note: r.note }, who);
+      } catch (er) { return sendJSON(res, er.status || 400, { error: 'bad', message: er.staffMsg || er.message || 'محصلش' }); }
+      const emp = (NT.staff.activeEmps() || []).find(e => e.id === String(b.emp_id));
+      db.prepare("UPDATE portal_req SET status = 'ok', reply = ?, done_at = ?, done_by = ? WHERE id = ?").run('اتحوّل لـ ' + (emp ? emp.name : 'فني'), nowTs(), who, r.id);
+      try { NT.event('portal', { kind: 'status', id: r.id }); } catch (e) {}
+      return sendJSON(res, 200, { ok: true, emp: emp ? emp.name : '' });
+    });
   }
   if (req.method === 'GET' && pathname === '/api/portal/count') return sendJSON(res, 200, { newCount: db.prepare("SELECT COUNT(*) AS n FROM portal_req WHERE status = 'new'").get().n });
   if (req.method === 'POST' && pathname === '/api/portal/request') {
@@ -311,7 +380,7 @@ function adminApi(req, res, pathname, me, h) {
 /* → true when handled */
 const MISS = new Map();
 function handle(req, res, pathname, data) {
-  const m = /^\/(?:([pc])\/)?([A-Za-z0-9]+)(\/order)?\/?$/.exec(pathname);
+  const m = /^\/(?:([pc])\/)?([A-Za-z0-9]+)(\/order|\/maint)?\/?$/.exec(pathname);
   if (!m) return false;
   const bare = !m[1];   // 4.76 · the shortest link: ozarex.pro/<6 letters with a digit>
   if (bare && !(m[2].length === 6 && /\d/.test(m[2]))) return false;
@@ -324,7 +393,7 @@ function handle(req, res, pathname, data) {
   /* data() → every branch: [{ id, name, data }] (or plain datasets, older callers) */
   const stores = [].concat(data() || []).map(x => x && x.data ? x : { id: 'main', name: '', data: x || {} });
   if (bare && !stores.some(x => findCenter(x.data, m[2]))) { const x = MISS.get(ip); MISS.set(ip, x && now - x.t < 600e3 ? { n: x.n + 1, t: x.t } : { n: 1, t: now }); return false; }   // not a center → the app handles it
-  if (isOrder) { takeOrder(req, res, stores, m[2]); return true; }
+  if (isOrder) { if (m[3] === '/maint') takeMaint(req, res, stores, m[2]); else takeOrder(req, res, stores, m[2]); return true; }
   let st = stores[0] || { data: {} }, c = null;
   for (const x of stores) { const k = findCenter(x.data, m[2]); if (k) { st = x; c = k; break; } }
   if (!c) { const x = MISS.get(ip); MISS.set(ip, x && now - x.t < 600e3 ? { n: x.n + 1, t: x.t } : { n: 1, t: now }); if (MISS.size > 5000) MISS.clear(); }

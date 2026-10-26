@@ -409,5 +409,5 @@ module.exports = function init(H) {
     }
     return false;
   }
-  return { taskOut, rewardsFor, stepTask, setNotify, onPunch, onVisit, addFault, tasksOf, board, visitStarted, visitEnded, publicRoute, adminRoute, recurring, searchFaults, toAdmins, toEmps };
+  return { createTask, taskOut, rewardsFor, stepTask, setNotify, onPunch, onVisit, addFault, tasksOf, board, visitStarted, visitEnded, publicRoute, adminRoute, recurring, searchFaults, toAdmins, toEmps };
 };

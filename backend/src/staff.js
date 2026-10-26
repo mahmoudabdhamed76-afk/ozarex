@@ -785,4 +785,6 @@ async function handleAdmin(req, res, pathname, me, h) {
   }
 }
 
-module.exports = { handlePublic, handleAdmin, setSource, setNotify: n => X.setNotify(n), _test: { payroll: m => PAY.payroll(m), nowLocal, calc, rulesOf, tsMin } };
+module.exports = { handlePublic, handleAdmin, setSource, setNotify: n => X.setNotify(n),
+  /* 4.82 · a center's maintenance request → a job for an employee */
+  createTask: (b, who) => X.createTask(b, who), activeEmps: () => db.prepare('SELECT id, name, job FROM staff_emp WHERE active = 1 ORDER BY name').all(), toEmps: (ids, msg) => X.toEmps(ids, msg), _test: { payroll: m => PAY.payroll(m), nowLocal, calc, rulesOf, tsMin } };

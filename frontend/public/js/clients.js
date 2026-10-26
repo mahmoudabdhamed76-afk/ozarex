@@ -137,8 +137,18 @@
     var list = ui.rq.filter(function (r) { return ui.rf === 'all' || r.status === 'new' || r.status === 'ok'; });
     var h = '<div class="cl-rf"><button class="' + (ui.rf === 'open' ? 'on' : '') + '" onclick="AXClients.rf(\'open\')">المفتوحة</button><button class="' + (ui.rf === 'all' ? 'on' : '') + '" onclick="AXClients.rf(\'all\')">الكل</button></div>';
     if (!list.length) return h + '<div class="cl-emp"><i>📭</i>' + (ui.rf === 'open' ? 'مفيش طلبات مفتوحة.' : 'لسه مفيش طلبات.') + '<br><small>المراكز بتطلب ورق من اللينك بتاعها، والطلب بيظهر هنا بإشعار.</small></div>';
+    if (!EMPS && list.some(function (r) { return r.kind === 'maint'; })) loadEmps(function () { if (isPage() && ui.tab === 'req') render(); });
     return h + list.map(function (r) {
       var c = A('customers').filter(function (x) { return x.id === r.customer_id; })[0], ph = c ? phoneOf(c) : '';
+      if (r.kind === 'maint') {
+        var it = r.items && !Array.isArray(r.items) ? r.items : {}, MS = { new: 'جديد', ok: 'اتحوّل لفني', sent: 'اتصلحت', no: 'اتلغى' };
+        return '<div class="cl-rq ' + r.status + '"><div class="h"><span class="cl-av" style="background:rgba(249,115,22,.15)">' + (it.urgent ? '🚨' : '🛠') + '</span><div><b>' + esc(r.customer_name) + ' — طلب صيانة</b><small>' + ago(r.created_at) + (r.branch_name ? ' · ' + esc(r.branch_name) : '') + (r.contact ? ' · ' + esc(r.contact) : '') + '</small></div><span class="cl-tg ' + r.status + '">' + MS[r.status] + '</span></div>' +
+          '<ul><li>' + (it.device ? '<span style="opacity:1;font-weight:800;color:#f59e0b">' + esc(it.device) + '</span>' : '') + '<span style="opacity:1">' + esc(r.note || '') + '</span></li></ul>' +
+          (it.urgent ? '<p class="nt" style="color:#f87171;font-weight:700">🚨 مستعجل — الشغل واقف</p>' : '') + (r.reply ? '<p class="nt" style="opacity:.7">👷 ' + esc(r.reply) + (r.done_by ? ' · بواسطة ' + esc(r.done_by) : '') + '</p>' : '') +
+          '<div class="cl-a">' + (r.status === 'new' || r.status === 'ok' ? (EMPS ? empSel(r.id) + '<button class="btn btn-primary btn-sm" onclick="AXClients.assign(' + r.id + ', this.previousElementSibling)">👷 حوّل للموظف</button>' : '<span class="cl-note">بنحمّل الموظفين…</span>') +
+            '<button class="btn btn-secondary btn-sm" onclick="AXClients.st(' + r.id + ',\'sent\')">✅ اتصلحت</button><button class="btn btn-ghost btn-sm" onclick="AXClients.st(' + r.id + ',\'no\')">إلغاء</button>' : '<button class="btn btn-ghost btn-sm" onclick="AXClients.del(' + r.id + ')">🗑 مسح</button>') +
+          (ph ? '<button class="btn btn-secondary btn-sm cl-wa" onclick="AXClients.waReq(' + r.id + ')">واتساب</button>' : '') + '</div></div>';
+      }
       return '<div class="cl-rq ' + r.status + '"><div class="h"><span class="cl-av">📦</span><div><b>' + esc(r.customer_name) + '</b><small>' + ago(r.created_at) + (r.branch_name ? ' · ' + esc(r.branch_name) : '') + (r.contact ? ' · ' + esc(r.contact) : '') + '</small></div><span class="cl-tg ' + r.status + '">' + ST[r.status] + '</span></div>' +
         '<ul>' + r.items.map(function (x) { return '<li><b>' + num(x.qty) + '</b><span>' + esc(x.unit || '') + '</span><span style="opacity:1">' + esc(x.name) + '</span></li>'; }).join('') + '</ul>' +
         (r.note ? '<p class="nt">📝 ' + esc(r.note) + '</p>' : '') + (r.done_by && r.status !== 'new' ? '<p class="nt" style="opacity:.55">' + esc(ST[r.status]) + ' بواسطة ' + esc(r.done_by) + '</p>' : '') +
@@ -150,6 +160,17 @@
           (typeof openIssuanceForm === 'function' && c && r.status !== 'no' && r.status !== 'sent' ? '<button class="btn btn-secondary btn-sm" onclick="AXClients.issue(\'' + c.id + '\')">🧾 صرف</button>' : '') +
         '</div></div>';
     }).join('');
+  }
+  var EMPS = null;
+  function loadEmps(cb) { if (EMPS) return cb(EMPS); api('GET', '/emps').then(function (r) { EMPS = r.list || []; cb(EMPS); }).catch(function () { cb([]); }); }
+  function empSel(id) { return '<select class="form-control cl-emp" data-rq="' + id + '" style="flex:1;min-width:150px">' + '<option value="">اختار الموظف…</option>' + (EMPS || []).map(function (e) { return '<option value="' + esc(e.id) + '">' + esc(e.name) + (e.job ? ' — ' + esc(e.job) : '') + '</option>'; }).join('') + '</select>'; }
+  function assign(id, sel) {
+    var v = sel && sel.value; if (!v) return T('اختار الموظف الأول', 'error');
+    api('POST', '/assign', { id: id, emp_id: v }).then(function (r) {
+      (ui.rq || []).forEach(function (x) { if (x.id === id) { x.status = 'ok'; x.reply = 'اتحوّل لـ ' + r.emp; } });
+      setCount((ui.rq || []).filter(function (x) { return x.status === 'new'; }).length);
+      T('🛠 اتحوّلت المشكلة لـ ' + r.emp + ' — وصله إشعار بالمهمة'); if (isPage()) render(); else refreshCount();
+    }).catch(function (e) { T(e.message, 'error'); });
   }
   function loadReq() {
     if (ui.busy) return; ui.busy = true;
@@ -234,6 +255,9 @@
       '.clp-sl .sr.r{background:#FEF2F2}.clp-sl .sr.o{background:#FFFBEB}.clp-sl .sr .nm{flex:1;min-width:0;font-weight:700;font-size:14.5px;color:#1F2937}',
       '.clp-sl .sr .q{font-weight:800;font-size:19px;color:#0F172A;font-variant-numeric:tabular-nums}.clp-sl .sr .u{font-size:12px;color:#64748B;margin-inline-start:3px}',
       '.clp-tg{font-size:11.5px;font-weight:800;border-radius:8px;padding:3px 9px;white-space:nowrap}',
+      '.clp-pr{background:#FFF7ED;border:1px solid #FED7AA;color:#7C2D12;border-radius:16px;padding:14px 16px;font-size:17px;font-weight:700;line-height:1.6;margin:6px 0 4px;text-align:right;white-space:pre-wrap;animation:clpRow .45s .65s both}',
+      '.clp-sel{flex:1.4;border:1px solid #CDEBD1!important;border-radius:14px!important;padding:11px 12px!important;font-family:inherit;font-size:15px!important;background:#fff!important;color:#1F2937!important;-webkit-text-fill-color:#1F2937}.clp-wait{flex:1;font-size:13px;color:#64748B;padding:10px}',
+      '.clp-as{margin-top:2px}',
       '.clp-more{display:inline-block;margin-top:4px;font-size:13px;color:#fff;background:#ef4444;border-radius:999px;padding:3px 10px}'
     ].join('\n');
     document.head.appendChild(s);
@@ -243,17 +267,23 @@
     var ov = document.querySelector('.clp-ov');
     if (ov) { POPQ.push(m); var mo = ov.querySelector('.clp-more'); if (mo) { mo.textContent = '+' + POPQ.length + ' إشعار كمان'; mo.style.display = ''; } return; }
     ov = document.createElement('div'); ov.className = 'clp-ov ax-hl-off';
-    var items = Array.isArray(m.items) ? m.items : [], due = m.kind === 'due', stk = m.kind === 'stock';
-    var ic = stk ? '<svg viewBox="0 0 24 24"><path class="lg" d="M3.5 8L12 3.5L20.5 8V16L12 20.5L3.5 16zM3.5 8L12 12.5L20.5 8M12 12.5V20.5"/></svg>' : due ? '<svg viewBox="0 0 24 24"><path class="lg" d="M12 3.5a8.5 8.5 0 1 1 0 17a8.5 8.5 0 1 1 0-17M12 7.5V12l3 2"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+    var items = Array.isArray(m.items) ? m.items : [], due = m.kind === 'due', stk = m.kind === 'stock', mnt = m.kind === 'maint';
+    var ic = mnt ? '<svg viewBox="0 0 24 24"><path class="lg" d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.6 17.2a1.9 1.9 0 0 0 2.7 2.7l5.7-5.7a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>' : stk ? '<svg viewBox="0 0 24 24"><path class="lg" d="M3.5 8L12 3.5L20.5 8V16L12 20.5L3.5 16zM3.5 8L12 12.5L20.5 8M12 12.5V20.5"/></svg>' : due ? '<svg viewBox="0 0 24 24"><path class="lg" d="M12 3.5a8.5 8.5 0 1 1 0 17a8.5 8.5 0 1 1 0-17M12 7.5V12l3 2"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
     ov.innerHTML = '<div class="clp" role="dialog" aria-modal="true"><div class="clp-hd"><span class="clp-dot"></span><span class="clp-ln l"></span>' +
       '<span class="clp-ring"><span class="clp-ck">' + ic + '</span></span><span class="clp-ln r"></span><span class="clp-dot"></span></div>' +
-      (stk ? stockBody(m) : due ? dueBody(m) : '') + (due || stk ? '' :
+      (mnt ? maintBody(m) : stk ? stockBody(m) : due ? dueBody(m) : '') + (due || stk || mnt ? '' :
       '<h3>📦 طلب ورق جديد</h3><p class="ctr">' + esc(m.center || '') + '</p>' +
       (items.length ? '<ul>' + items.map(function (x, i) { return '<li style="animation-delay:' + (0.7 + i * 0.08).toFixed(2) + 's"><b>' + num(x.qty) + '</b><span>' + esc(x.name) + '</span></li>'; }).join('') + '</ul>' : '<p class="mt2">' + esc(m.text || '') + '</p>') +
       (m.contact ? '<p class="mt2">👤 ' + esc(m.contact) + '</p>' : '') + (m.note ? '<p class="mt2">📝 ' + esc(m.note) + '</p>' : '') +
       '') + '<span class="clp-more" style="display:none"></span>' +
-      '<div class="clp-bt"><button class="clp-ok" type="button">حسنا</button>' + (stk ? '<button class="clp-go" data-go="inv" type="button">افتح المخزن ←</button>' : due ? '<div class="clp-two"><button class="clp-b2" data-x="pay" type="button">💵 تحصيل</button>' + (m.phone ? '<button class="clp-b2 wa" data-x="wa" type="button">واتساب</button>' : '') + '<button class="clp-b2" data-x="stmt" type="button">📒 كشف الحساب</button></div>' : '<button class="clp-go" type="button">افتح الطلبات ←</button>') + '</div></div>';
+      '<div class="clp-bt"><button class="clp-ok" type="button">حسنا</button>' + (mnt ? '<div class="clp-two clp-as"><span class="clp-wait">بنحمّل الموظفين…</span></div><button class="clp-go" type="button">افتح الطلبات ←</button>' : stk ? '<button class="clp-go" data-go="inv" type="button">افتح المخزن ←</button>' : due ? '<div class="clp-two"><button class="clp-b2" data-x="pay" type="button">💵 تحصيل</button>' + (m.phone ? '<button class="clp-b2 wa" data-x="wa" type="button">واتساب</button>' : '') + '<button class="clp-b2" data-x="stmt" type="button">📒 كشف الحساب</button></div>' : '<button class="clp-go" type="button">افتح الطلبات ←</button>') + '</div></div>';
     document.body.appendChild(ov);
+    if (mnt) loadEmps(function (L) {
+      var box = ov.querySelector('.clp-as'); if (!box) return;
+      if (!L.length) { box.innerHTML = '<span class="clp-wait">مفيش موظفين نشطين — ضيفهم من «الموظفين»</span>'; return; }
+      box.innerHTML = '<select class="clp-sel"><option value="">اختار الموظف…</option>' + L.map(function (e) { return '<option value="' + esc(e.id) + '">' + esc(e.name) + '</option>'; }).join('') + '</select><button class="clp-b2" data-x="assign" type="button">👷 حوّله</button>';
+      box.querySelector('[data-x=assign]').onclick = function () { var sl = box.querySelector('.clp-sel'); if (!sl.value) { sl.focus(); return T('اختار الموظف الأول', 'error'); } assign(m.id, sl); close(); };
+    });
     var close = function (then) {
       ov.classList.add('out'); setTimeout(function () { ov.remove(); if (then) then(); else if (POPQ.length) showPop(POPQ.shift()); }, 220);
     };
@@ -302,6 +332,12 @@
       '<div class="amt">' + num(m.amount) + ' <small>' + esc(m.cur || 'ج') + '</small></div>' +
       '<span class="late ' + dt + '">متأخر من ' + dtx + '</span>' +
       (m.last ? '<p class="mt2">آخر دفعة: ' + num(m.last.amount) + ' يوم ' + esc(String(m.last.date || '').split('-').reverse().join('/')) + '</p>' : '<p class="mt2">مفيش دفعات متسجلة</p>');
+  }
+  function maintBody(m) {
+    return '<h3>' + (m.urgent ? '🚨' : '🛠') + ' طلب صيانة</h3><p class="ctr">' + esc(m.center || '') + '</p>' +
+      (m.device ? '<span class="late" style="background:#FFF7ED;color:#C2410C">' + esc(m.device) + '</span>' : '') + (m.urgent ? ' <span class="late hot">مستعجل — الشغل واقف</span>' : '') +
+      '<div class="clp-pr">' + esc(m.problem || '') + '</div>' + (m.contact ? '<p class="mt2">👤 ' + esc(m.contact) + '</p>' : '') +
+      '<p class="mt2" style="margin-top:8px">وصل إشعار لكل الموظفين — حوّله لموظف معيّن يتسجّل عنده مهمة:</p>';
   }
   function dueTick(force) {
     if (!canDue() || (!dueOn() && !force)) return;
@@ -359,6 +395,10 @@
 
   document.addEventListener('ax:sse', function (ev) {
     var m = ev.detail || {}; if (m.event !== 'portal' || !isAdmin()) return;
+    if (m.kind === 'maint') {
+      if (window.innerWidth >= 760) showPop(m); else T(m.text || 'طلب صيانة 🛠', 'success');
+      try { var Ac2 = window.AudioContext || window.webkitAudioContext; if (Ac2) { var ac2 = new Ac2(); [520, 780, 520].forEach(function (f, j) { var o = ac2.createOscillator(), g = ac2.createGain(); o.connect(g); g.connect(ac2.destination); o.frequency.value = f; g.gain.setValueAtTime(.1, ac2.currentTime + j * .16); g.gain.exponentialRampToValueAtTime(.001, ac2.currentTime + j * .16 + .3); o.start(ac2.currentTime + j * .16); o.stop(ac2.currentTime + j * .16 + .31); }); } } catch (e) {}
+    }
     if (m.kind === 'order') {
       if (window.innerWidth >= 760) showPop(m); else T(m.text || 'طلب ورق جديد 📦', 'success');
       try { var Ac = window.AudioContext || window.webkitAudioContext; if (Ac) { var ac = new Ac(), o = ac.createOscillator(), g = ac.createGain(); o.connect(g); g.connect(ac.destination); o.frequency.value = 880; g.gain.setValueAtTime(.12, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + .5); o.start(); o.stop(ac.currentTime + .5); } } catch (e) {}
@@ -465,6 +505,7 @@
   function waReq(id) {
     var r = (ui.rq || []).filter(function (x) { return x.id === id; })[0]; if (!r) return;
     var c = A('customers').filter(function (x) { return x.id === r.customer_id; })[0]; if (!c) return;
+    if (r.kind === 'maint') { var mi = r.items || {}; window.open('https://wa.me/' + phoneOf(c) + '?text=' + encodeURIComponent('السلام عليكم ' + c.name + ' 🌿\nطلب الصيانة وصلنا ✅' + (mi.device ? ' (' + mi.device + ')' : '') + '\n«' + (r.note || '') + '»\n' + (r.status === 'sent' ? 'واتصلح — شكراً لكم 🙏' : r.reply ? r.reply + ' وهيتواصل معاكم.' : 'والفني هيتواصل معاكم في أقرب وقت.') + '\n' + company()), '_blank'); return; }
     var what = r.items.map(function (x) { return '• ' + x.qty + ' ' + (x.unit || '') + ' ' + x.name; }).join('\n');
     var txt = 'السلام عليكم ' + c.name + ' 🌿\nطلبكم وصلنا ✅\n' + what + '\n' + (r.status === 'sent' ? 'واتسلّم — شكراً لكم 🙏' : 'وجاري تجهيزه، هنبلغكم بميعاد التسليم.') + '\n' + company();
     window.open('https://wa.me/' + phoneOf(c) + '?text=' + encodeURIComponent(txt), '_blank');
@@ -479,7 +520,7 @@
   };
   window.AXClients = {
     render: render, make: make, makeAll: makeAll, shortAll: shortAll, rotate: rotate, stop: stop, copy: copy, wa: wa,
-    st: setSt, del: del, _pop: showPop, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, stockShow: stockShow, stockToggle: stockToggle, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
+    st: setSt, del: del, _pop: showPop, assign: assign, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, stockShow: stockShow, stockToggle: stockToggle, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
     tab: function (t) { ui.tab = t; if (t === 'req') ui.rq = null; render(); },
     rf: function (f) { ui.rf = f; render(); },
     grp: function (k) { ui.grp[k] = !ui.grp[k]; render(); },

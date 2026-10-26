@@ -49,7 +49,8 @@ staff.setNotify({
 portal.setNotify({
   admins: () => ((store.data() || {}).users || []).filter(u => u && u.role === 'admin' && !u.disabled).map(u => u.id),
   event: (name, payload) => { try { broadcast(name, payload); } catch (e) {} },
-  push: webpush
+  push: webpush,
+  staff: { createTask: (b, who) => staff.createTask(b, who), activeEmps: () => staff.activeEmps(), toEmps: (ids, msg) => staff.toEmps(ids, msg) }
 });
 const digest = require('./src/digest');
 /* 4.39 · the daily summary + instant alerts read every active branch */
@@ -329,7 +330,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname.startsWith('/tiles/') && tiles.handle(req, res, pathname)) return;   // 4.81 · the map's tiles through our server
     if (pathname === '/api/version' && req.method === 'GET') { const vb = String(parsed.query.branch || 'main'); return sendJSON(res, 200, { version: branches.get(vb) ? verOf(vb) : verOf('main') }); }
     /* a center's own read-only page (token link) */
-    if ((pathname.startsWith('/p/') || pathname.startsWith('/c/') || /^\/[A-Za-z0-9]{6}(\/order)?\/?$/.test(pathname)) && portal.handle(req, res, pathname, () => branches.list().filter(b => b.active || b.main).map(b => { const st = branches.storeOf(b.id); return st ? { id: b.id, name: b.name, data: st.data() } : null; }).filter(Boolean))) return;   // 4.32 · a center's link works in any branch
+    if ((pathname.startsWith('/p/') || pathname.startsWith('/c/') || /^\/[A-Za-z0-9]{6}(\/order|\/maint)?\/?$/.test(pathname)) && portal.handle(req, res, pathname, () => branches.list().filter(b => b.active || b.main).map(b => { const st = branches.storeOf(b.id); return st ? { id: b.id, name: b.name, data: st.data() } : null; }).filter(Boolean))) return;   // 4.32 · a center's link works in any branch
 
     /* 4.60 · الموظفين: the employee's own page (/staff) and its API — his own login, never the ERP's */
     if (pathname === '/staff/') { res.writeHead(302, { Location: APP_PATH + '/staff' }); return res.end(); }

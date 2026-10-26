@@ -12,7 +12,7 @@
 
 <!-- PWA: install to home screen with company logo -->
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#070304">
+<meta name="theme-color" content="#1A0B0E">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -33,7 +33,7 @@
   var t = 'dark', rail = false;
   try { t = localStorage.getItem('theme') || 'dark'; rail = localStorage.getItem('ax_rail') === '1'; } catch (e) {}
   d.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
-  try { var tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.setAttribute('content', t === 'light' ? '#B3121B' : '#070304'); } catch (e) {}
+  try { var tc = document.querySelector('meta[name="theme-color"]'); if (tc) tc.setAttribute('content', t === 'light' ? '#B3121B' : '#1A0B0E'); } catch (e) {}
   d.classList.add('aurum');
   if (rail) d.classList.add('ax-rail');
   /* 4.9 · no splash: the login form shows at once. Only when this device was
@@ -9572,7 +9572,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
   if (tc) tc.setAttribute('content', '#D03A5A');                     // the phone's bar matches the welcome screen while it shows
   function go(){
     if (gone) return; gone = true;
-    try { var t = d.getAttribute('data-theme'); if (tc) tc.setAttribute('content', t === 'light' ? '#B3121B' : (tc0 && tc0 !== '#D03A5A' ? tc0 : '#070304')); } catch (e) {}
+    try { var t = d.getAttribute('data-theme'); if (tc) tc.setAttribute('content', t === 'light' ? '#B3121B' : (tc0 && tc0 !== '#D03A5A' ? tc0 : '#1A0B0E')); } catch (e) {}
     el.classList.add('out');
     setTimeout(function(){ d.classList.remove('ax-splash-on'); if (el.parentNode) el.remove(); }, 650);
   }
@@ -9767,7 +9767,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 4.81</div>
+      <div class="version">الإصدار 4.82</div>
     </footer>
   </div>
 </div>
