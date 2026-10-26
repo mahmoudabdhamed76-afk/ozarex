@@ -6946,3 +6946,24 @@ html[dir=rtl] .rd-man { transform: translateX(50%); }
 .stf-lock{max-width:380px;margin:30px auto;text-align:center}.stf-lk{font-size:46px;margin-bottom:10px}
 
 
+
+/* 4.79 · الموظفين على الكمبيوتر: المهام كروت صغيرة جنب بعض */
+@media (min-width: 900px) {
+  .stf-road .tk-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }
+  .stf-road .card-title { font-size: 15px; }
+  .stf-road .tkc { padding: 11px 13px 9px; border-radius: 18px; }
+  .stf-road .tkc-h { gap: 9px; }
+  .stf-road .tkc-h .ic { width: 34px; height: 34px; font-size: 16px; border-radius: 11px; }
+  .stf-road .tkc .lb { font-size: 11.5px; }
+  .stf-road .tkc .big { font-size: 16px; line-height: 1.3; }
+  .stf-road .tkc-s, .stf-road .tkc-x { font-size: 12px; margin-top: 5px; line-height: 1.55; }
+  .stf-road .tkc .stq { margin: 10px 0 0; }
+  .stf-road .tkc .stq-t { top: 11px; height: 3px; }
+  .stf-road .tkc .stq > div { font-size: 10.5px; gap: 2px; }
+  .stf-road .tkc .stq i { width: 24px; height: 24px; font-size: 11.5px; }
+  .stf-road .tkc .stq .cur i { box-shadow: 0 0 0 4px rgba(30,154,76,.18); }
+  .stf-road .tkc .stq .s-working i::after { inset: -4px; }
+  .stf-road .tkc .stq em { font-size: 9.5px; min-height: 12px; }
+  .stf-road .tkc-a { margin-top: 6px; }
+  .stf-road .tkc-b { padding: 4px 11px; font-size: 11.5px; }
+}
