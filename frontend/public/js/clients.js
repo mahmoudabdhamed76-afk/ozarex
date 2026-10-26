@@ -16,7 +16,7 @@
   function T(m, t) { if (typeof toast === 'function') toast(m, t || 'success'); }
   function today() { var d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
   function base() { return typeof API_BASE !== 'undefined' && API_BASE ? API_BASE : location.origin; }
-  function url(tok) { return base().replace(/\/$/, '') + (String(tok).length <= 12 ? '/c/' : '/p/') + tok; }
+  function url(tok) { return base().replace(/\/$/, '') + (String(tok).length === 6 ? '/' : String(tok).length <= 12 ? '/c/' : '/p/') + tok; }
   function phoneOf(c) { try { return typeof normalizeEgyptianPhone === 'function' ? normalizeEgyptianPhone(c.phone) : String(c.phone || '').replace(/\D/g, ''); } catch (e) { return ''; } }
   function company() { return S().companyName || 'Ozarex'; }
   function links() { return S()._portal || {}; }
@@ -25,7 +25,7 @@
   function newToken() {   // short code (8 letters/digits) → /c/xxxxxxxx
     var AB = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789', used = {}, L = links(), k, t;
     for (k in L) used[L[k]] = 1;
-    do { var a = new Uint8Array(8); (window.crypto || window.msCrypto).getRandomValues(a); t = Array.from(a, function (b) { return AB.charAt(b % AB.length); }).join(''); } while (used[t]);
+    do { var a = new Uint8Array(8); (window.crypto || window.msCrypto).getRandomValues(a); t = Array.from(a.slice(0, 6), function (b) { return AB.charAt(b % AB.length); }).join(''); } while (used[t] || !/\d/.test(t));
     return t;
   }
   function norm(s) { return String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ').trim(); }
@@ -115,7 +115,7 @@
     var f = all.filter(function (r) { return !q || norm(r.c.name).indexOf(q) >= 0 || String(r.c.phone || '').indexOf(ui.q) >= 0; })
       .sort(function (a, b) { return b.n - a.n || b.bal - a.bal || String(a.c.name).localeCompare(String(b.c.name), 'ar'); });
     var on = f.filter(function (r) { return r.tok; }), off = f.filter(function (r) { return !r.tok; }), allOn = all.filter(function (r) { return r.tok; }).length;
-    var longN = all.filter(function (r) { return r.tok && r.tok.length > 12; }).length;
+    var longN = all.filter(function (r) { return r.tok && r.tok.length > 6; }).length;
     return '<div class="cl-st"><div><b>' + all.length + '</b><span>مركز ومستشفى</span></div><div class="ok"><b>' + allOn + '</b><span>ليهم لينك</span></div><div><b>' + (all.length - allOn) + '</b><span>من غير لينك</span></div></div>' +
       '<input class="cl-q" placeholder="🔍 دوّر على مركز بالاسم أو التليفون" value="' + esc(ui.q) + '" oninput="AXClients.search(this.value)">' +
       group('on', '🔗 ليهم لينك', on, longN ? '<div class="cl-gx"><button class="btn btn-secondary btn-sm" onclick="AXClients.shortAll()">✂ اختصر ' + longN + ' لينك طويل</button></div>' : '') +
@@ -180,10 +180,71 @@
     var startObs = function () { var n = document.getElementById('sidebar-nav'); if (n) mo.observe(n, { childList: true }); else setTimeout(startObs, 800); };
     startObs();
   } catch (e) {}
+
+  /* 4.76 · a new order on a computer → a big card in the middle of the screen (animated) */
+  var POPQ = [];
+  function popCss() {
+    if (document.getElementById('cl-pop-css')) return;
+    var s = document.createElement('style'); s.id = 'cl-pop-css';
+    s.textContent = [
+      '.clp-ov{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;background:rgba(15,23,42,.38);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:clpF .25s ease both;padding:16px}',
+      '.clp-ov.out{animation:clpF .22s ease reverse both}.clp-ov.out .clp{animation:clpOut .22s ease both}',
+      '@keyframes clpF{from{opacity:0}to{opacity:1}}@keyframes clpOut{to{opacity:0;transform:scale(.92) translateY(10px)}}',
+      '.clp{width:min(520px,100%);background:#fff;color:#334155;border:1px solid #E5E7EB;border-radius:30px;padding:34px 34px 28px;text-align:center;box-shadow:0 30px 80px -20px rgba(15,23,42,.45);animation:clpIn .55s cubic-bezier(.2,1.4,.35,1) both;font-family:inherit}',
+      '@keyframes clpIn{from{opacity:0;transform:scale(.7) translateY(24px)}to{opacity:1;transform:none}}',
+      '.clp-hd{display:flex;align-items:center;justify-content:center;margin-bottom:22px}',
+      '.clp-dot{width:16px;height:16px;border-radius:50%;background:#A8D8AE;flex:none;transform:scale(0);animation:clpPop .4s .55s cubic-bezier(.2,1.6,.4,1) forwards}',
+      '.clp-ln{height:3px;flex:1;max-width:150px;background:#BFE5C4;border-radius:3px;transform:scaleX(0);animation:clpLn .45s .3s cubic-bezier(.2,.8,.2,1) forwards}.clp-ln.l{transform-origin:left}.clp-ln.r{transform-origin:right}',
+      '@keyframes clpLn{to{transform:scaleX(1)}}@keyframes clpPop{to{transform:scale(1)}}',
+      '.clp-ring{position:relative;width:118px;height:118px;border-radius:50%;background:#F1FBF3;display:grid;place-items:center;flex:none;margin:0 14px;animation:clpPop2 .5s .1s cubic-bezier(.2,1.6,.4,1) both}',
+      '@keyframes clpPop2{from{transform:scale(0)}to{transform:scale(1)}}',
+      '.clp-ring::after{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid #A8D8AE;opacity:0;animation:clpWave 1.8s 1s ease-out infinite}',
+      '@keyframes clpWave{0%{opacity:.8;transform:scale(1)}100%{opacity:0;transform:scale(1.45)}}',
+      '.clp-ck{width:64px;height:64px;border-radius:50%;background:#58A85E;display:grid;place-items:center;box-shadow:0 10px 24px -8px rgba(88,168,94,.7)}',
+      '.clp-ck svg{width:34px;height:34px}.clp-ck path{stroke:#fff;stroke-width:3.4;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:30;stroke-dashoffset:30;animation:clpCk .45s .55s ease forwards}',
+      '@keyframes clpCk{to{stroke-dashoffset:0}}',
+      '.clp h3{margin:0 0 4px;font-size:25px;color:#1F2937!important;-webkit-text-fill-color:#1F2937!important;background:none!important;font-weight:800;opacity:1!important}',
+      '.clp .ctr{font-size:17px;color:#475569;margin:0 0 16px}',
+      '.clp ul{list-style:none;padding:0;margin:0 0 14px;display:flex;flex-direction:column;gap:8px}',
+      '.clp li{display:flex;align-items:center;gap:10px;background:#F6FAF6;border:1px solid #E3F1E5;border-radius:16px;padding:12px 16px;opacity:0;animation:clpRow .4s cubic-bezier(.2,.8,.2,1) forwards}',
+      '@keyframes clpRow{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}',
+      '.clp li b{font-size:24px;color:#2F855A;font-weight:800;min-width:64px}.clp li span{font-size:17px;color:#334155;font-weight:600}',
+      '.clp .mt2{font-size:14px;color:#64748B;margin:0 0 6px}',
+      '.clp-bt{display:flex;flex-direction:column;gap:10px;margin-top:20px}',
+      '.clp-ok{border:1px solid #8EE29B;background:#69C973;color:#fff;font-weight:800;font-size:19px;font-family:inherit;padding:15px;border-radius:14px;cursor:pointer;box-shadow:0 0 0 4px rgba(105,201,115,.14);transition:transform .15s,filter .15s}.clp-ok:hover{filter:brightness(1.05);transform:translateY(-1px)}',
+      '.clp-ok:focus,.clp-go:focus{outline:none!important;box-shadow:0 0 0 4px rgba(105,201,115,.25)!important}.clp-go:focus{box-shadow:none!important;text-decoration:underline}',
+      '.clp-go{border:0;background:transparent;color:#2F855A;font-weight:700;font-size:15px;font-family:inherit;padding:8px;cursor:pointer}',
+      '.clp-more{display:inline-block;margin-top:4px;font-size:13px;color:#fff;background:#ef4444;border-radius:999px;padding:3px 10px}'
+    ].join('\n');
+    document.head.appendChild(s);
+  }
+  function showPop(m) {
+    popCss();
+    var ov = document.querySelector('.clp-ov');
+    if (ov) { POPQ.push(m); var mo = ov.querySelector('.clp-more'); if (mo) { mo.textContent = '+' + POPQ.length + ' طلب كمان'; mo.style.display = ''; } return; }
+    ov = document.createElement('div'); ov.className = 'clp-ov ax-hl-off';
+    var items = Array.isArray(m.items) ? m.items : [];
+    ov.innerHTML = '<div class="clp" role="dialog" aria-modal="true"><div class="clp-hd"><span class="clp-dot"></span><span class="clp-ln l"></span>' +
+      '<span class="clp-ring"><span class="clp-ck"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span><span class="clp-ln r"></span><span class="clp-dot"></span></div>' +
+      '<h3>📦 طلب ورق جديد</h3><p class="ctr">' + esc(m.center || '') + '</p>' +
+      (items.length ? '<ul>' + items.map(function (x, i) { return '<li style="animation-delay:' + (0.7 + i * 0.08).toFixed(2) + 's"><b>' + num(x.qty) + '</b><span>' + esc(x.name) + '</span></li>'; }).join('') + '</ul>' : '<p class="mt2">' + esc(m.text || '') + '</p>') +
+      (m.contact ? '<p class="mt2">👤 ' + esc(m.contact) + '</p>' : '') + (m.note ? '<p class="mt2">📝 ' + esc(m.note) + '</p>' : '') +
+      '<span class="clp-more" style="display:none"></span>' +
+      '<div class="clp-bt"><button class="clp-ok" type="button">حسنا</button><button class="clp-go" type="button">افتح الطلبات ←</button></div></div>';
+    document.body.appendChild(ov);
+    var close = function (then) {
+      ov.classList.add('out'); setTimeout(function () { ov.remove(); if (then) then(); else if (POPQ.length) showPop(POPQ.shift()); }, 220);
+    };
+    ov.querySelector('.clp-ok').onclick = function () { close(); };
+    ov.querySelector('.clp-go').onclick = function () { POPQ = []; close(function () { ui.tab = 'req'; ui.rq = null; if (isPage()) render(); else if (typeof navigate === 'function') navigate('clients'); }); };
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    var key = function (e) { if (!document.body.contains(ov)) return document.removeEventListener('keydown', key); if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); document.removeEventListener('keydown', key); close(); } };
+    document.addEventListener('keydown', key);
+  }
   document.addEventListener('ax:sse', function (ev) {
     var m = ev.detail || {}; if (m.event !== 'portal' || !isAdmin()) return;
     if (m.kind === 'order') {
-      T(m.text || 'طلب ورق جديد 📦', 'success');
+      if (window.innerWidth >= 760) showPop(m); else T(m.text || 'طلب ورق جديد 📦', 'success');
       try { var Ac = window.AudioContext || window.webkitAudioContext; if (Ac) { var ac = new Ac(), o = ac.createOscillator(), g = ac.createGain(); o.connect(g); g.connect(ac.destination); o.frequency.value = 880; g.gain.setValueAtTime(.12, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + .5); o.start(); o.stop(ac.currentTime + .5); } } catch (e) {}
     }
     if (isPage()) { ui.rq = ui.rq || []; loadReq(); } else refreshCount();
@@ -201,7 +262,7 @@
   function ask(msg, go) { if (typeof confirmDialog === 'function') confirmDialog(msg, go); else if (confirm(msg)) go(); }
   function shortAll() {
     ask('هتتعمل لينكات قصيرة بدل الطويلة، واللينكات الطويلة القديمة هتقف — لازم تبعت الجديدة للمراكز. تكمل؟', function () {
-      var p = Object.assign({}, links()), n = 0; Object.keys(p).forEach(function (k) { if (String(p[k]).length > 12) { S()._portal = p; p[k] = newToken(); n++; } });
+      var p = Object.assign({}, links()), n = 0; Object.keys(p).forEach(function (k) { if (String(p[k]).length > 6) { S()._portal = p; p[k] = newToken(); n++; } });
       save(p); T('اتختصر ' + n + ' لينك — ابعت اللينكات الجديدة للمراكز'); render();
     });
   }
@@ -241,7 +302,7 @@
   };
   window.AXClients = {
     render: render, make: make, makeAll: makeAll, shortAll: shortAll, rotate: rotate, stop: stop, copy: copy, wa: wa,
-    st: setSt, del: del, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
+    st: setSt, del: del, _pop: showPop, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
     tab: function (t) { ui.tab = t; if (t === 'req') ui.rq = null; render(); },
     rf: function (f) { ui.rf = f; render(); },
     grp: function (k) { ui.grp[k] = !ui.grp[k]; render(); },

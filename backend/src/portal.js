@@ -35,7 +35,7 @@ const p2 = n => String(n).padStart(2, '0');
 function hm(ts) { const m = /(\d{2}):(\d{2})/.exec(String(ts || '').slice(11)); if (!m) return ''; const h = +m[1]; return ((h % 12) || 12) + ':' + m[2] + (h < 12 ? ' ص' : ' م'); }
 
 function findCenter(d, token) {
-  if (!/^[A-Za-z0-9]{8,64}$/.test(String(token || ''))) return null;   // short codes (/c/xxxxxxxx) or the old long ones
+  if (!/^[A-Za-z0-9]{6,64}$/.test(String(token || ''))) return null;   // short codes (/c/xxxxxxxx) or the old long ones
   const map = (d.settings && d.settings._portal) || {};
   const cid = Object.keys(map).find(k => map[k] === token);
   if (!cid) return null;
@@ -102,7 +102,8 @@ function page(d, c, q, tok, pre, br) {
   if (!(m >= 1 && m <= 12)) m = y === t.slice(0, 4) ? +t.slice(5, 7) : 12;
   if (y === t.slice(0, 4) && m > +t.slice(5, 7)) m = +t.slice(5, 7);
   const ym = y + '-' + p2(m), M = yearOf(d, c.id, y), cm = M[m - 1];
-  const href = (yy, mm) => '/' + pre + '/' + tok + '?y=' + yy + '&m=' + mm + '#mon';
+  const self = (pre ? '/' + pre : '') + '/' + tok;   // 4.76 · /<code> (6) or /c/<code> or /p/<token>
+  const href = (yy, mm) => self + '?y=' + yy + '&m=' + mm + '#mon';
   const due = Math.max(0, a.balance), total = a.buckets.reduce((x, v) => x + v, 0) || 1;
   const labels = ['30 يوم أو أقل', '31 – 60 يوم', '61 – 90 يوم', 'أكتر من 90 يوم'], colors = ['#16A34A', '#F59E0B', '#F97316', '#DC2626'];
   const logo = typeof s.companyLogo === 'string' && s.companyLogo.startsWith('data:image') ? s.companyLogo : '';
@@ -138,7 +139,7 @@ h2{font-size:15.5px;margin:0 0 12px;display:flex;align-items:center;gap:8px}h2 s
 .bar{display:flex;gap:2px;height:10px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.18);margin-top:14px}.bar i{display:block;height:100%}
 .leg{list-style:none;padding:0;margin:10px 0 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .leg li{display:flex;align-items:center;gap:7px;font-size:12px;background:rgba(255,255,255,.12);border-radius:11px;padding:7px 9px}.leg i{width:9px;height:9px;border-radius:3px;flex:none}.leg b{margin-inline-start:auto}
-.hq{display:flex;gap:8px;margin-top:14px}.hq a,.hq button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:14px;padding:11px;font:700 14px inherit;font-family:inherit;cursor:pointer;text-decoration:none}
+.hq{display:flex;gap:8px;margin-top:14px}.hq a,.hq button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:14px;padding:11px;font-weight:700;font-size:14px;font-family:inherit;cursor:pointer;text-decoration:none}
 .hq .a1{background:#fff;color:var(--pri2)}.hq .a2{background:rgba(255,255,255,.16);color:#fff}
 .yr{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:10px}.yr::-webkit-scrollbar{display:none}
 .yr a{flex:none;padding:6px 14px;border-radius:999px;background:var(--soft);color:var(--mut);text-decoration:none;font-weight:700;font-size:13px}.yr a.on{background:var(--ink);color:#fff}
@@ -169,11 +170,11 @@ details.stm>summary{cursor:pointer;font-weight:700;font-size:15px;display:flex;a
 .oform{display:none}.oform.on{display:block;animation:up .35s both}
 .ol{display:flex;gap:8px;align-items:center;margin-bottom:8px}.ol select,.ol input,.fld{font:inherit;font-size:15px;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;color:var(--ink);min-width:0}
 .ol select{flex:1}.ol input{width:96px;text-align:center}.ol .x{border:0;background:var(--soft);color:var(--mut);width:40px;height:44px;border-radius:12px;font-size:18px;cursor:pointer;flex:none}
-.fld{width:100%;margin-top:8px}.add{border:1px dashed #94A3B8;background:transparent;color:var(--pri2);border-radius:12px;padding:10px;width:100%;font:700 14px inherit;font-family:inherit;cursor:pointer}
-.go{margin-top:12px;width:100%;border:0;border-radius:14px;padding:14px;background:linear-gradient(135deg,var(--pri),#22C1B8);color:#fff;font:800 15.5px inherit;font-family:inherit;cursor:pointer;box-shadow:0 10px 24px -12px rgba(14,159,154,.8)}
+.fld{width:100%;margin-top:8px}.add{border:1px dashed #94A3B8;background:transparent;color:var(--pri2);border-radius:12px;padding:10px;width:100%;font-weight:700;font-size:14px;font-family:inherit;cursor:pointer}
+.go{margin-top:12px;width:100%;border:0;border-radius:14px;padding:14px;background:linear-gradient(135deg,var(--pri),#22C1B8);color:#fff;font-weight:800;font-size:15.5px;font-family:inherit;cursor:pointer;box-shadow:0 10px 24px -12px rgba(14,159,154,.8)}
 .go:disabled{opacity:.6}.omsg{margin-top:10px;font-size:14px;text-align:center}
 .or{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}.or:last-child{border-bottom:0}.or .dt{flex:1;font-size:13.5px}.or .dt small{display:block;color:var(--mut);font-size:12px}
-.btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:14px;padding:11px 16px;background:var(--ink);color:#fff;font:700 14px inherit;font-family:inherit;cursor:pointer}
+.btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:14px;padding:11px 16px;background:var(--ink);color:#fff;font-weight:700;font-size:14px;font-family:inherit;cursor:pointer}
 .acts{display:flex;justify-content:center;margin-top:16px}.foot{margin-top:14px;font-size:12px;color:var(--faint);text-align:center}
 .done{position:fixed;inset:0;display:grid;place-items:center;background:rgba(244,246,250,.85);backdrop-filter:blur(6px);z-index:9;animation:up .3s both}.done div{background:#fff;border-radius:24px;padding:26px 30px;text-align:center;box-shadow:var(--sh)}.done i{font-style:normal;font-size:48px;display:block;animation:pop .6s cubic-bezier(.2,1.6,.4,1) both}
 @keyframes pop{from{transform:scale(.3)}to{transform:none}}
@@ -229,7 +230,7 @@ ${st.rows.map(r => `<tr><td class="n">${dmy(r.date)}</td><td>${esc(r.label)}</td
 <script>
 (function(){var p=function(e){e.preventDefault()};document.addEventListener('gesturestart',p,{passive:false});document.addEventListener('gesturechange',p,{passive:false});document.addEventListener('touchmove',function(e){if(e.touches&&e.touches.length>1)e.preventDefault()},{passive:false});document.addEventListener('dblclick',p,{passive:false})})();
 try{var mo=document.querySelector('.mh a.on');if(mo)mo.parentNode.scrollLeft=mo.offsetLeft-mo.parentNode.clientWidth/2+mo.clientWidth/2;}catch(e){}
-var P=${JSON.stringify(prods).replace(/</g, '\\u003c')},U=${JSON.stringify('/' + pre + '/' + tok + '/order')};
+var P=${JSON.stringify(prods).replace(/</g, '\\u003c')},U=${JSON.stringify(self + '/order')};
 function opts(){return '<option value="">اختار الصنف…</option>'+P.map(function(p,i){return '<option value="'+i+'">'+p.name.replace(/[<&]/g,'')+(p.unit?' ('+p.unit.replace(/[<&]/g,'')+')':'')+'</option>'}).join('')}
 function addLine(){var d=document.createElement('div');d.className='ol';d.innerHTML='<select>'+opts()+'</select><input type="number" inputmode="numeric" min="1" placeholder="الكمية"><button class="x" type="button" aria-label="شيل" onclick="this.parentNode.remove()">×</button>';document.getElementById('olines').appendChild(d);}
 function openOrder(){var f=document.getElementById('oform');if(!f.classList.contains('on')){f.classList.add('on');document.getElementById('o-open').style.display='none';if(!document.querySelector('.ol'))addLine();}document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});}
@@ -274,7 +275,7 @@ function takeOrder(req, res, stores, tok) {
     const r = db.prepare('INSERT INTO portal_req (branch, branch_name, customer_id, customer_name, items, note, contact, status, created_at) VALUES (?,?,?,?,?,?,?,?,?)')
       .run(found.st.id || 'main', found.st.name || '', found.c.id, String(found.c.name || '').slice(0, 120), JSON.stringify(items), clean(b.note, 300), clean(b.contact, 60), 'new', nowTs());
     const what = items.map(x => x.qty + ' ' + (x.unit ? x.unit + ' ' : '') + x.name).join(' · ');
-    try { NT.event('portal', { kind: 'order', id: Number(r.lastInsertRowid), text: '📦 طلب ورق من ' + found.c.name + ': ' + what }); } catch (e) {}
+    try { NT.event('portal', { kind: 'order', id: Number(r.lastInsertRowid), center: String(found.c.name || ''), items, contact: clean(b.contact, 60), note: clean(b.note, 300), text: '📦 طلب ورق من ' + found.c.name + ': ' + what }); } catch (e) {}
     try { const ids = (NT.admins() || []).slice(0, 50); if (ids.length && NT.push) NT.push.send(ids, { title: '📦 طلب ورق — ' + found.c.name, body: what, url: './?go=clients', tag: 'preq-' + r.lastInsertRowid, urgent: true }).catch(() => {}); } catch (e) {}
     send(200, { ok: true });
   });
@@ -310,8 +311,10 @@ function adminApi(req, res, pathname, me, h) {
 /* → true when handled */
 const MISS = new Map();
 function handle(req, res, pathname, data) {
-  const m = /^\/([pc])\/([A-Za-z0-9]+)(\/order)?\/?$/.exec(pathname);
+  const m = /^\/(?:([pc])\/)?([A-Za-z0-9]+)(\/order)?\/?$/.exec(pathname);
   if (!m) return false;
+  const bare = !m[1];   // 4.76 · the shortest link: ozarex.pro/<6 letters with a digit>
+  if (bare && !(m[2].length === 6 && /\d/.test(m[2]))) return false;
   const isOrder = !!m[3];
   if (isOrder ? req.method !== 'POST' : req.method !== 'GET') return false;
   /* a short code is guessable only by trying a lot — too many wrong ones from one address → wait */
@@ -320,11 +323,12 @@ function handle(req, res, pathname, data) {
   if (miss && miss.n >= 30 && now - miss.t < 600e3) { res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '600' }); res.end('حاولت كتير — جرّب بعد شوية'); return true; }
   /* data() → every branch: [{ id, name, data }] (or plain datasets, older callers) */
   const stores = [].concat(data() || []).map(x => x && x.data ? x : { id: 'main', name: '', data: x || {} });
+  if (bare && !stores.some(x => findCenter(x.data, m[2]))) { const x = MISS.get(ip); MISS.set(ip, x && now - x.t < 600e3 ? { n: x.n + 1, t: x.t } : { n: 1, t: now }); return false; }   // not a center → the app handles it
   if (isOrder) { takeOrder(req, res, stores, m[2]); return true; }
   let st = stores[0] || { data: {} }, c = null;
   for (const x of stores) { const k = findCenter(x.data, m[2]); if (k) { st = x; c = k; break; } }
   if (!c) { const x = MISS.get(ip); MISS.set(ip, x && now - x.t < 600e3 ? { n: x.n + 1, t: x.t } : { n: 1, t: now }); if (MISS.size > 5000) MISS.clear(); }
-  const html = c ? page(st.data, c, new URL(req.url, 'http://x').searchParams, m[2], m[1], st.id) : notFound();
+  const html = c ? page(st.data, c, new URL(req.url, 'http://x').searchParams, m[2], m[1] || '', st.id) : notFound();
   const status = c ? 200 : 404;
   const headers = {
     'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow',

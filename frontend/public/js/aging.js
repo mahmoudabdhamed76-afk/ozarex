@@ -27,7 +27,7 @@
   function phoneOf(c) { try { return typeof normalizeEgyptianPhone === 'function' ? normalizeEgyptianPhone(c.phone) : String(c.phone || '').replace(/\D/g, ''); } catch (e) { return ''; } }
   function company() { var s = S(); return s.companyName || 'Ozarex'; }
   function base() { return typeof API_BASE !== 'undefined' ? API_BASE : location.origin; }
-  function plink(tok) { return base().replace(/\/$/, '') + (String(tok).length <= 12 ? '/c/' : '/p/') + tok; }
+  function plink(tok) { return base().replace(/\/$/, '') + (String(tok).length === 6 ? '/' : String(tok).length <= 12 ? '/c/' : '/p/') + tok; }
   function daysTxt(n) { return n === 0 ? 'النهارده' : n === 1 ? 'يوم' : n === 2 ? 'يومين' : n + (n <= 10 ? ' أيام' : ' يوم'); }
 
   function rows() {
@@ -151,7 +151,7 @@
   function newToken() {   // 4.73 · short code (8 letters/digits) → /c/xxxxxxxx
     var AB = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789', used = {}, L = (S()._portal || {}), k, t;
     for (k in L) used[L[k]] = 1;
-    do { var a = new Uint8Array(8); (window.crypto || window.msCrypto).getRandomValues(a); t = Array.from(a, function (b) { return AB.charAt(b % AB.length); }).join(''); } while (used[t]);
+    do { var a = new Uint8Array(8); (window.crypto || window.msCrypto).getRandomValues(a); t = Array.from(a.slice(0, 6), function (b) { return AB.charAt(b % AB.length); }).join(''); } while (used[t] || !/\d/.test(t));
     return t;
   }
   function portal(cid) {
