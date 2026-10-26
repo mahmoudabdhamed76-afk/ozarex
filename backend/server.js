@@ -25,6 +25,7 @@ const branches = require('./src/branches');
 const transfers = require('./src/transfers');
 try { transfers.recover(); } catch (e) { console.error('[transfers] recover:', e.message); }
 const portal = require('./src/portal');
+const tiles = require('./src/tiles');
 const webpush = require('./src/webpush');
 const staff = require('./src/staff');
 /* 4.61 · the employees pick the center they're working at from the ERP's own customers (every branch) */
@@ -325,6 +326,7 @@ const server = http.createServer(async (req, res) => {
       const logo = typeof st.companyLogo === 'string' && /^data:image\/(png|jpe?g|webp|gif);base64,/.test(st.companyLogo) ? st.companyLogo : '';
       return sendJSON(res, 200, { name: String(st.companyName || '').slice(0, 120), logo });
     }
+    if (pathname.startsWith('/tiles/') && tiles.handle(req, res, pathname)) return;   // 4.81 · the map's tiles through our server
     if (pathname === '/api/version' && req.method === 'GET') { const vb = String(parsed.query.branch || 'main'); return sendJSON(res, 200, { version: branches.get(vb) ? verOf(vb) : verOf('main') }); }
     /* a center's own read-only page (token link) */
     if ((pathname.startsWith('/p/') || pathname.startsWith('/c/') || /^\/[A-Za-z0-9]{6}(\/order)?\/?$/.test(pathname)) && portal.handle(req, res, pathname, () => branches.list().filter(b => b.active || b.main).map(b => { const st = branches.storeOf(b.id); return st ? { id: b.id, name: b.name, data: st.data() } : null; }).filter(Boolean))) return;   // 4.32 · a center's link works in any branch

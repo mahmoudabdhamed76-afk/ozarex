@@ -120,6 +120,9 @@
     var ow = owing();
     var dueBar = canDue() ? '<div class="cl-g" style="padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:22px">' + (dueOn() ? '🔔' : '🔕') + '</span><div style="flex:1;min-width:180px"><b>تذكير يومي بالمراكز المتأخرة</b><div style="font-size:12.5px;opacity:.7">' + ow.length + ' مركز عليه فلوس من أسبوع أو أكتر — كل واحد بيطلعلك مرة في اليوم في وقت عشوائي</div></div>' +
       '<button class="btn btn-secondary btn-sm" onclick="AXClients.dueTry()">جرّب</button><button class="btn ' + (dueOn() ? 'btn-ghost' : 'btn-primary') + ' btn-sm" onclick="AXClients.dueToggle()">' + (dueOn() ? 'إيقاف' : 'تشغيل') + '</button></div>' : '';
+    if (canStock()) { var sl = stockList(), sr = sl.filter(function (x) { return x.st === 'r'; }).length, so = sl.filter(function (x) { return x.st === 'o'; }).length;
+      dueBar += '<div class="cl-g" style="padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:22px">' + (stockOn() ? '📦' : '🔕') + '</span><div style="flex:1;min-width:180px"><b>تقرير المخزن اليومي</b><div style="font-size:12.5px;opacity:.7">كل يوم الصبح: ' + sl.length + ' صنف · ' + sr + ' ناقص · ' + so + ' قرب يخلص</div></div>' +
+        '<button class="btn btn-secondary btn-sm" onclick="AXClients.stockShow()">اعرض دلوقتي</button><button class="btn ' + (stockOn() ? 'btn-ghost' : 'btn-primary') + ' btn-sm" onclick="AXClients.stockToggle()">' + (stockOn() ? 'إيقاف' : 'تشغيل') + '</button></div>'; }
     return dueBar + '<div class="cl-st"><div><b>' + all.length + '</b><span>مركز ومستشفى</span></div><div class="ok"><b>' + allOn + '</b><span>ليهم لينك</span></div><div><b>' + (all.length - allOn) + '</b><span>من غير لينك</span></div></div>' +
       '<input class="cl-q" placeholder="🔍 دوّر على مركز بالاسم أو التليفون" value="' + esc(ui.q) + '" oninput="AXClients.search(this.value)">' +
       group('on', '🔗 ليهم لينك', on, (on.length || longN) ? '<div class="cl-gx">' + (on.length ? '<button class="btn btn-secondary btn-sm" onclick="AXClients.qrPrint()">🖨 اطبع باركود كل المراكز (' + allOn + ')</button>' : '') + (longN ? '<button class="btn btn-secondary btn-sm" onclick="AXClients.shortAll()">✂ اختصر ' + longN + ' لينك طويل</button>' : '') + '</div>' : '') +
@@ -224,6 +227,13 @@
       '.clp .late.hot{background:#FEE2E2;color:#B91C1C}',
       '.clp-two{display:flex;gap:8px}.clp-b2{flex:1;border:1px solid #CDEBD1;background:#F1FBF3;color:#2F855A;font-weight:700;font-size:15px;font-family:inherit;padding:12px 8px;border-radius:14px;cursor:pointer}.clp-b2:hover{background:#E3F6E6}.clp-b2.wa{color:#15803D}',
       '.clp-b2:focus{outline:none!important}',
+      '.clp-sk{display:flex;gap:6px;justify-content:center;margin:4px 0 12px;flex-wrap:wrap}.clp-sk span{font-size:13px;font-weight:800;border-radius:999px;padding:5px 12px}',
+      '.clp-sk .r,.clp-tg.r{background:#FEE2E2;color:#B91C1C}.clp-sk .o,.clp-tg.o{background:#FEF3C7;color:#B45309}.clp-sk .g,.clp-tg.g{background:#DCFCE7;color:#15803D}',
+      '.clp-sl{max-height:min(42vh,340px);overflow:auto;text-align:right;margin:0 -6px;padding:0 6px}',
+      '.clp-sl .sr{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:#F8FAFC;margin-bottom:6px;opacity:0;animation:clpRow .35s cubic-bezier(.2,.8,.2,1) forwards}',
+      '.clp-sl .sr.r{background:#FEF2F2}.clp-sl .sr.o{background:#FFFBEB}.clp-sl .sr .nm{flex:1;min-width:0;font-weight:700;font-size:14.5px;color:#1F2937}',
+      '.clp-sl .sr .q{font-weight:800;font-size:19px;color:#0F172A;font-variant-numeric:tabular-nums}.clp-sl .sr .u{font-size:12px;color:#64748B;margin-inline-start:3px}',
+      '.clp-tg{font-size:11.5px;font-weight:800;border-radius:8px;padding:3px 9px;white-space:nowrap}',
       '.clp-more{display:inline-block;margin-top:4px;font-size:13px;color:#fff;background:#ef4444;border-radius:999px;padding:3px 10px}'
     ].join('\n');
     document.head.appendChild(s);
@@ -233,16 +243,16 @@
     var ov = document.querySelector('.clp-ov');
     if (ov) { POPQ.push(m); var mo = ov.querySelector('.clp-more'); if (mo) { mo.textContent = '+' + POPQ.length + ' إشعار كمان'; mo.style.display = ''; } return; }
     ov = document.createElement('div'); ov.className = 'clp-ov ax-hl-off';
-    var items = Array.isArray(m.items) ? m.items : [], due = m.kind === 'due';
-    var ic = due ? '<svg viewBox="0 0 24 24"><path class="lg" d="M12 3.5a8.5 8.5 0 1 1 0 17a8.5 8.5 0 1 1 0-17M12 7.5V12l3 2"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+    var items = Array.isArray(m.items) ? m.items : [], due = m.kind === 'due', stk = m.kind === 'stock';
+    var ic = stk ? '<svg viewBox="0 0 24 24"><path class="lg" d="M3.5 8L12 3.5L20.5 8V16L12 20.5L3.5 16zM3.5 8L12 12.5L20.5 8M12 12.5V20.5"/></svg>' : due ? '<svg viewBox="0 0 24 24"><path class="lg" d="M12 3.5a8.5 8.5 0 1 1 0 17a8.5 8.5 0 1 1 0-17M12 7.5V12l3 2"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
     ov.innerHTML = '<div class="clp" role="dialog" aria-modal="true"><div class="clp-hd"><span class="clp-dot"></span><span class="clp-ln l"></span>' +
       '<span class="clp-ring"><span class="clp-ck">' + ic + '</span></span><span class="clp-ln r"></span><span class="clp-dot"></span></div>' +
-      (due ? dueBody(m) : '') + (due ? '' :
+      (stk ? stockBody(m) : due ? dueBody(m) : '') + (due || stk ? '' :
       '<h3>📦 طلب ورق جديد</h3><p class="ctr">' + esc(m.center || '') + '</p>' +
       (items.length ? '<ul>' + items.map(function (x, i) { return '<li style="animation-delay:' + (0.7 + i * 0.08).toFixed(2) + 's"><b>' + num(x.qty) + '</b><span>' + esc(x.name) + '</span></li>'; }).join('') + '</ul>' : '<p class="mt2">' + esc(m.text || '') + '</p>') +
       (m.contact ? '<p class="mt2">👤 ' + esc(m.contact) + '</p>' : '') + (m.note ? '<p class="mt2">📝 ' + esc(m.note) + '</p>' : '') +
       '') + '<span class="clp-more" style="display:none"></span>' +
-      '<div class="clp-bt"><button class="clp-ok" type="button">حسنا</button>' + (due ? '<div class="clp-two"><button class="clp-b2" data-x="pay" type="button">💵 تحصيل</button>' + (m.phone ? '<button class="clp-b2 wa" data-x="wa" type="button">واتساب</button>' : '') + '<button class="clp-b2" data-x="stmt" type="button">📒 كشف الحساب</button></div>' : '<button class="clp-go" type="button">افتح الطلبات ←</button>') + '</div></div>';
+      '<div class="clp-bt"><button class="clp-ok" type="button">حسنا</button>' + (stk ? '<button class="clp-go" data-go="inv" type="button">افتح المخزن ←</button>' : due ? '<div class="clp-two"><button class="clp-b2" data-x="pay" type="button">💵 تحصيل</button>' + (m.phone ? '<button class="clp-b2 wa" data-x="wa" type="button">واتساب</button>' : '') + '<button class="clp-b2" data-x="stmt" type="button">📒 كشف الحساب</button></div>' : '<button class="clp-go" type="button">افتح الطلبات ←</button>') + '</div></div>';
     document.body.appendChild(ov);
     var close = function (then) {
       ov.classList.add('out'); setTimeout(function () { ov.remove(); if (then) then(); else if (POPQ.length) showPop(POPQ.shift()); }, 220);
@@ -251,7 +261,8 @@
     [].forEach.call(ov.querySelectorAll('.clp-b2'), function (b) { b.onclick = function () { var x = b.dataset.x; close(function () {
       try { if (x === 'pay' && typeof openPaymentForm === 'function') openPaymentForm(m.cid); else if (x === 'wa' && window.AXAging) AXAging.whatsapp(m.cid); else if (x === 'stmt' && typeof viewCustomerStatement === 'function') viewCustomerStatement(m.cid); } catch (e) {}
       if (POPQ.length) setTimeout(function () { showPop(POPQ.shift()); }, 400); }); }; });
-    var goB = ov.querySelector('.clp-go'); if (goB) goB.onclick = function () { POPQ = []; close(function () { ui.tab = 'req'; ui.rq = null; if (isPage()) render(); else if (typeof navigate === 'function') navigate('clients'); }); };
+    var goB = ov.querySelector('.clp-go'); if (goB && goB.dataset.go === 'inv') { goB.onclick = function () { close(function () { if (typeof navigate === 'function') navigate('inventory'); }); }; goB = null; }
+    if (goB) goB.onclick = function () { POPQ = []; close(function () { ui.tab = 'req'; ui.rq = null; if (isPage()) render(); else if (typeof navigate === 'function') navigate('clients'); }); };
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
     var key = function (e) { if (!document.body.contains(ov)) return document.removeEventListener('keydown', key); if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); document.removeEventListener('keydown', key); close(); } };
     document.addEventListener('keydown', key);
@@ -313,6 +324,38 @@
   function dueTry() { var x = owing()[Math.floor(Math.random() * Math.max(1, owing().length))]; if (!x) return T('مفيش مراكز متأخرة أسبوع أو أكتر 🎉', 'info'); showPop(dueMsg(x)); }
   function dueToggle() { try { localStorage.setItem('ax_due_on', dueOn() ? '0' : '1'); } catch (e) {} T(dueOn() ? '🔔 التذكير اليومي اشتغل' : 'التذكير اليومي اتوقف', 'info'); render(); }
   (function dueBoot() { var n = 0; (function w() { if (typeof currentUser === 'undefined' || !currentUser || !window.AXCore || !A('customers').length) { if (++n < 120) setTimeout(w, 1000); return; } setTimeout(function () { dueTick(); }, 90e3); setInterval(function () { dueTick(); }, 60e3); })(); })();
+
+  /* ── 4.81 · تقرير المخزن اليومي: الناقص واللي قرب يخلص والموجود — مرة كل يوم الصبح ── */
+  function stockOn() { try { return localStorage.getItem('ax_stk_on') !== '0'; } catch (e) { return true; } }
+  function canStock() { try { if (isAdmin()) return true; return typeof can === 'function' && can('inventory'); } catch (e) { return false; } }
+  function stockList() {
+    return A('products').filter(function (p) { return p && !p.archived && !p.deleted; }).map(function (p) {
+      var q = Number(p.quantity) || 0, mn = Number(p.minQuantity) || 0;
+      var st = q <= 0 ? 'r' : (mn > 0 && q <= mn) ? 'r' : (mn > 0 && q <= mn * 1.5) ? 'o' : 'g';
+      var tx = q <= 0 ? 'خلص' : st === 'r' ? 'ناقص' : st === 'o' ? 'قرب يخلص' : 'كويس';
+      return { name: p.name, q: q, unit: p.unit || '', min: mn, st: st, tx: tx };
+    }).sort(function (a, b) { var o = { r: 0, o: 1, g: 2 }; return o[a.st] - o[b.st] || a.q - b.q || String(a.name).localeCompare(String(b.name), 'ar'); });
+  }
+  function stockBody(m) {
+    var L = m.list || [], n = { r: 0, o: 0, g: 0 }; L.forEach(function (x) { n[x.st]++; });
+    return '<h3>📦 تقرير المخزن النهارده</h3><p class="ctr">' + L.length + ' صنف في المخزن</p>' +
+      '<div class="clp-sk">' + (n.r ? '<span class="r">🔴 ناقص ' + n.r + '</span>' : '') + (n.o ? '<span class="o">🟠 قرب يخلص ' + n.o + '</span>' : '') + '<span class="g">🟢 كويس ' + n.g + '</span></div>' +
+      '<div class="clp-sl">' + L.map(function (x, i) { return '<div class="sr ' + x.st + '" style="animation-delay:' + Math.min(1.6, 0.6 + i * 0.05).toFixed(2) + 's"><span class="nm">' + esc(x.name) + (x.min ? '<small style="display:block;font-weight:500;font-size:11.5px;color:#64748B">الحد الأدنى ' + num(x.min) + '</small>' : '') + '</span><span><span class="q">' + num(x.q) + '</span><span class="u">' + esc(x.unit) + '</span></span><span class="clp-tg ' + x.st + '">' + x.tx + '</span></div>'; }).join('') + '</div>';
+  }
+  function stockShow() { var L = stockList(); if (!L.length) return T('مفيش أصناف في المخزن', 'info'); showPop({ kind: 'stock', list: L }); }
+  function stockTick() {
+    if (!canStock() || !stockOn() || document.querySelector('.clp-ov')) return;
+    var k = 'ax_stk_' + today(), p = lsGet(k);
+    if (!p) { p = { at: 9 * 60 + 15 + Math.floor(Math.random() * 90), done: 0 }; lsSet(k, p); try { Object.keys(localStorage).forEach(function (kk) { if (/^ax_stk_\d{4}-/.test(kk) && kk !== k) localStorage.removeItem(kk); }); } catch (e) {} }
+    if (p.done || nowMin() < p.at) return;
+    var m = document.getElementById('modal-overlay'); if (m && m.classList.contains('show')) return;
+    p.done = 1; lsSet(k, p);
+    if (!stockList().length) return;
+    stockShow();
+    try { var Ac = window.AudioContext || window.webkitAudioContext; if (Ac) { var ac = new Ac(), o = ac.createOscillator(), g = ac.createGain(); o.connect(g); g.connect(ac.destination); o.frequency.value = 740; g.gain.setValueAtTime(.1, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + .45); o.start(); o.stop(ac.currentTime + .45); } } catch (e) {}
+  }
+  function stockToggle() { try { localStorage.setItem('ax_stk_on', stockOn() ? '0' : '1'); } catch (e) {} T(stockOn() ? '📦 تقرير المخزن اليومي اشتغل' : 'تقرير المخزن اليومي اتوقف', 'info'); render(); }
+  (function stockBoot() { var n = 0; (function w() { if (typeof currentUser === 'undefined' || !currentUser || !A('products').length) { if (++n < 120) setTimeout(w, 1000); return; } setTimeout(stockTick, 60e3 + Math.random() * 60e3); setInterval(stockTick, 60e3); })(); })();
 
   document.addEventListener('ax:sse', function (ev) {
     var m = ev.detail || {}; if (m.event !== 'portal' || !isAdmin()) return;
@@ -436,7 +479,7 @@
   };
   window.AXClients = {
     render: render, make: make, makeAll: makeAll, shortAll: shortAll, rotate: rotate, stop: stop, copy: copy, wa: wa,
-    st: setSt, del: del, _pop: showPop, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
+    st: setSt, del: del, _pop: showPop, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, stockShow: stockShow, stockToggle: stockToggle, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
     tab: function (t) { ui.tab = t; if (t === 'req') ui.rq = null; render(); },
     rf: function (f) { ui.rf = f; render(); },
     grp: function (k) { ui.grp[k] = !ui.grp[k]; render(); },

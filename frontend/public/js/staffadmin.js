@@ -126,13 +126,14 @@
       tl.on('tileload', function () { ok++; el.parentNode && el.parentNode.classList.remove('noinet'); });
       tl.on('tileerror', function () {
         if (++bad > 4 && !ok) {
-          if (!alt) { alt = true; bad = 0; m.removeLayer(tl); mk('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap', referrerPolicy: 'strict-origin-when-cross-origin' }); }
+          if (!alt) { alt = true; bad = 0; m.removeLayer(tl); mk('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19, attribution: '© OpenStreetMap · © CARTO', referrerPolicy: 'strict-origin-when-cross-origin' }); }
           else if (el.parentNode) el.parentNode.classList.add('noinet');
         }
       });
     }
     /* 4.79 · CARTO first: OpenStreetMap's own servers block apps that send no Referer (the desktop app showed «Access blocked» tiles) */
-    mk('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19, attribution: '© OpenStreetMap · © CARTO', referrerPolicy: 'strict-origin-when-cross-origin' });
+    /* 4.81 · tiles through our own server (/tiles/…): OSM blocks apps with no Referer and CARTO now asks for a key */
+    mk(String(API || '').replace(/\/$/, '') + '/tiles/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
     m._base = L.layerGroup().addTo(m); m._live = L.layerGroup().addTo(m); m._trail = L.layerGroup().addTo(m);
     m._mk = {}; m._fitted = false; m._sig = '';
     m.on('click', function () { m.scrollWheelZoom.enable(); });
@@ -482,10 +483,8 @@
   function liveHtml() {
     var L = S.live, list = L.list;
     if (!list.length) return '<div class="card stf-empty"><div class="stf-ill">👥</div><h3>مفيش موظفين لسه</h3><p>ضيف أول موظف، وابعتله اللينك باسم المستخدم وكلمة السر، وهو هيسجّل حضوره من موبايله.</p><button class="btn btn-primary" data-a="new">＋ موظف جديد</button></div>';
-    var wide = window.innerWidth >= 1100;   // 4.79 · computer: the map + the team first, the jobs as small cards under them
-    var h = liveStats(list) + (wide ? '' : roadHtml(L.tasks || []));
+    var h = liveStats(list) + roadHtml(L.tasks || []);   // 4.81 · the jobs above the map (on the computer as cards side by side)
     h += '<div class="stf-live"><div class="card stf-mapcard lt">' + mapBox('stf-map', 520, 'tall') + '</div><div class="card stf-lvcard"><div class="stf-lvh ax-hl-off"><b class="ax-hl-off">الموظفين النهارده</b><span class="stf-livedot ax-hl-off"><i></i>مباشر · تحديث كل ' + L.ping_min + ' د</span></div><div class="stf-lvlist" id="stf-lcards">' + liveList(L) + '</div></div></div>';
-    if (wide) h += roadHtml(L.tasks || []);
     return h;
   }
   function liveStats(list) {
