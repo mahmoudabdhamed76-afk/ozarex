@@ -5,9 +5,10 @@
    · One document per transfer (main database, table branch_transfers):
        بضاعة: الأصناف والكميات · فلوس: المبلغ — من فرع إلى فرع.
    · «إرسال»: the goods leave the sending branch's stock (or the money its
-     cash) — a stock move «منصرف · تحويل» / a cash move «خارج».
-     «تأكيد الاستلام»: they enter the receiving branch (a product missing
-     there is made with the same name / unit / code / cost).
+     cash) — a stock move «منصرف · تحويل» / a cash move «خارج» — and (4.50)
+     enter the receiving branch in the same action (a product missing there
+     is made with the same name / unit / code / cost). A transfer left
+     «في الطريق» from before 4.50 is still received with «تأكيد الاستلام».
      «إلغاء» (before it is received): everything goes back to the sender.
    · A transfer is never a sale, a purchase, an expense or a profit: stock
      moves carry kind:'transfer' (left out of consumption), cash moves live
@@ -31,6 +32,9 @@ class TransferError extends Error { constructor(code, msg, status) { super(msg);
 const now = () => new Date().toISOString();
 const N = v => { v = Number(v); return Number.isFinite(v) ? v : 0; };
 const RID = /^[A-Za-z0-9_-]{8,64}$/;
+/* the pre-4.50 two-step flow (send now, «تأكيد الاستلام» later) — kept only so transfers still «في الطريق» from before
+   4.50 (receive / cancel) stay covered by the tests */
+const TWO_STEP = process.env.TRANSFERS_TWO_STEP === '1';
 
 function row(r) {
   if (!r) return null;
@@ -168,7 +172,19 @@ function create(u, b) {
     .run(id, number, kind, from, to, 'sending', JSON.stringify(doc), t0, t0);
   try { sendEffect(get(id), u); }
   catch (e) { db.prepare('DELETE FROM branch_transfers WHERE id = ?').run(id); throw e; }   // nothing left the branch → no document
-  return { transfer: setStatus(id, 'sent') };
+  setStatus(id, 'sent');
+  if (TWO_STEP) return { transfer: get(id) };
+  /* 4.50 · one step: what leaves one branch enters the other at the same moment (it used to wait for «تأكيد الاستلام»
+     in the receiving branch, so the goods / money were taken off one side and never showed on the other).
+     If entering fails for any reason the transfer simply stays «في الطريق» and can still be received or cancelled. */
+  try {
+    setStatus(id, 'receiving');
+    receiveEffect(get(id), u);
+    return { transfer: setStatus(id, 'received', { receivedBy: { id: u.id, name: u.name || u.username }, receivedAt: now(), auto: true }) };
+  } catch (e) {
+    console.error('[transfers] auto-receive', id, e.message);
+    return { transfer: setStatus(id, 'sent') };
+  }
 }
 function receive(u, id) {
   const t = get(id);

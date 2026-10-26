@@ -6,7 +6,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 const APP_GLOBALS = Object.fromEntries(['uid', 'SmartAds', 'AXAds', 'Branch', 'AXBranch', 'AXRet', 'AXBStats', 'AXProfit', 'AXCash', 'AXFulus', 'AXPush', 'openNotifications', 'AXN', 'openExpenseForm', 'AXPur', 'supplierMetrics', 'viewIssuance', 'userPages', 'currentUser', 'navigate', 'currentPage', 'DB', 'OfflineManager', 'SyncEngine', 'AXCore', 'closeModal', 'openCustomerForm', 'logout',
-  'renderDashboard', 'renderInvoices', 'renderIssuances', 'renderPayments', 'renderCustomers', 'renderReports', 'issuanceFilters', 'AXMarker', 'AX', 'toggleSidebar', 'AXA', 'AXStmt', 'AXDeskMore', 'notify', 'AXSales', 'AXLock', 'AXGlassNav', 'can', 'todayStr', 'fmtCurrency'].map(n => [n, 'readonly']));
+  'renderDashboard', 'renderInvoices', 'renderIssuances', 'renderPayments', 'renderCustomers', 'renderReports', 'issuanceFilters', 'AXMarker', 'AX', 'toggleSidebar', 'AXA', 'AXStmt', 'AXDeskMore', 'notify', 'AXSales', 'AXLock', 'AXGlassNav', 'can', 'todayStr', 'fmtCurrency', 'renderInventory', 'AXCons'].map(n => [n, 'readonly']).concat([['invTab', 'writable']]));
 
 export default [
   { ignores: ['tests/node_modules/**', 'tests/test-results/**', 'tests/playwright-report/**', 'frontend/public/vendor/**'] },

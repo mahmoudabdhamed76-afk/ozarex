@@ -425,8 +425,9 @@ const server = http.createServer(async (req, res) => {
             const t = out.transfer;
             if (!out.dup) {
               const meta = { source: req.headers['x-client-id'] || 'unknown', by: me.id, type: 'transfer' };
-              if (!tm[1]) digest.alert(digestCtx(), 'transfer', '🚚 تحويل ' + (t.kind === 'cash' ? 'فلوس ' + Number(t.amount || 0).toLocaleString('en-US') : 'بضاعة (' + (t.items || []).length + ' صنف)') + ' لـ ' + (t.toName || ''), 'من ' + (t.fromName || '') + ' — بعته ' + (me.name || me.username) + ' ومستني تأكيد الاستلام').catch(() => {});
+              if (!tm[1]) digest.alert(digestCtx(), 'transfer', '🚚 تحويل ' + (t.kind === 'cash' ? 'فلوس ' + Number(t.amount || 0).toLocaleString('en-US') : 'بضاعة (' + (t.items || []).length + ' صنف)') + ' لـ ' + (t.toName || ''), 'من ' + (t.fromName || '') + ' — بعته ' + (me.name || me.username) + (t.status === 'received' ? ' ودخل الفرع' : ' ومستني تأكيد الاستلام')).catch(() => {});
               if (tm[2] === 'receive') notifyDataChanged(meta, t.to); else notifyDataChanged(meta, t.from);
+              if (!tm[1] && t.status === 'received') notifyDataChanged(meta, t.to);      // 4.50 · it arrived in the same step: the receiving branch's devices refresh too
               broadcast('transfers', { id: t.id, status: t.status, from: t.from, to: t.to });
             }
             return sendJSON(res, 200, { ok: true, transfer: t, dup: !!out.dup });

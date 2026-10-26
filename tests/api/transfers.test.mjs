@@ -1,6 +1,9 @@
-/* 4.34 · Multi-branch — Phase 4: transfers between branches. Goods leave the sender on «إرسال» and enter the receiver on
-   «تأكيد الاستلام»; money moves between the branches' cash; nothing is a sale / expense / profit; nothing happens twice;
-   a cancel puts everything back; permissions; a step cut in the middle is finished or undone at start. */
+/* 4.34 · Multi-branch — Phase 4: transfers between branches. Money moves between the branches' cash; nothing is a
+   sale / expense / profit; nothing happens twice; a cancel puts everything back; permissions; a step cut in the middle
+   is finished or undone at start.
+   4.50: a transfer now arrives in the same action it is sent (first test block, the normal server). The older two-step
+   flow (send · «تأكيد الاستلام» later) is still what transfers left «في الطريق» from before 4.50 go through, so the rest
+   of the file runs a server in that mode (TRANSFERS_TWO_STEP=1) to keep receive / cancel / recovery covered. */
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -18,7 +21,7 @@ const sum = async () => (await req(s.base, 'GET', '/api/branches/summary?p=all',
 const relogin = async () => { admin = (await adminLogin(s.base)).token; };
 
 before(async () => {
-  s = await startServer();
+  s = await startServer({ env: { TRANSFERS_TWO_STEP: '1' } });
   await relogin();
   assert.equal((await req(s.base, 'POST', '/api/ops', { token: admin, body: { opId: randomUUID(), cid: 't', ops: ops({ cols: {
     customers: col({ added: [{ id: 'c1', name: 'مركز', balance: 0, customPrices: {} }] }),
@@ -130,7 +133,7 @@ test('a step cut in the middle (server stopped) is finished or undone at the nex
   const { mkdtempSync, rmSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const dir = mkdtempSync(path.join(tmpdir(), 'erp-tr-'));
-  let x = await startServer({ dataDir: dir });
+  let x = await startServer({ dataDir: dir, env: { TRANSFERS_TWO_STEP: '1' } });
   try {
     let tok = (await adminLogin(x.base)).token;
     assert.equal((await req(x.base, 'POST', '/api/ops', { token: tok, body: { opId: randomUUID(), cid: 't', ops: ops({ cols: { products: col({ added: [{ id: 'p1', name: 'ورق A4', unit: 'رزمة', quantity: 50, minQuantity: 0, cost: 10, price: 20 }] }) } }) } })).status, 200);
@@ -145,7 +148,7 @@ test('a step cut in the middle (server stopped) is finished or undone at the nex
     db.prepare("INSERT INTO branch_transfers (id, number, kind, from_branch, to_branch, status, data, created_at, updated_at) VALUES (?, 999, 'stock', 'main', ?, 'sending', ?, ?, ?)")
       .run('tr_ghost00000000000001', CA, g.data.replace(/"qty":3/, '"qty":7'), g.created_at, g.updated_at);
     db.close();
-    x = await startServer({ dataDir: dir });
+    x = await startServer({ dataDir: dir, env: { TRANSFERS_TWO_STEP: '1' } });
     tok = (await adminLogin(x.base)).token;
     const ls = (await req(x.base, 'GET', '/api/transfers', { token: tok })).json.transfers;
     assert.equal(ls.find(t => t.id === id).status, 'sent', 'the receive never happened → back to «في الطريق»');
@@ -156,4 +159,49 @@ test('a step cut in the middle (server stopped) is finished or undone at the nex
     const ca = (await req(x.base, 'GET', '/api/data', { token: tok, headers: { 'X-Branch': CA } })).json;
     assert.equal(ca.products.find(p => p.name === 'ورق A4').quantity, 3, 'received exactly once');
   } finally { await x.stop(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+/* ═══ 4.50 · one step: sent = arrived ═══ */
+test('4.50: goods sent from one branch arrive in the other at once — out of منوف, into القاهرة, never a sale, never twice', async () => {
+  const y = await startServer();
+  try {
+    const tok = (await adminLogin(y.base)).token;
+    const get = async (b) => (await req(y.base, 'GET', '/api/data', { token: tok, headers: { 'X-Branch': b } })).json;
+    assert.equal((await req(y.base, 'POST', '/api/ops', { token: tok, body: { opId: randomUUID(), cid: 't', ops: ops({ cols: {
+      products: col({ added: [{ id: 'p1', name: 'ورق A4', unit: 'رزمة', sku: 'A4-80', quantity: 100, minQuantity: 5, cost: 150, price: 200 }] }) } }) } })).status, 200);
+    const sm = async () => (await req(y.base, 'GET', '/api/branches/summary?p=all', { token: tok })).json;
+    const b0 = await sm();
+    const rid = randomUUID();
+    const r = await req(y.base, 'POST', '/api/transfers', { token: tok, body: { rid, kind: 'stock', from: 'main', to: CA, items: [{ productId: 'p1', qty: 30 }] } });
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.json.transfer.status, 'received');
+    assert.equal(r.json.transfer.auto, true);
+    assert.equal(prod(await get('main'), 'ورق A4').quantity, 70, 'out of the sender');
+    const c = await get(CA);
+    assert.equal(prod(c, 'ورق A4').quantity, 30, 'into the receiver — no confirmation needed');
+    assert.equal(prod(c, 'ورق A4').cost, 150);
+    assert.deepEqual(c.stockMoves.filter(x => x.kind === 'transfer').map(x => x.type), ['in']);
+    /* the same request again (a retry) — nothing twice */
+    const again = await req(y.base, 'POST', '/api/transfers', { token: tok, body: { rid, kind: 'stock', from: 'main', to: CA, items: [{ productId: 'p1', qty: 30 }] } });
+    assert.equal(again.json.dup, true);
+    assert.equal(prod(await get('main'), 'ورق A4').quantity, 70);
+    assert.equal(prod(await get(CA), 'ورق A4').quantity, 30);
+    /* a second one lands on the same product there */
+    await req(y.base, 'POST', '/api/transfers', { token: tok, body: { rid: randomUUID(), kind: 'stock', from: 'main', to: CA, items: [{ productId: 'p1', qty: 5 }] } });
+    assert.equal((await get(CA)).products.filter(p => p.name === 'ورق A4').length, 1);
+    assert.equal(prod(await get(CA), 'ورق A4').quantity, 35);
+    /* the company did not gain or lose anything */
+    const b1 = await sm();
+    assert.equal(b1.total.stockValue, b0.total.stockValue, 'stock value only moved between branches');
+    ['sales', 'profit', 'expenses', 'purchases'].forEach(k => assert.equal(b1.total[k], b0.total[k], k));
+    /* already arrived → can not be cancelled (send it back with a new transfer) */
+    assert.equal((await req(y.base, 'POST', '/api/transfers/' + r.json.transfer.id + '/cancel', { token: tok })).status, 400);
+    /* money arrives at once too */
+    const m = await req(y.base, 'POST', '/api/transfers', { token: tok, body: { rid: randomUUID(), kind: 'cash', from: 'main', to: CA, amount: 1500 } });
+    assert.equal(m.json.transfer.status, 'received');
+    const b2 = await sm(), bm = id => b2.branches.find(x => x.id === id), bm0 = id => b0.branches.find(x => x.id === id);
+    assert.equal(bm('main').treasury, bm0('main').treasury - 1500);
+    assert.equal(bm(CA).treasury, bm0(CA).treasury + 1500);
+    assert.equal(b2.total.treasury, b0.total.treasury);
+  } finally { await y.stop(); }
 });

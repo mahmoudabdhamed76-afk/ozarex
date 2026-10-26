@@ -98,12 +98,17 @@
     var exps = A(d, 'expenses').filter(function (e) { return e && e.kind !== 'purchase' && inR(e.date, from, to); });
     var exp = 0, byCat = {};
     exps.forEach(function (e) { var a = N(e.amount), c = String(e.category || 'أخرى'); exp += a; byCat[c] = (byCat[c] || 0) + a; });
+    /* 4.50 · «مستهلكات»: stock taken to try / as a sample / for internal use — its cost is a real expense, never a sale */
+    var cons = 0;
+    A(d, 'stockMoves').forEach(function (m) { if (m && m.kind === 'consumable' && inR(m.date, from, to)) cons += N(m.quantity) * N(m.cost); });
+    cons = Math.round(cons * 100) / 100;
+    if (cons) { exp += cons; byCat['مستهلكات'] = (byCat['مستهلكات'] || 0) + cons; }
     var coll = 0, nColl = 0;
     A(d, 'payments').forEach(function (p) { if (p && inR(p.date, from, to) && N(p.amount) > 0) { coll += N(p.amount); nColl++; } });
     var refunds = 0;
     ((d.settings && Array.isArray(d.settings._returns)) ? d.settings._returns : []).forEach(function (r) { if (r && r.type === 'sale' && inR(r.date, from, to)) refunds += N(r.refund); });
     var gross = rev - cost, net = gross - exp;
-    return { from: from, to: to, lines: ls, rev: rev, cost: cost, gross: gross, exp: exp, net: net, returns: returns,
+    return { from: from, to: to, lines: ls, rev: rev, cost: cost, gross: gross, exp: exp, net: net, returns: returns, cons: cons,
       grossMargin: rev ? gross / rev * 100 : 0, netMargin: rev ? net / rev * 100 : 0, expRatio: rev ? exp / rev * 100 : 0,
       byCat: byCat, coll: coll, nColl: nColl, refunds: refunds, cashIn: coll - refunds };
   }

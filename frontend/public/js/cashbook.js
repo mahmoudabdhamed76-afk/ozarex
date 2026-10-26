@@ -214,7 +214,8 @@
       var lines = [
         { k: 'unpaid', label: 'مبيعات لسه ما اتحصّلتش', a: r2(Ssales - Rret), b: r2(C - F), v: -(Ssales - Rret - C + F) },          // a: sold · b: collected
         { k: 'tax', label: 'ضرايب وفروق فواتير', v: Ssales - Rret - N(P.rev) },
-        { k: 'stock', label: 'بضاعة اشتريتها زيادة عن اللي اتباع', a: r2(PN), b: r2(P.cost), v: -(PN - N(P.cost)) },                 // a: bought · b: cost of what was sold
+        /* 4.50 · goods taken as «مستهلكات» left the stock with no money: their cost is in the profit's expenses, so it goes back here */
+        { k: 'stock', label: 'بضاعة اشتريتها زيادة عن اللي اتباع', a: r2(PN), b: r2(N(P.cost) + N(P.cons)), v: -(PN - N(P.cost) - N(P.cons)) },   // a: bought · b: cost of what was sold (+ consumed)
         { k: 'payable', label: 'مشتريات لسه ما اتدفعتش للموردين', a: r2(PN), b: r2(SP - SR), v: PN - SP + SR },                       // a: bought · b: paid
         { k: 'branch', label: 'فلوس بين الفروع (صافي)', v: T },
         { k: 'custody', label: 'عهد نقدية لسه مع الناس', v: -(CU - Ec) },

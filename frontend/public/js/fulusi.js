@@ -51,7 +51,7 @@
 
   function compute() {
     var m = monthOf(ui.month), P = window.AXProfit && AXProfit.compute ? AXProfit.compute(D(), m.from, m.to).cur : { rev: 0, cost: 0, exp: 0, net: 0 };
-    var R = AXCash.report(D(), m.from, m.to, { today: today(), profit: { rev: P.rev, cost: P.cost, exp: P.exp, net: P.net }, dueSoon: dueSoon(), fmt: money, fdate: function (x) { var q = String(x || '').split('-'); return q.length === 3 ? (+q[2]) + '/' + (+q[1]) : x; } });
+    var R = AXCash.report(D(), m.from, m.to, { today: today(), profit: { rev: P.rev, cost: P.cost, exp: P.exp, net: P.net, cons: P.cons || 0 }, dueSoon: dueSoon(), fmt: money, fdate: function (x) { var q = String(x || '').split('-'); return q.length === 3 ? (+q[2]) + '/' + (+q[1]) : x; } });
     R.m = m; R.P = P;
     return R;
   }

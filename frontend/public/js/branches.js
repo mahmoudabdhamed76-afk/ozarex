@@ -267,22 +267,24 @@
       if (r.ok) TR.list = (await r.json()).transfers || [];
     } catch (_) { /* offline: keep what we had */ }
     var cur = B() ? B().get() : 'main';
-    TR.incoming = (canStock() || canCash()) ? TR.list.filter(function (t) { return t.to === cur && t.status === 'sent' && (t.kind === 'cash' ? canCash() : canStock()); }).length : 0;
+    TR.incoming = (canStock() || canCash()) ? TR.list.filter(function (t) { return (t.to === cur || isAdmin()) && t.status === 'sent' && (t.kind === 'cash' ? canCash() : canStock()); }).length : 0;
     mount(); redrawTr();
   }
   function prodList() { return ((typeof DB !== 'undefined' && DB.data && DB.data.products) || []).filter(function (p) { return p && Number(p.quantity) > 0; }).sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'ar'); }); }
-  function stTag(t) { return t.status === 'sent' ? '<span class="axt-st go">في الطريق</span>' : t.status === 'received' ? '<span class="axt-st ok">اتستلم</span>' : t.status === 'cancelled' ? '<span class="axt-st no">اتلغى</span>' : '<span class="axt-st">' + esc(t.status) + '</span>'; }
+  function stTag(t) { return t.status === 'sent' ? '<span class="axt-st go">في الطريق</span>' : t.status === 'received' ? '<span class="axt-st ok">' + (t.auto ? 'وصل' : 'اتستلم') + '</span>' : t.status === 'cancelled' ? '<span class="axt-st no">اتلغى</span>' : '<span class="axt-st">' + esc(t.status) + '</span>'; }
   function trRow(t) {
     var cur = B().get(), inc = t.to === cur, mine = t.by && me() && t.by.id === me().id;
     var what = t.kind === 'cash' ? money(t.amount) : (t.items || []).map(function (it) { return esc(it.name) + ' <b>×' + num(it.qty) + '</b>' + (it.unit ? ' ' + esc(it.unit) : ''); }).join(' · ');
     var acts = '';
-    if (t.status === 'sent' && inc && (t.kind === 'cash' ? canCash() : canStock())) acts += '<button type="button" class="axb-btn pri" onclick="AXBranch.trAct(\'' + q(t.id) + '\',\'receive\')">' + IC.check + ' تأكيد الاستلام</button>';
+    /* 4.50 · a transfer arrives the moment it is sent; one still «في الطريق» (sent before 4.50) is added to the other branch
+       here — by that branch, or by the admin from anywhere */
+    if (t.status === 'sent' && (inc || isAdmin()) && (t.kind === 'cash' ? canCash() : canStock())) acts += '<button type="button" class="axb-btn pri" onclick="AXBranch.trAct(\'' + q(t.id) + '\',\'receive\')">' + IC.check + ' دخّله ' + esc(t.toName || 'الفرع التاني') + '</button>';
     if (t.status === 'sent' && t.from === cur && (isAdmin() || mine)) acts += '<button type="button" class="axb-btn" onclick="AXBranch.trAct(\'' + q(t.id) + '\',\'cancel\')">إلغاء التحويل</button>';
     var when = String(t.sentAt || t.createdAt || '').slice(0, 10);
-    return '<article class="axt-r' + (t.status === 'sent' && inc ? ' hot' : '') + '"><div class="axt-h"><span class="axb-ri">' + (t.kind === 'cash' ? IC.cash : IC.box) + '</span>' +
+    return '<article class="axt-r' + (t.status === 'sent' && (inc || isAdmin()) ? ' hot' : '') + '"><div class="axt-h"><span class="axb-ri">' + (t.kind === 'cash' ? IC.cash : IC.box) + '</span>' +
       '<div class="axt-t"><b>#' + t.number + ' · ' + (t.kind === 'cash' ? 'فلوس' : 'بضاعة') + '</b><em>' + esc(t.fromName || t.from) + ' ← ' + esc(t.toName || t.to) + ' · ' + esc(when) + (t.by ? ' · ' + esc(t.by.name) : '') + '</em></div>' + stTag(t) + '</div>' +
       '<div class="axt-w">' + what + '</div>' + (t.note ? '<div class="axt-n">' + esc(t.note) + '</div>' : '') +
-      (t.status === 'received' && t.receivedBy ? '<div class="axt-n">استلم: ' + esc(t.receivedBy.name) + ' · ' + esc(String(t.receivedAt || '').slice(0, 10)) + '</div>' : '') +
+      (t.status === 'received' && t.receivedBy ? '<div class="axt-n">' + (t.auto ? 'وصل ' + esc(t.toName || '') + ' مع الإرسال' : 'استلم: ' + esc(t.receivedBy.name)) + ' · ' + esc(String(t.receivedAt || '').slice(0, 10)) + '</div>' : '') +
       (acts ? '<div class="axt-a">' + acts + '</div>' : '') + '</article>';
   }
   function trHtml() {
@@ -290,12 +292,15 @@
     if (TR.view === 'stock' || TR.view === 'cash') return formHtml();
     var inc = TR.list.filter(function (t) { return t.to === cur; }), out = TR.list.filter(function (t) { return t.from === cur; });
     var pend = inc.filter(function (t) { return t.status === 'sent'; }).length;
+    var stuck = TR.list.filter(function (t) { return t.status === 'sent' && (t.to === cur || isAdmin()); });
     var l = TR.tab === 'in' ? inc : TR.tab === 'out' ? out : TR.list;
+    if (isAdmin() && TR.tab === 'in') l = l.concat(stuck.filter(function (t) { return t.to !== cur; }));
     var tabs = '<div class="axo-per" role="tablist">' + [['in', 'واردة لـ' + name + (pend ? ' (' + pend + ')' : '')], ['out', 'صادرة من ' + name], ['all', 'الكل']].map(function (x) {
       return '<button type="button" role="tab" aria-selected="' + (TR.tab === x[0]) + '" class="' + (TR.tab === x[0] ? 'on' : '') + '" onclick="AXBranch.trTab(\'' + x[0] + '\')">' + esc(x[1]) + '</button>'; }).join('') + '</div>';
     var newb = '<div class="axt-new">' + (canStock() ? '<button type="button" class="axb-btn pri" onclick="AXBranch.trNew(\'stock\')">' + IC.box + ' تحويل بضاعة</button>' : '') +
       (canCash() ? '<button type="button" class="axb-btn pri" onclick="AXBranch.trNew(\'cash\')">' + IC.cash + ' تحويل فلوس</button>' : '') + '</div>';
-    return newb + '<p class="axb-lead">البضاعة بتتخصم من الفرع اللي باعت لما تتبعت، وبتدخل الفرع التاني لما يأكد الاستلام. التحويلات مش بتتحسب مبيعات ولا مصروفات ولا أرباح.</p>' + tabs +
+    var warn = stuck.length ? '<div class="axt-stuck">' + IC.box + '<div><b>' + stuck.length + ' تحويل اتخصم ولسه مادخلش الفرع التاني</b><span>اتبعتوا قبل التحديث ده. دوس «دخّله…» على كل واحد عشان يتضاف هناك — مرة واحدة بس، ومش هيتكرر.</span></div></div>' : '';
+    return newb + '<p class="axb-lead">التحويل بيتخصم من الفرع اللي باعت ويدخل الفرع التاني في نفس اللحظة. التحويلات مش بتتحسب مبيعات ولا مصروفات ولا أرباح.</p>' + warn + tabs +
       (l.length ? '<div class="axt-list">' + l.map(trRow).join('') + '</div>' : '<div class="axo-load">' + (TR.busy ? 'بيحمّل…' : 'مفيش تحويلات هنا') + '</div>');
   }
   function formHtml() {
@@ -316,7 +321,7 @@
       '<h4 class="axb-h">' + (stock ? 'تحويل بضاعة' : 'تحويل فلوس') + ' من ' + esc(B().info().name) + '</h4>' + to + body +
       '<label class="axt-f"><span>ملاحظة</span><input id="axt-note" class="axb-in" maxlength="300" placeholder="اختياري"></label>' +
       '<button type="button" class="axb-btn pri wide" id="axt-send" onclick="AXBranch.trSend()"' + (TR.busy ? ' disabled' : '') + '>إرسال</button>' +
-      '<p class="axb-note">' + (stock ? 'هتتخصم من مخزن الفرع ده دلوقتي، وتدخل الفرع التاني لما يأكد الاستلام. ممكن تلغيه قبل الاستلام وترجع.' : 'هيتخصم من خزنة الفرع ده دلوقتي، ويدخل خزنة الفرع التاني لما يأكد الاستلام.') + '</p>';
+      '<p class="axb-note">' + (stock ? 'هتتخصم من مخزن الفرع ده وتدخل مخزن الفرع التاني في نفس اللحظة. لو عايز ترجّعها اعمل تحويل عكسي.' : 'هيتخصم من خزنة الفرع ده ويدخل خزنة الفرع التاني في نفس اللحظة.') + '</p>';
   }
   function redrawTr() { var el = document.getElementById('axb-sheet'); if (el && el.getAttribute('data-k') === 'tr') el.querySelector('.axb-body').innerHTML = trHtml(); }
   function transfers() { TR.view = 'list'; TR.busy = true; var el = sheet('tr', 'التحويلات بين الفروع', trHtml()); el.classList.add('axo'); loadTr().then(function () { TR.busy = false; redrawTr(); }); }
@@ -351,7 +356,7 @@
     TR.busy = false;
     if (j.__status !== 200) { say(j.message || 'محصلش', 'error'); if (b) b.disabled = false; return; }
     TR.tab = 'out';                            // show the one just sent
-    afterTr('✓ اتبعت تحويل #' + j.transfer.number + ' لـ' + (j.transfer.toName || ''));
+    afterTr(j.transfer.status === 'received' ? '✓ تحويل #' + j.transfer.number + ': اتخصم من ' + (j.transfer.fromName || '') + ' ودخل ' + (j.transfer.toName || '') : '✓ اتبعت تحويل #' + j.transfer.number + ' لـ' + (j.transfer.toName || ''));
   }
   async function trAct(id, what) {
     if (TR.busy) return; TR.busy = true;

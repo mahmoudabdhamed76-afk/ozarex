@@ -128,34 +128,38 @@ test('«جميع الفروع» (admin): totals + every branch, periods, and one
   expect(errors).toEqual([]);
 });
 
-test('transfers on screen: send goods from منوف, القاهرة sees «1» and confirms, the stock moves; money too', async ({ app: page, server }) => {
+test('transfers on screen (4.58): goods sent from منوف arrive in القاهرة at once — no confirmation; money too', async ({ app: page, server }) => {
   const errors = watchErrors(page);
   const p1Before = (await apiData(server.base, 'main')).products.find(p => p.id === 'p1').quantity;
+  const caBefore = ((await apiData(server.base, CA)).products.find(p => p.name === 'ورق A4') || { quantity: 0 }).quantity;
   await page.evaluate(() => AXBranch.open());
   await page.locator('#axb-sheet .axb-trb').click();
+  await expect(page.locator('#axb-sheet .axb-lead')).toContainText('في نفس اللحظة');
   await page.locator('#axb-sheet .axt-new .axb-btn', { hasText: 'تحويل بضاعة' }).click();
   await page.selectOption('#axb-sheet .axt-it select', 'p1');
   await page.fill('#axb-sheet .axt-it input', '7');
   await page.selectOption('#axt-to', CA);
   await page.click('#axt-send');
-  await expect(page.locator('#axb-sheet .axt-r').first()).toContainText('في الطريق', { timeout: 10000 });
+  await expect(page.locator('#axb-sheet .axt-r').first()).toContainText('وصل', { timeout: 10000 });
+  await expect(page.locator('#axb-sheet .axt-r').first()).not.toContainText('في الطريق');
   await expect.poll(async () => (await apiData(server.base, 'main')).products.find(p => p.id === 'p1').quantity).toBe(p1Before - 7);
+  await expect.poll(async () => ((await apiData(server.base, CA)).products.find(p => p.name === 'ورق A4') || {}).quantity, { timeout: 10000 }).toBe(caBefore + 7);
   await page.evaluate(() => AXBranch.close());
-  /* القاهرة: a badge on the branch name, the transfer waits; confirm → it is in القاهرة's stock */
+  /* القاهرة: nothing waits for a confirmation — the goods are already in its stock on this device */
   await switchTo(page, CA);
   const phone = test.info().project.name !== 'desktop';
-  await expect(page.locator((phone ? '#axb-chip-m' : '#axb-chip-d') + ' .axb-n')).toBeVisible({ timeout: 10000 });
-  const caBefore = ((await apiData(server.base, CA)).products.find(p => p.name === 'ورق A4') || { quantity: 0 }).quantity;
-  await page.evaluate(() => AXBranch.transfers());
-  await page.locator('#axb-sheet .axt-r.hot .axb-btn.pri').first().click();
-  await expect.poll(async () => ((await apiData(server.base, CA)).products.find(p => p.name === 'ورق A4') || {}).quantity, { timeout: 10000 }).toBe(caBefore + 7);
   await expect.poll(() => page.evaluate(() => (DB.data.products.find(p => p.name === 'ورق A4') || {}).quantity), { timeout: 10000 }).toBe(caBefore + 7);
-  /* money from القاهرة back to منوف */
+  await expect(page.locator((phone ? '#axb-chip-m' : '#axb-chip-d') + ' .axb-n')).toHaveCount(0);
+  await page.evaluate(() => AXBranch.transfers());
+  await expect(page.locator('#axb-sheet .axt-stuck')).toHaveCount(0);
+  /* money from القاهرة back to منوف — out of one cash, into the other */
+  const mainIn0 = ((await apiData(server.base, 'main')).settings._cashMoves || []).filter(m => m.dir === 'in').length;
   await page.locator('#axb-sheet .axt-new .axb-btn', { hasText: 'تحويل فلوس' }).click();
   await page.selectOption('#axt-to', 'main');
   await page.fill('#axt-amt', '250');
   await page.click('#axt-send');
   await expect.poll(async () => ((await apiData(server.base, CA)).settings._cashMoves || []).filter(m => m.dir === 'out').length, { timeout: 10000 }).toBeGreaterThan(0);
+  await expect.poll(async () => ((await apiData(server.base, 'main')).settings._cashMoves || []).filter(m => m.dir === 'in').length, { timeout: 10000 }).toBe(mainIn0 + 1);
   await page.evaluate(() => AXBranch.close());
   await switchTo(page, 'main');
   expect(errors).toEqual([]);

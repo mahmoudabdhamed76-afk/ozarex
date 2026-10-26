@@ -91,6 +91,11 @@
     A('payments').forEach(function (p) { if (!p || !inR(p.date) || N(p.amount) <= 0) return; collections += N(p.amount); nColl++; });
     var purchaseReturns = retSum(d, 'purchase', r[0], r[1]);
     purchases -= purchaseReturns;
+    /* 4.50 · «مستهلكات» (stock taken to try / as a sample): its cost is an expense of the profit — the profit page's rule; no cash moved */
+    var consumables = 0;
+    A('stockMoves').forEach(function (m) { if (m && m.kind === 'consumable' && inR(m.date)) consumables += N(m.quantity) * N(m.cost); });
+    consumables = Math.round(consumables * 100) / 100;
+    expenses += consumables;
 
     /* balances (as of now) */
     var sum = function (k, f) { return A(k).reduce(function (s, x) { return s + (x ? N(x[f]) : 0); }, 0); };
@@ -108,7 +113,7 @@
     return {
       from: r[0], to: r[1],
       sales: sales, salesDocs: Object.keys(docs).length, salesReturns: salesReturns, purchaseReturns: purchaseReturns,
-      revenue: rev, cost: cost, gross: gross, expenses: expenses, profit: gross - expenses,
+      revenue: rev, cost: cost, gross: gross, expenses: expenses, consumables: consumables, profit: gross - expenses,
       purchases: purchases, collections: collections, collectionsCount: nColl,
       treasury: treasury, receivables: receivables, payables: payables,
       stockValue: stockValue, products: A('products').length, lowStock: low,
@@ -116,7 +121,7 @@
     };
   }
 
-  var SUM_KEYS = ['sales', 'salesDocs', 'salesReturns', 'purchaseReturns', 'revenue', 'cost', 'gross', 'expenses', 'profit', 'purchases', 'collections', 'collectionsCount', 'treasury', 'receivables', 'payables', 'stockValue', 'products', 'lowStock', 'customers', 'suppliers'];
+  var SUM_KEYS = ['sales', 'salesDocs', 'salesReturns', 'purchaseReturns', 'revenue', 'cost', 'gross', 'expenses', 'consumables', 'profit', 'purchases', 'collections', 'collectionsCount', 'treasury', 'receivables', 'payables', 'stockValue', 'products', 'lowStock', 'customers', 'suppliers'];
   function total(list) {
     var t = {}; SUM_KEYS.forEach(function (k) { t[k] = 0; });
     (list || []).forEach(function (x) { SUM_KEYS.forEach(function (k) { t[k] += N(x[k]); }); });

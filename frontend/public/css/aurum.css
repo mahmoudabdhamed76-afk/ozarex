@@ -6567,3 +6567,34 @@ html.aurum #page-content [role="tablist"]:not(.pxs-tiles):not(.fc-cal):not(.skh-
     transition: none !important;
   }
 }
+
+/* §77 · 4.50 «🧪 مستهلكات» (js/consumables.js) + a transfer still «في الطريق» from before 4.50 */
+.cs-form .cs-lead { margin: 0 0 12px; font-size: 13px; line-height: 1.8; color: var(--ax-muted, #9E9E9E); }
+.cs-form .cs-lead b { color: inherit; }
+.cs-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-chip { position: relative; cursor: pointer; }
+.cs-chip input { position: absolute; opacity: 0; pointer-events: none; }
+.cs-chip span { display: inline-block; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--ax-line, #2a2a2a); font-size: 13px; transition: background .15s, border-color .15s; }
+.cs-chip input:checked + span { background: rgba(229, 35, 47, .14); border-color: #E5232F; font-weight: 700; }
+.cs-chip input:focus-visible + span { outline: 2px solid #E5232F; outline-offset: 2px; }
+.cs-other { display: none; margin-top: 8px; }
+.cs-form.other .cs-other { display: block; }
+.cs-sum { margin-top: 6px; padding: 10px 14px; border-radius: 14px; background: var(--ax-surface-2, rgba(255,255,255,.05)); font-size: 13.5px; line-height: 1.8; }
+.cs-sum.bad { background: rgba(229, 35, 47, .12); color: #ff8a8f; }
+.cs-wrap { display: flex; flex-direction: column; gap: 12px; }
+.cs-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.cs-kpi { display: flex; flex-direction: column; gap: 2px; }
+.cs-kpi span { font-size: 12.5px; color: var(--ax-muted, #9E9E9E); font-weight: 700; }
+.cs-kpi b { font-size: 24px; font-variant-numeric: tabular-nums; }
+.cs-kpi small { font-size: 12px; color: var(--ax-muted, #9E9E9E); }
+.cs-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.cs-tools select { width: auto; min-width: 150px; }
+.cs-by { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-by span { padding: 5px 11px; border-radius: 99px; background: var(--ax-surface-2, rgba(255,255,255,.05)); font-size: 12.5px; }
+.cs-by.p span { background: transparent; border: 1px solid var(--ax-line, #2a2a2a); }
+.cs-r { display: inline-block; padding: 2px 9px; border-radius: 99px; background: rgba(229, 35, 47, .12); font-size: 12px; white-space: nowrap; }
+@media (max-width: 768px) { .cs-tools, .cs-tools select, .cs-tools .btn { width: 100%; } }
+.axt-stuck { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; padding: 12px 14px; border-radius: 16px; border: 1px solid rgba(255, 176, 32, .5); background: rgba(255, 176, 32, .1); }
+.axt-stuck svg { flex: none; width: 20px; height: 20px; color: #FFB020; margin-top: 2px; }
+.axt-stuck div { display: flex; flex-direction: column; gap: 3px; }
+.axt-stuck b { font-size: 14px; } .axt-stuck span { font-size: 12.5px; line-height: 1.7; opacity: .85; }
