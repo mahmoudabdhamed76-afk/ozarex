@@ -6872,3 +6872,43 @@ html[dir=rtl] .rd-man { transform: translateX(50%); }
 .stf-qk { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .stf-qk button { border: 1px solid var(--ax-line); background: transparent; color: inherit; border-radius: 99px; padding: 5px 11px; font-size: 12.5px; cursor: pointer; }
 @media (max-width: 768px) { .stf-rwi { flex-wrap: wrap; } }
+/* 4.66 · the manager's task card = the employee's card (light), with an animated stage bar */
+.tk-list { gap: 12px; }
+.tkc { border-radius: 22px; padding: 16px 16px 12px; background: linear-gradient(180deg, #FCEEEE, #fff 70%); border: 1.5px solid rgba(229,35,47,.32); color: #16110F; animation: tkcIn .45s ease backwards; }
+.tkc.st-going, .tkc.st-arrived, .tkc.st-working { background: linear-gradient(180deg, #EAF6EE, #fff 75%); border-color: rgba(30,154,76,.45); }
+.tkc.st-done { background: linear-gradient(180deg, #E3F4E9, #fff 80%); border-color: #1E9A4C; }
+.tkc.chg { animation: tkcFlash 1.4s ease; }
+@keyframes tkcIn { from { opacity: 0; transform: translateY(8px); } }
+@keyframes tkcFlash { 0%, 100% { box-shadow: none; } 30% { box-shadow: 0 0 0 6px rgba(30,154,76,.25); } }
+.tkc-h { display: flex; align-items: center; gap: 12px; }
+.tkc-h .ic { width: 48px; height: 48px; border-radius: 16px; display: grid; place-items: center; font-size: 22px; background: rgba(229,35,47,.1); flex: none; }
+.tkc.st-going .tkc-h .ic, .tkc.st-arrived .tkc-h .ic, .tkc.st-working .tkc-h .ic, .tkc.st-done .tkc-h .ic { background: rgba(30,154,76,.14); }
+.tkc-h .t { flex: 1; min-width: 0; }
+.tkc .lb { font-size: 13px; color: #6E6567; } .tkc .lb b { color: #16110F; }
+.tkc .big { font: 800 22px/1.35 var(--ax-display, inherit); color: #16110F; -webkit-text-fill-color: #16110F; }
+.tkc-s { font-size: 13.5px; color: #6E6567; margin-top: 8px; line-height: 1.7; } .tkc-s b { color: #3a3335; }
+.tkc-x { font-size: 13px; color: #3a3335; margin-top: 8px; line-height: 1.7; } .tkc-x.ok { background: rgba(30,154,76,.1); border-radius: 12px; padding: 7px 11px; }
+.tkc-x code { font: 700 11px monospace; background: rgba(0,0,0,.08); border-radius: 6px; padding: 1px 6px; direction: ltr; display: inline-block; }
+.tkc-a { display: flex; gap: 8px; margin-top: 10px; justify-content: flex-end; }
+.tkc-b { border: 1px solid #E4D9D7; background: #fff; color: #16110F; border-radius: 99px; padding: 6px 14px; font: 700 12.5px var(--ax-font, inherit); cursor: pointer; }
+.tkc-b.x { color: #B3120A; }
+.tkc .stq { display: flex; margin: 16px 0 2px; position: relative; }
+.tkc .stq-t { display: block; position: absolute; top: 16px; inset-inline: 10%; height: 4px; border-radius: 9px; background: #E7DFDE; }
+.tkc .stq-t b { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: 9px; background: #1E9A4C; transition: width .9s cubic-bezier(.4,0,.2,1); }
+.tkc .stq > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative; font-size: 12px; color: #A59B9C; text-align: center; min-width: 0; }
+.tkc .stq i { position: relative; z-index: 1; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 16px; background: #F1ECEB; filter: grayscale(1); opacity: .6; transition: all .4s; }
+.tkc .stq .ok i { background: rgba(30,154,76,.16); filter: none; opacity: 1; }
+.tkc .stq .cur i { background: #1E9A4C; filter: none; opacity: 1; box-shadow: 0 0 0 6px rgba(30,154,76,.18); animation: stqP 1.8s infinite; }
+.tkc .stq .ok.cur i { animation: none; }
+.tkc .stq .pop i { animation: stqPop .6s cubic-bezier(.2,1.6,.4,1) .65s backwards, stqP 1.8s 1.3s infinite; }
+.tkc .stq .ok.cur.pop i { animation: stqPop .6s cubic-bezier(.2,1.6,.4,1) .65s backwards; }
+.tkc .stq .s-going i { animation: stqDrive 1s ease-in-out infinite alternate, stqP 1.8s infinite; }
+.tkc .stq .s-going.pop i { animation: stqPop .6s cubic-bezier(.2,1.6,.4,1) .65s backwards, stqDrive 1s 1.3s ease-in-out infinite alternate; }
+.tkc .stq .s-working i::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 2px dashed rgba(30,154,76,.7); animation: stqSpin 3s linear infinite; }
+.tkc .stq .ok span, .tkc .stq .cur span { color: #16110F; font-weight: 700; }
+.tkc .stq em { white-space: nowrap; font-style: normal; font-variant-numeric: tabular-nums; min-height: 15px; font-size: 10.5px; color: #8E8486; }
+@keyframes stqP { 50% { box-shadow: 0 0 0 10px rgba(30,154,76,.05); } }
+@keyframes stqPop { 0% { transform: scale(.3); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+@keyframes stqDrive { from { transform: translateX(3px); } to { transform: translateX(-4px); } }
+@keyframes stqSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .tkc, .tkc .stq i, .tkc .stq i::after { animation: none !important; } .tkc .stq-t b { transition: none; } }

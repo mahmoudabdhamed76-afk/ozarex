@@ -229,19 +229,24 @@
     var list = (tasks || []).filter(function (t) { return t.status !== 'cancel'; });
     var h = '<div class="card stf-road ax-hl-off" id="stf-road"><div class="card-header"><h3 class="card-title">📌 المهام النهارده</h3><button class="btn btn-sm btn-primary" data-a="newtask">＋ مهمة لموظف</button></div>';
     if (!list.length) return h + '<p class="stf-note" style="margin:6px 4px 2px">مفيش مهام النهارده — اضغط «＋ مهمة لموظف» واختار المركز. الموظف بيدوس على كل مرحلة (في الطريق ← وصل ← بيشتغل ← خلّص) وانت بتشوفها هنا وبيوصلك إشعار.</p></div>';
+    var prev = S.tprev || {};
     return h + '<div class="tk-list">' + list.map(function (t) {
-      var cur = TSTEPS.map(function (x) { return x[0]; }).indexOf(t.status), at = [t.created_at, t.started_at, t.arrived_at, t.working_at, t.done_at];
-      var steps = '<div class="tk-st">' + TSTEPS.map(function (x, i) { return '<div class="' + (i < cur || t.status === 'done' ? 'ok' : i === cur ? 'cur' : '') + '"><i>' + x[1] + '</i><span>' + x[2] + '</span><em>' + (i <= cur && at[i] ? hm(at[i]) : '') + '</em></div>'; }).join('') + '</div>';
-      var extra = '';
-      if (t.status === 'going' && t.dist != null) extra += '<div class="tk-x">🚗 باقي ' + kmT(t.dist) + (t.eta ? ' · حوالي ' + t.eta + ' دقيقة' : '') + '</div>';
-      if (t.fault) extra += '<div class="tk-x ok">🛠 ' + (t.fault.code ? '<code>' + esc(t.fault.code) + '</code> ' : '') + esc(t.fault.title) + ' ← ' + esc(t.fault.solution) + '</div>';
-      if (t.result) extra += '<div class="tk-x">📝 ' + esc(t.result) + '</div>';
+      var keys = TSTEPS.map(function (x) { return x[0]; }), cur = keys.indexOf(t.status), pv = prev[t.id] != null ? keys.indexOf(prev[t.id]) : cur, ch = pv !== cur, done = t.status === 'done';
+      var at = [t.created_at, t.started_at, t.arrived_at, t.working_at, t.done_at];
+      var steps = '<div class="stq"><span class="stq-t"><b data-to="' + (cur / 4 * 100) + '" style="width:' + (prev[t.id] == null ? 0 : Math.max(0, pv) / 4 * 100) + '%"></b></span>' + TSTEPS.map(function (x, i) {
+        return '<div class="' + (i < cur || done ? 'ok' : '') + (i === cur ? ' cur s-' + x[0] + (ch ? ' pop' : '') : '') + '"><i>' + x[1] + '</i><span>' + x[2] + '</span><em>' + (i <= cur && at[i] ? hm(at[i]) : '') + '</em></div>'; }).join('') + '</div>';
       var self = String(t.created_by || '').indexOf('emp:') === 0;
-      return '<div class="tk-it ' + t.status + '"><div class="tk-h"><div><b>' + esc(t.emp) + (self ? ' <em class="tk-self">سجّلها بنفسه</em>' : '') + '</b><span>' + esc(t.center) + (t.title && t.title.indexOf('زيارة ') !== 0 ? ' · ' + esc(t.title) : '') + (t.note ? ' · ' + esc(t.note) : '') + '</span></div>' +
-        '<button class="btn btn-sm btn-secondary tk-rt" data-a="troute" data-id="' + t.id + '">🗺️ المسار</button>' +
-        (t.status !== 'done' ? '<button class="rd-x" data-a="tcancel" data-id="' + t.id + '" title="إلغاء المهمة">✕</button>' : '') + '</div>' + steps + extra + '</div>';
+      var sub = [t.title && t.title.indexOf('زيارة ') !== 0 ? esc(t.title) : '', t.note ? esc(t.note) : '', t.status === 'going' && t.dist != null ? '<b>باقي ' + kmT(t.dist) + (t.eta ? ' · حوالي ' + t.eta + ' د' : '') + '</b>' : ''].filter(Boolean).join(' · ');
+      var extra = '';
+      if (t.fault) extra += '<div class="tkc-x ok">🛠 ' + (t.fault.code ? '<code>' + esc(t.fault.code) + '</code> ' : '') + esc(t.fault.title) + ' ← ' + esc(t.fault.solution) + '</div>';
+      if (t.result) extra += '<div class="tkc-x">📝 ' + esc(t.result) + '</div>';
+      return '<div class="tkc ax-hl-off st-' + t.status + (ch ? ' chg' : '') + '"><div class="tkc-h"><span class="ic">' + (done ? '✅' : '📌') + '</span><div class="t"><div class="lb">' + (self ? 'مهمة سجّلها ' : 'مهمة إلى ') + '<b>' + esc(t.emp) + '</b></div><div class="big">' + esc(t.center) + '</div></div></div>' +
+        (sub ? '<div class="tkc-s">' + sub + '</div>' : '') + steps + extra +
+        '<div class="tkc-a"><button class="tkc-b" data-a="troute" data-id="' + t.id + '">🗺️ المسار</button>' + (t.status !== 'done' ? '<button class="tkc-b x" data-a="tcancel" data-id="' + t.id + '">✕ إلغاء</button>' : '') + '</div></div>';
     }).join('') + '</div></div>';
   }
+  function animSteps() { setTimeout(function () { [].forEach.call(document.querySelectorAll('#stf-road .stq-t b[data-to]'), function (b) { b.style.width = b.dataset.to + '%'; }); }, 40); }
+  function keepPrev(l) { S.tprev = {}; (l.tasks || []).forEach(function (t) { S.tprev[t.id] = t.status; }); }
   function routeModal(id) {
     api('GET', '/task/route?id=' + encodeURIComponent(id)).then(function (r) {
       var t = r.task, P = r.points, mins = P.length > 1 ? Math.round((Date.parse(P[P.length - 1].at.replace(' ', 'T')) - Date.parse(P[0].at.replace(' ', 'T'))) / 60000) : 0;
@@ -394,7 +399,7 @@
       var st = document.getElementById('stf-lstats'), cd = document.getElementById('stf-lcards');
       if (st && cd && l.list.length) {
         var prev = S.tstat || {}; (l.tasks || []).forEach(function (t) { if (t.status === 'done' && prev[t.id] && prev[t.id] !== 'done') celebrate(t); });
-        st.outerHTML = liveStats(l.list); cd.innerHTML = liveList(l); var rd = document.getElementById('stf-road'); if (rd) rd.outerHTML = roadHtml(l.tasks || []); drawLive(true); keepTstat(l);
+        st.outerHTML = liveStats(l.list); cd.innerHTML = liveList(l); var rd = document.getElementById('stf-road'); if (rd) { rd.outerHTML = roadHtml(l.tasks || []); animSteps(); } drawLive(true); keepTstat(l); keepPrev(l);
         var fast = (l.tasks || []).some(function (t) { return t.status !== 'done' && t.status !== 'cancel'; }); if (fast !== S.fast) { S.fast = fast; clearInterval(S.timer); S.timer = setInterval(refreshLive, fast ? 10000 : 30000); }
       } else paint();
     }).catch(function () {});
@@ -402,6 +407,7 @@
   function paint() {
     var body = document.getElementById('stf-body'); if (!body) return;
     body.innerHTML = S.tab === 'live' ? liveHtml() : S.tab === 'centers' ? centersHtml() : S.tab === 'faults' ? faultsHtml() : S.tab === 'emps' ? empsHtml() : S.tab === 'report' ? reportHtml() : cfgHtml();
+    if (S.tab === 'live' && S.live) { animSteps(); keepPrev(S.live); }
     if (S.tab === 'live' && S.live && S.live.list.length) drawLive(false);
     if (S.tab === 'centers' && S.visits) drawCenters();
   }
