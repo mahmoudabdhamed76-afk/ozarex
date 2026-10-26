@@ -104,71 +104,102 @@
     });
     return LFP;
   }
-  function mapBox(id, h) { return '<div class="stf-lmap ax-hl-off" id="' + id + '" dir="ltr" style="height:' + (h || 380) + 'px"><div class="stf-lwait">بنحمّل الخريطة…</div></div><div class="stf-noinet">الخريطة محتاجة إنترنت — المواقع لسه ظاهرة كنقط</div>'; }
-  function pinIcon(L, html, cls, size) { return L.divIcon({ className: 'lm ' + (cls || ''), html: html, iconSize: size || [34, 34], iconAnchor: size ? [size[0] / 2, size[1] / 2] : [17, 17], popupAnchor: [0, -16] }); }
+  function mapBox(id, h, cls) { return '<div class="stf-lmap ax-hl-off ' + (cls || '') + '" id="' + id + '" dir="ltr" style="height:' + (h || 380) + 'px"><div class="stf-lwait">بنحمّل الخريطة…</div></div><div class="stf-noinet">الخريطة محتاجة إنترنت — المواقع لسه ظاهرة كنقط</div>'; }
+  function pinIcon(L, html, cls, size, anchor) { size = size || [34, 34]; anchor = anchor || [size[0] / 2, size[1] / 2]; return L.divIcon({ className: 'emk-w ' + (cls || ''), html: html, iconSize: size, iconAnchor: anchor, popupAnchor: [0, -anchor[1] + 6] }); }
   var BLD = '<svg viewBox="0 0 24 24"><path d="M4 21V7l8-4 8 4v14"/><path d="M9 21v-5h6v5M10 9h4M12 7v4"/></svg>';
+  function km(a, b) { var R = 6371, r = Math.PI / 180, dl = (b.lat - a.lat) * r, dg = (b.lng - a.lng) * r, x = Math.sin(dl / 2) * Math.sin(dl / 2) + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dg / 2) * Math.sin(dg / 2); return 2 * R * Math.asin(Math.sqrt(x)); }
+  /* same system as the EmdadX attendance app: ONE map per page that stays alive; base (sites + centers), live (employees) and trail layers; employee = photo-style bubble + name coloured by freshness */
+  function mapFor(L, id) {
+    var el = document.getElementById(id); if (!el) return null;
+    var m = MAPS[id];
+    if (m && m._container === el) return m;
+    if (m) { try { m.remove(); } catch (e) {} }
+    el.innerHTML = '';
+    m = MAPS[id] = L.map(el, { zoomControl: true, scrollWheelZoom: false, attributionControl: true });
+    m.attributionControl.setPrefix(false);
+    var ok = 0, bad = 0, alt = false, tl;
+    function mk(url, opt) {
+      tl = L.tileLayer(url, opt).addTo(m);
+      tl.on('tileload', function () { ok++; el.parentNode && el.parentNode.classList.remove('noinet'); });
+      tl.on('tileerror', function () {
+        if (++bad > 4 && !ok) {
+          if (!alt) { alt = true; bad = 0; m.removeLayer(tl); mk('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19, attribution: '© OpenStreetMap · © CARTO' }); }
+          else if (el.parentNode) el.parentNode.classList.add('noinet');
+        }
+      });
+    }
+    mk('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+    m._base = L.layerGroup().addTo(m); m._live = L.layerGroup().addTo(m); m._trail = L.layerGroup().addTo(m);
+    m._mk = {}; m._fitted = false; m._sig = '';
+    m.on('click', function () { m.scrollWheelZoom.enable(); });
+    return m;
+  }
+  function empBubble(L, x, st) {
+    var nm = String(x.name || '').trim().split(/\s+/).slice(0, 2).join(' ');
+    return L.divIcon({ className: 'emk-w', html: '<div class="emk ' + st + '"><b class="emk-av">' + esc(String(x.name || '?').trim().charAt(0)) + '</b><span>' + esc(nm) + '</span></div>', iconSize: [120, 68], iconAnchor: [60, 24], popupAnchor: [0, -22] });
+  }
+  function empPop(x) {
+    var u = empById(x.id) || {};
+    return '<div dir="rtl" class="lm-pop"><div class="pop-h"><b class="emk-av sm">' + esc(String(x.name || '?').trim().charAt(0)) + '</b><div><b>' + esc(x.name) + '</b><span>' + esc(u.job || '') + '</span></div></div>' +
+      '<div class="pop-k"><span>الحالة</span><b>' + esc(x.stText) + '</b><span>آخر تحديث</span><b>' + hm(x.at) + ' (' + ago(x.age) + ')</b>' + (x.in_at ? '<span>الحضور</span><b>' + hm(x.in_at) + '</b>' : '') + (x.place ? '<span>المكان</span><b>' + esc(x.place) + '</b>' : '') + (x.battery != null ? '<span>البطارية</span><b>' + x.battery + '%</b>' : '') + (x.visit ? '<span>في مركز</span><b>' + esc(x.visit.center) + ' من ' + hm(x.visit.start_at) + '</b>' : '') + '</div>' +
+      '<div class="pop-a"><button class="btn btn-sm btn-primary" data-a="day" data-id="' + esc(x.id) + '">🛣 مسار اليوم</button>' + (u.phone ? '<a class="btn btn-sm btn-secondary" href="tel:' + esc(u.phone) + '">📞</a><a class="btn btn-sm btn-secondary" target="_blank" rel="noopener" href="' + wa(u.phone, 'أهلاً ' + x.name) + '">💬</a>' : '') + '<a class="btn btn-sm btn-secondary" target="_blank" rel="noopener" href="' + maps(x.lat, x.lng) + '">↗</a></div></div>';
+  }
   /* layers: { sites, centers, emps, route, visits } — keep: keep the view the user zoomed to (live refresh) */
   function drawMap(id, layers, keep) {
     var el = document.getElementById(id); if (!el) return;
     return leaflet().then(function (L) {
-      el = document.getElementById(id); if (!el) return;
-      var m = MAPS[id];
-      if (!m || m._container !== el) {
-        if (m) { try { m.remove(); } catch (e) {} }
-        el.innerHTML = '';
-        m = MAPS[id] = L.map(el, { zoomControl: true, scrollWheelZoom: false, attributionControl: true });
-        m.attributionControl.setPrefix(false);
-        var tl = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 19, attribution: '© OpenStreetMap · © CARTO' }).addTo(m);
-        var ok = 0, bad = 0, alt = false;
-        tl.on('tileload', function () { ok++; el.parentNode && el.parentNode.classList.remove('noinet'); });
-        tl.on('tileerror', function () {
-          if (++bad > 4 && !ok) {
-            if (!alt) {                 // the light tiles can't be reached → the standard OpenStreetMap ones
-              alt = true; bad = 0; m.removeLayer(tl);
-              tl = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap', className: 'lm-osm' }).addTo(m);
-              tl.on('tileload', function () { ok++; el.parentNode && el.parentNode.classList.remove('noinet'); });
-              tl.on('tileerror', function () { if (++bad > 4 && !ok && el.parentNode) el.parentNode.classList.add('noinet'); });
-            } else if (el.parentNode) el.parentNode.classList.add('noinet');
-          }
-        });
-        m._grp = L.layerGroup().addTo(m); m._fitted = false;
-        m.on('click', function () { m.scrollWheelZoom.enable(); });
-      }
-      var g = m._grp; g.clearLayers();
+      var m = mapFor(L, id); if (!m) return;
       var pts = [];
-      (layers.sites || []).forEach(function (st) {
-        if (st.lat == null) return;
-        L.circle([st.lat, st.lng], { radius: st.radius || 200, color: '#E5232F', weight: 1.6, dashArray: '6 6', fillColor: '#E5232F', fillOpacity: .07 }).addTo(g);
-        L.marker([st.lat, st.lng], { icon: pinIcon(L, '<i>🏢</i>', 'lm-site', [30, 30]), zIndexOffset: 100 }).bindTooltip(esc(st.name), { permanent: true, direction: 'top', offset: [0, -14], className: 'lm-tip site' }).addTo(g);
-        pts.push([st.lat, st.lng]);
-      });
-      (layers.centers || []).forEach(function (c) {
-        var busy = c.here && c.here.length, big = c.n ? Math.min(46, 26 + c.n * 2) : 0;
-        var html = '<span>' + BLD + '</span>' + (busy ? '<b>' + c.here.length + '</b>' : (c.n ? '<b>' + c.n + '</b>' : ''));
-        var mk = L.marker([c.lat, c.lng], { icon: pinIcon(L, html, 'lm-c' + (busy ? ' busy' : '') + (c.gray ? ' gray' : ''), big ? [big, big] : [28, 28]), zIndexOffset: busy ? 300 : 0 });
-        mk.bindTooltip(esc(c.name), { direction: 'top', offset: [0, -12], className: 'lm-tip', permanent: !!busy || !!c.label });
-        mk.bindPopup('<div dir="rtl" class="lm-pop"><b>🏥 ' + esc(c.name) + '</b>' + (busy ? '<div>فيه دلوقتي: <b>' + c.here.map(esc).join('، ') + '</b></div>' : '') + (c.today ? '<div>زيارات النهارده: ' + c.today + '</div>' : '') + (c.n ? '<div>زيارات الشهر: <b>' + c.n + '</b>' + (c.mins ? ' · ' + dur(c.mins) + ' ساعة' : '') + '</div>' : '') + (c.gray ? '<div>ما اتزارش الشهر ده</div>' : '') + '<a href="' + maps(c.lat, c.lng) + '" target="_blank" rel="noopener">افتح في جوجل ماب ↗</a></div>');
-        mk.addTo(g); pts.push([c.lat, c.lng]);
-      });
+      /* base — only redrawn when a site / center moved */
+      var sig = JSON.stringify([(layers.sites || []).map(function (s) { return [s.id, s.lat, s.lng, s.radius]; }), (layers.centers || []).map(function (c) { return [c.key, c.lat, c.lng, c.n, c.gray ? 1 : 0, c.here ? c.here.length : 0, c.label ? 1 : 0]; })]);
+      if (m._sig !== sig) {
+        m._sig = sig; m._base.clearLayers();
+        (layers.sites || []).forEach(function (st) {
+          if (st.lat == null) return;
+          L.circle([st.lat, st.lng], { radius: st.radius || 200, color: '#f7c12d', weight: 2, fillColor: '#f7c12d', fillOpacity: .08 }).addTo(m._base);
+          L.marker([st.lat, st.lng], { icon: pinIcon(L, '<div class="cmk site">' + BLD + '</div>', '', [30, 30]), zIndexOffset: -100 }).bindTooltip(esc(st.name), { direction: 'top', offset: [0, -12], className: 'lm-tip' }).addTo(m._base);
+        });
+        (layers.centers || []).forEach(function (c) {
+          var busy = c.here && c.here.length, badge = busy ? c.here.length : c.n;
+          var mk = L.marker([c.lat, c.lng], { icon: pinIcon(L, '<div class="cmk' + (busy ? ' busy' : '') + (c.gray ? ' gray' : '') + '">' + BLD + (badge ? '<b>' + badge + '</b>' : '') + '</div>', '', [30, 30]), zIndexOffset: busy ? 300 : -200 });
+          mk.bindTooltip(esc(c.name), { direction: 'top', offset: [0, -12], className: 'lm-tip', permanent: !!busy || !!c.label });
+          mk.bindPopup('<div dir="rtl" class="lm-pop"><b>🏥 ' + esc(c.name) + '</b>' + (busy ? '<div>فيه دلوقتي: <b>' + c.here.map(esc).join('، ') + '</b></div>' : '') + (c.n ? '<div>زيارات الشهر: <b>' + c.n + '</b>' + (c.mins ? ' · ' + dur(c.mins) + ' ساعة' : '') + '</div>' : '') + (c.gray ? '<div>ما اتزارش الشهر ده</div>' : '') + '<a href="' + maps(c.lat, c.lng) + '" target="_blank" rel="noopener">افتح في جوجل ماب ↗</a></div>');
+          mk.addTo(m._base);
+        });
+      }
+      (layers.sites || []).forEach(function (s) { if (s.lat != null) pts.push([s.lat, s.lng]); });
+      (layers.centers || []).forEach(function (c) { pts.push([c.lat, c.lng]); });
+      /* live employees — markers are moved in place, never rebuilt, so the popup / zoom survive every refresh */
+      var seen = {};
       (layers.emps || []).forEach(function (x) {
-        var cls = 'lm-e ' + (x.state === 'in' ? 'on' : 'done') + (x.far ? ' far' : '');
-        var mk = L.marker([x.lat, x.lng], { icon: pinIcon(L, '<span>' + esc(x.name.trim().charAt(0)) + '</span><em>' + esc(x.name.split(' ')[0]) + '</em>', cls, [38, 38]), zIndexOffset: 500 });
-        mk.bindPopup('<div dir="rtl" class="lm-pop"><b>' + esc(x.name) + '</b><div>' + (x.state === 'in' ? '🟢 في الشغل' : '⚪ خلّص') + (x.in_at ? ' · حضور ' + hm(x.in_at) : '') + '</div>' + (x.visit ? '<div>🏥 في <b>' + esc(x.visit.center) + '</b> من ' + hm(x.visit.start_at) + '</div>' : '') + '<div>آخر موقع ' + hm(x.at) + (x.battery != null ? ' · 🔋' + x.battery + '%' : '') + '</div><button class="btn btn-sm btn-primary" data-a="day" data-id="' + esc(x.id) + '">مسار اليوم</button></div>');
-        mk.addTo(g); pts.push([x.lat, x.lng]);
+        seen[x.id] = 1; pts.push([x.lat, x.lng]);
+        var key = x.st + '|' + x.name, mk = m._mk[x.id];
+        if (!mk) { mk = m._mk[x.id] = L.marker([x.lat, x.lng], { icon: empBubble(L, x, x.st), zIndexOffset: x.st === 'off' || x.st === 'none' ? 0 : 500 }).bindPopup(empPop(x), { maxWidth: 290 }).addTo(m._live); mk._k = key; }
+        else { mk.setLatLng([x.lat, x.lng]); if (mk._k !== key) { mk.setIcon(empBubble(L, x, x.st)); mk._k = key; } mk.setPopupContent(empPop(x)); mk.setZIndexOffset(x.st === 'off' || x.st === 'none' ? 0 : 500); }
       });
-      if (layers.route && layers.route.length) {
-        var line = layers.route.map(function (p) { return [p.lat, p.lng]; });
-        if (line.length > 1) L.polyline(line, { color: '#E5232F', weight: 3.5, opacity: .8, dashArray: '8 8', className: 'lm-route' }).addTo(g);
-        layers.route.forEach(function (p, i) {
-          var first = i === 0, last = i === layers.route.length - 1;
-          if (first || last) L.marker([p.lat, p.lng], { icon: pinIcon(L, '<span>' + (first ? '▶' : '■') + '</span>', 'lm-rt ' + (first ? 'start' : 'end'), [26, 26]), zIndexOffset: 400 }).bindTooltip((first ? 'بداية ' : 'آخر نقطة ') + hm(p.at), { direction: 'top', offset: [0, -12], className: 'lm-tip' }).addTo(g);
-          else L.circleMarker([p.lat, p.lng], { radius: 5, color: '#fff', weight: 2, fillColor: p.kind === 'visit' ? '#1E9A4C' : '#E8A21A', fillOpacity: 1 }).bindTooltip(hm(p.at) + (p.kind === 'visit' ? ' · مركز' : '') + (p.battery != null ? ' · 🔋' + p.battery + '%' : ''), { direction: 'top', className: 'lm-tip' }).addTo(g);
+      Object.keys(m._mk).forEach(function (k) { if (!seen[k]) { m._live.removeLayer(m._mk[k]); delete m._mk[k]; } });
+      /* trail of one day — gold line, numbered pings, حضور / انصراف bubbles, purple center visits */
+      m._trail.clearLayers();
+      var rt = layers.route || [];
+      if (rt.length) {
+        var line = rt.map(function (p) { return [p.lat, p.lng]; });
+        if (line.length > 1) { L.polyline(line, { color: '#0a2357', weight: 8, opacity: .25 }).addTo(m._trail); L.polyline(line, { color: '#f7c12d', weight: 4, opacity: .95 }).addTo(m._trail); }
+        var n = 0;
+        rt.forEach(function (p, i) {
+          var tip = hm(p.at) + (p.battery != null ? ' • 🔋 ' + p.battery + '%' : '') + (p.acc ? ' • دقة ' + Math.round(p.acc) + ' م' : '');
+          if (p.kind === 'in' || p.kind === 'out') L.marker([p.lat, p.lng], { icon: pinIcon(L, '<div class="pnum ' + p.kind + '">' + (p.kind === 'in' ? 'ح' : 'ن') + '</div>', '', [28, 28]), zIndexOffset: 400 }).bindTooltip((p.kind === 'in' ? 'حضور ' : 'انصراف ') + tip, { direction: 'top', offset: [0, -12], className: 'lm-tip' }).addTo(m._trail);
+          else { n++; L.marker([p.lat, p.lng], { icon: pinIcon(L, '<div class="pnum">' + n + '</div>', '', [22, 22]) }).bindTooltip((p.kind === 'visit' ? '🏥 ' : '') + tip, { direction: 'top', offset: [0, -10], className: 'lm-tip' }).addTo(m._trail); }
           pts.push([p.lat, p.lng]);
         });
       }
+      (layers.visits || []).forEach(function (v) {
+        if (v.lat == null) return;
+        L.marker([v.lat, v.lng], { icon: pinIcon(L, '<div class="cmk visit">' + BLD + '</div>', '', [30, 30]), zIndexOffset: 600 }).bindPopup('<div dir="rtl" class="lm-pop"><b>🏥 ' + esc(v.center) + '</b><div>' + hm(v.start_at) + ' ← ' + (v.end_at ? hm(v.end_at) : 'لسه هناك') + ' · ' + dur(v.mins) + (v.purpose ? '<br>' + esc(v.purpose) : '') + '</div></div>').addTo(m._trail);
+        pts.push([v.lat, v.lng]);
+      });
       if (!keep || !m._fitted) {
         if (pts.length === 1) m.setView(pts[0], 15);
-        else if (pts.length) m.fitBounds(pts, { padding: [46, 46], maxZoom: 16 });
+        else if (pts.length) m.fitBounds(L.latLngBounds(pts).pad(.25), { maxZoom: 16 });
         else m.setView([30.05, 31.24], 6);
         m._fitted = true;
       }
@@ -178,6 +209,14 @@
       var P = (layers.emps || []).map(function (x) { return { lat: x.lat, lng: x.lng, label: x.name.trim().charAt(0), cls: x.state === 'in' ? 'on' : 'done' }; });
       el.innerHTML = mapSvg(P.concat((layers.route || []).map(function (p) { return { lat: p.lat, lng: p.lng, cls: 'on' }; })), (layers.sites || []), { route: !!(layers.route && layers.route.length) });
     });
+  }
+  function focusEmp(id) {
+    var m = MAPS['stf-map'], mk = m && m._mk[id];
+    S.sel = String(id); [].forEach.call(document.querySelectorAll('.lv-it'), function (b) { b.classList.toggle('on', b.dataset.id === String(id)); });
+    if (!mk) return T('الموظف ده مفيش له موقع على الخريطة', 'error');
+    m.flyTo(mk.getLatLng(), Math.max(m.getZoom(), 15), { duration: .8 });
+    setTimeout(function () { mk.openPopup(); }, 850);
+    var el = document.getElementById('stf-map'); if (el && el.scrollIntoView && window.innerWidth < 900) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
   /* ════════ page ════════ */
@@ -217,7 +256,7 @@
     api('GET', '/live').then(function (l) {
       S.live = l; if (!isPage() || S.tab !== 'live') return;
       var st = document.getElementById('stf-lstats'), cd = document.getElementById('stf-lcards');
-      if (st && cd && l.list.length) { st.outerHTML = liveStats(l.list); cd.outerHTML = liveCards(l); drawLive(true); } else paint();
+      if (st && cd && l.list.length) { st.outerHTML = liveStats(l.list); cd.innerHTML = liveList(l); drawLive(true); } else paint();
     }).catch(function () {});
   }
   function paint() {
@@ -226,10 +265,23 @@
     if (S.tab === 'live' && S.live && S.live.list.length) drawLive(false);
     if (S.tab === 'centers' && S.visits) drawCenters();
   }
+  /* freshness of an employee's last ping — same words as the EmdadX app */
+  function lst(x, L) {
+    if (!x.last) return 'none'; if (x.state !== 'in') return 'off';
+    var iv = L.ping_min || 15, a = x.age_min == null ? 0 : x.age_min;
+    return a <= iv * 1.6 ? 'fresh' : a <= iv * 4 ? 'stale' : 'old';
+  }
+  var STT = { fresh: 'مباشر', stale: 'متأخر في التحديث', old: 'التحديث واقف', off: 'انصرف', none: 'مفيش موقع' };
+  function placeOf(x) {
+    if (x.visit && x.state === 'in') return 'في ' + x.visit.center;
+    if (x.site) return x.at_site ? 'في ' + x.site : (x.dist != null ? 'بعيد ' + x.dist + ' م عن ' + x.site : '');
+    return '';
+  }
   function drawLive(keep) {
     var L = S.live;
-    var emps = L.list.filter(function (x) { return x.last && (x.state === 'in' || x.state === 'done'); }).map(function (x) {
-      return { id: x.id, name: x.name, state: x.state, lat: x.last.lat, lng: x.last.lng, at: x.last.at, battery: x.last.battery, in_at: x.in_at, visit: x.visit, far: x.at_site === false && !x.visit };
+    var emps = L.list.filter(function (x) { return x.last; }).map(function (x) {
+      var st = lst(x, L);
+      return { id: x.id, name: x.name, st: st, stText: STT[st], state: x.state, lat: x.last.lat, lng: x.last.lng, at: x.last.at, age: x.age_min, battery: x.last.battery, in_at: x.in_at, visit: x.visit, place: placeOf(x) };
     });
     drawMap('stf-map', { sites: L.sites, centers: L.centers, emps: emps }, keep);
   }
@@ -240,37 +292,27 @@
     var L = S.live, list = L.list;
     if (!list.length) return '<div class="card stf-empty"><div class="stf-ill">👥</div><h3>مفيش موظفين لسه</h3><p>ضيف أول موظف، وابعتله اللينك باسم المستخدم وكلمة السر، وهو هيسجّل حضوره من موبايله.</p><button class="btn btn-primary" data-a="new">＋ موظف جديد</button></div>';
     var h = liveStats(list);
-    h += '<div class="card stf-mapcard lt"><div class="card-header"><h3 class="card-title">الخريطة دلوقتي</h3><span class="stf-sub">الموظفين بيتحدّثوا كل ' + L.ping_min + ' دقيقة وهما في الشغل · 🏥 = مركز (الأخضر فيه حد دلوقتي) · الدايرة = نطاق مكان الشغل</span></div>' + mapBox('stf-map', 400) + '</div>';
-    return h + liveCards(L);
+    h += '<div class="stf-live"><div class="card stf-mapcard lt">' + mapBox('stf-map', 520, 'tall') + '</div><div class="card stf-lvcard"><div class="stf-lvh ax-hl-off"><b class="ax-hl-off">الموظفين النهارده</b><span class="stf-livedot ax-hl-off"><i></i>مباشر · تحديث كل ' + L.ping_min + ' د</span></div><div class="stf-lvlist" id="stf-lcards">' + liveList(L) + '</div></div></div>';
+    return h;
   }
   function liveStats(list) {
     var inn = list.filter(function (x) { return x.state === 'in'; }).length, done = list.filter(function (x) { return x.state === 'done'; }).length, out = list.filter(function (x) { return x.state === 'out'; }).length;
     var late = list.filter(function (x) { return x.late > 0; }).length, atc = list.filter(function (x) { return x.visit; }).length;
     return '<div class="stf-stats five" id="stf-lstats"><div class="st-in"><b>' + inn + '</b><span>في الشغل دلوقتي</span></div><div class="st-c"><b>' + atc + '</b><span>في مراكز دلوقتي</span></div><div><b>' + done + '</b><span>خلّصوا النهارده</span></div><div class="' + (out ? 'st-out' : '') + '"><b>' + out + '</b><span>لسه ما سجّلوش</span></div><div class="' + (late ? 'st-late' : '') + '"><b>' + late + '</b><span>متأخرين</span></div></div>';
   }
-  function liveCards(L) {
-    var list = L.list;
-    return '<div class="stf-cards" id="stf-lcards">' + list.map(function (x) {
-      var chip = x.state === 'in' ? '<span class="stf-chip ax-hl-off in"><i></i>في الشغل</span>' : x.state === 'done' ? '<span class="stf-chip ax-hl-off done"><i></i>خلّص</span>' : '<span class="stf-chip ax-hl-off"><i></i>لسه</span>';
-      var loc = '';
-      if (x.last) {
-        var inC = x.visit && x.state === 'in';
-        loc = '<a class="stf-loc ax-hl-off ' + (inC ? '' : x.at_site === false ? 'far' : x.at_site ? 'near' : '') + '" href="' + maps(x.last.lat, x.last.lng) + '" target="_blank" rel="noopener">📍 ' +
-          (inC ? 'آخر موقع' : x.site ? (x.at_site ? 'في ' + esc(x.site) : 'بعيد ' + x.dist + ' م عن ' + esc(x.site)) : 'على الخريطة') + ' · ' + ago(x.age_min) + (x.last.battery != null ? ' · 🔋' + x.last.battery + '%' : '') + '</a>';
-      } else if (x.state === 'in') loc = '<span class="stf-loc ax-hl-off far">📍 مفيش موقع واصل</span>';
-      var tags = '';
+  function liveList(L) {
+    var order = { in: 0, done: 1, out: 2 };
+    return L.list.slice().sort(function (a, b) { return (order[a.state] - order[b.state]) || a.name.localeCompare(b.name, 'ar'); }).map(function (x) {
+      var st = lst(x, L), pl = placeOf(x), tags = '';
       if (x.late > 0) tags += '<span class="stf-tag ax-hl-off l">تأخير ' + x.late + ' د</span>';
       if (x.in_far) tags += '<span class="stf-tag ax-hl-off o" title="سجّل الحضور بعيد عن مكان الشغل">حضور برّه المكان</span>';
-      if (x.state === 'in' && x.tracking && x.age_min != null && x.age_min > L.ping_min * 2 + 5) tags += '<span class="stf-tag ax-hl-off o">الموقع قديم</span>';
-      var vis = x.visit ? '<div class="stf-vis ax-hl-off' + (x.visit.far ? ' far' : '') + '">🏥 في <b>' + esc(x.visit.center) + '</b> من ' + hm(x.visit.start_at) + ' · ' + dur(x.visit.mins) + (x.visit.purpose ? ' · ' + esc(x.visit.purpose) : '') + (x.visit.far ? ' · بعيد ' + x.visit.dist + ' م عن المركز' : '') + '</div>' :
-        (x.visits ? '<div class="stf-meta">زار ' + x.visits + ' ' + (x.visits === 1 ? 'مركز' : 'مراكز') + ' النهارده</div>' : '');
-      return '<div class="card stf-card" data-a="day" data-id="' + x.id + '"><div class="stf-av">' + esc(x.name.trim().charAt(0)) + '</div><div class="stf-ci"><div class="stf-top"><b>' + esc(x.name) + '</b>' + chip + tags + '</div><div class="stf-meta">' +
-        (x.in_at ? 'حضور <b>' + hm(x.in_at) + '</b>' + (x.out_at ? ' ← انصراف <b>' + hm(x.out_at) + '</b>' : '') + ' · <b>' + dur(x.worked) + '</b> ساعة' : esc(x.job || 'لسه ما سجّلش حضور')) + '</div>' + vis + loc + '</div>' +
-        (x.phone ? '<a class="stf-wa" href="' + wa(x.phone, 'أهلاً ' + x.name) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="واتساب">💬</a>' : '') + '</div>';
-    }).join('') + '</div>';
+      var vis = x.visit && x.state === 'in' ? '<span class="lv-vis ax-hl-off' + (x.visit.far ? ' far' : '') + '">🏥 ' + esc(x.visit.center) + ' · من ' + hm(x.visit.start_at) + (x.visit.far ? ' · بعيد ' + x.visit.dist + ' م' : '') + '</span>' : '';
+      var sub = x.state === 'out' && !x.in_at ? 'لسه ما سجّلش حضور' : (x.in_at ? 'حضور ' + hm(x.in_at) + (x.out_at ? ' ← ' + hm(x.out_at) : '') + ' · ' + dur(x.worked) : '');
+      return '<div class="lv-it ax-hl-off' + (String(S.sel) === String(x.id) ? ' on' : '') + (x.last ? '' : ' nolast') + '" data-a="focus" data-id="' + x.id + '"><b class="emk-av ' + st + '">' + esc(x.name.trim().charAt(0)) + '</b>' +
+        '<div class="t"><b>' + esc(x.name) + '</b><div class="sub"><span class="lvs ax-hl-off ' + st + '"><i></i>' + (x.state === 'out' ? (x.in_at ? 'انصرف' : 'لسه') : STT[st]) + '</span>' + (pl && !vis ? '<span>📍 ' + esc(pl) + '</span>' : '') + (sub ? '<span>' + sub + '</span>' : '') + '</div>' + (vis ? '<div class="sub">' + vis + '</div>' : (x.visits ? '<div class="sub"><span>🏥 زار ' + x.visits + ' ' + (x.visits === 1 ? 'مركز' : 'مراكز') + '</span></div>' : '')) + (tags ? '<div class="sub">' + tags + '</div>' : '') + '</div>' +
+        '<div class="end"><span>' + (x.last ? ago(x.age_min) : '') + '</span>' + (x.last && x.last.battery != null ? '<span>🔋 ' + x.last.battery + '%</span>' : '') + '<button class="lv-day" data-a="day" data-id="' + x.id + '" title="مسار اليوم">🛣</button></div></div>';
+    }).join('');
   }
-
-  /* ─ المراكز (زيارات الشهر) ─ */
   function centersHtml() {
     var V = S.visits, m = V.month.split('-');
     var h = '<div class="stf-bar"><div class="stf-mn"><button class="btn btn-secondary btn-sm" data-a="vm" data-d="-1">‹</button><b>' + MON[+m[1] - 1] + ' ' + m[0] + '</b><button class="btn btn-secondary btn-sm" data-a="vm" data-d="1"' + (V.month >= today().slice(0, 7) ? ' disabled' : '') + '>›</button></div><div class="stf-spacer"></div><button class="btn btn-secondary btn-sm" data-a="vcsv">⬇ CSV</button></div>';
@@ -399,6 +441,7 @@
     if (a === 'edit') return empForm(id);
     if (a === 'send') return sendCreds(id);
     if (a === 'link') return linkModal();
+    if (a === 'focus') return focusEmp(id);
     if (a === 'day') { var e = empById(id); return dayModal(id, S.live ? S.live.now.date : today(), e && e.name); }
     if (a === 'emprep') return empReport(id);
     if (a === 'cvis') return centerVisits(id);
@@ -510,7 +553,14 @@
       var ev = [];
       t.att.forEach(function (a) { ev.push({ at: a.in_at, k: 'in', html: '🟢 <b>حضور</b>' + (a.in_dist != null ? ' · على بعد ' + a.in_dist + ' م من المكان' : '') + (a.source === 'manager' ? ' · ✍ يدوي' : '') }); if (a.out_at) ev.push({ at: a.out_at, k: 'out', html: '🔴 <b>انصراف</b>' }); });
       (t.visits || []).forEach(function (v) { ev.push({ at: v.start_at, k: 'v', html: '🏥 <b>' + esc(v.center) + '</b>' + (v.purpose ? ' · ' + esc(v.purpose) : '') + ' · ' + hm(v.start_at) + ' ← ' + (v.end_at ? hm(v.end_at) : 'لسه هناك') + ' · <b>' + dur(v.mins) + '</b>' + (v.far ? ' <span class="stf-tag ax-hl-off o">بعيد ' + v.dist + ' م عن المركز</span>' : '') + (v.note ? '<div class="stf-meta">📝 ' + esc(v.note) + '</div>' : '') }); });
+      var P = t.points || [], iv = (S.live && S.live.ping_min) || Number(cfg().ping_min) || 15, dist = 0;
+      for (var q = 1; q < P.length; q++) {
+        dist += km(P[q - 1], P[q]);
+        var gap = (Date.parse(P[q].at.replace(' ', 'T')) - Date.parse(P[q - 1].at.replace(' ', 'T'))) / 60000;
+        if (gap > iv * 2.5 && P[q].kind !== 'in') ev.push({ at: P[q - 1].at, k: 'g', html: '📡 <b>التحديث وقف ' + dur(gap) + '</b><div class="stf-meta">غالبًا البرنامج كان مقفول على موبايله</div>' });
+      }
       ev.sort(function (a, b) { return a.at < b.at ? -1 : a.at > b.at ? 1 : 0; });
+      var sum = P.length ? '<div class="stf-trksum"><div><b>' + (Math.round(dist * 10) / 10) + '</b><span>كم تقريبًا</span></div><div><b>' + P.length + '</b><span>نقطة موقع</span></div><div><b>' + (t.visits || []).length + '</b><span>زيارة</span></div></div>' : '';
       var tl = ev.length ? '<div class="stf-tl">' + ev.map(function (e) { return '<div class="' + e.k + '"><span>' + hm(e.at) + '</span><div>' + e.html + '</div></div>'; }).join('') + '</div>' : '<p class="stf-note">مفيش حضور مسجّل في اليوم ده.</p>';
       var edit = (t.att.length ? t.att.map(function (a) {
           return '<div class="stf-att" data-id="' + a.id + '"><div class="stf-grid2"><div class="form-group"><label>حضور</label><input type="time" class="form-control a-in" value="' + hm(a.in_at) + '"></div><div class="form-group"><label>انصراف</label><input type="time" class="form-control a-out" value="' + (a.out_at ? hm(a.out_at) : '') + '"></div></div>' +
@@ -519,11 +569,11 @@
         '<div class="stf-att add"><b>＋ إضافة حضور يدوي</b><div class="stf-grid2"><div class="form-group"><label>حضور</label><input type="time" class="form-control n-in"></div><div class="form-group"><label>انصراف</label><input type="time" class="form-control n-out"></div></div><button class="btn btn-sm btn-secondary n-sv">إضافة</button></div>';
       openModal(esc(name || t.emp.name) + ' — ' + DAYN[d.getUTCDay()] + ' ' + dmy(date),
         '<div class="stf-daybar"><input type="date" class="form-control" id="stf-dd" value="' + esc(date) + '"><button class="btn btn-secondary btn-sm" id="stf-ddg">عرض</button></div>' + tl +
-        (t.points.length || (t.centers || []).length ? '<div class="stf-mapcard lt in-modal">' + mapBox('stf-dmap', 300) + '</div>' : '<p class="stf-note">مفيش مواقع متسجّلة في اليوم ده.</p>') +
+        (t.points.length || (t.centers || []).length ? sum + '<div class="stf-mapcard lt in-modal">' + mapBox('stf-dmap', 340) + '</div>' : '<p class="stf-note">مفيش مواقع متسجّلة في اليوم ده.</p>') +
         '<details class="stf-edit"' + (t.att.length ? '' : ' open') + '><summary>✍ تعديل أو إضافة حضور يدوي</summary>' + edit + '</details>',
         '<button class="btn btn-ghost" onclick="closeModal()">إغلاق</button>');
       document.getElementById('stf-ddg').onclick = function () { var v = document.getElementById('stf-dd').value; if (v) { closeModal(); dayModal(empId, v, name); } };
-      if (document.getElementById('stf-dmap')) drawMap('stf-dmap', { sites: sites(), centers: (t.centers || []).map(function (c) { return { key: c.key, name: c.name, lat: c.lat, lng: c.lng, label: true }; }), route: t.points });
+      if (document.getElementById('stf-dmap')) drawMap('stf-dmap', { sites: sites(), centers: (t.centers || []).map(function (c) { return { key: c.key, name: c.name, lat: c.lat, lng: c.lng, label: true }; }), route: t.points, visits: t.visits || [] });
       var again = function () { closeModal(); dayModal(empId, date, name); if (S.tab === 'report') { api('GET', '/report?month=' + S.month).then(function (r) { S.report = r; }); } };
       [].forEach.call(document.querySelectorAll('.stf-att[data-id]'), function (box) {
         box.querySelector('.a-sv').onclick = function () {
