@@ -483,6 +483,19 @@
       bars2: { title: 'أكتر المراكز سحبًا', items: cs.map(function (x) { var c = cust(x.k); return { l: cname(x.k), txt: one ? num(x.v) + ' ' + U : qtyTxt(paperByUnit((paperRows.length ? paperRows : s).filter(function (y) { return y.cid === x.k; }), PI)), w: x.v / cmx, on: c ? fn(function () { ask('حساب ' + c.name, { cid: c.id }); }) : '' }; }) },
       follow: p.from === p.to ? ['طلعنا قد إيه ورق الأسبوع ده؟', 'طلعنا قد إيه ورق الشهر ده؟', 'إيه اللي قرب يخلص في المخزن؟'] : ['إيه اللي قرب يخلص في المخزن؟', 'قارن الشهر ده بالشهر اللي فات']
     };
+    /* one day («طلعنا إيه ورق النهارده؟»): which paper went out, each with its own count — reset every day */
+    if (p.from === p.to && paperRows.length) {
+      var pp = {}; paperRows.forEach(function (x) { var g = pp[x.pid] || (pp[x.pid] = { id: x.pid, name: x.pname || ((A('products').find(function (y) { return y.id === x.pid; }) || {}).name) || 'صنف', q: 0, ops: {}, cs: {} }); g.q += x.qty; g.ops[x.kind + (x.n || '') + '|' + x.cid] = 1; if (x.cid) g.cs[x.cid] = (g.cs[x.cid] || 0) + x.qty; });
+      var pl = Object.keys(pp).map(function (k) { return pp[k]; }).sort(function (a, b) { return b.q - a.q; });
+      r.title = 'الورق اللي طلع ' + p.label;
+      r.rowsTitle = pl.length + ' ' + plural(pl.length, 'صنف ورق', 'أصناف ورق', 'صنف ورق');
+      r.rows = pl.slice(0, 12).map(function (g) {
+        var cids = Object.keys(g.cs).sort(function (a, b) { return g.cs[b] - g.cs[a]; }), n = Object.keys(g.ops).length;
+        var who = cids.slice(0, 2).map(function (c) { return cname(c); }).join('، ') + (cids.length > 2 ? ' و' + (cids.length - 2) + ' ' + plural(cids.length - 2, 'مركز', 'مراكز', 'مركز') + ' كمان' : '');
+        return { l: g.name, sub: n + ' ' + plural(n, 'عملية صرف', 'عمليات صرف', 'عملية صرف') + (who ? ' · ' + who : ''), v: num(g.q) + ' ' + unitOfP(g.id, ''), tone: 'ok', on: fn(function () { ask(g.name, { pid: g.id }); }) };
+      });
+      delete r.bars;
+    }
     if (days > 1 && days <= 62) {
       var byDay = {}; paperRows.forEach(function (x) { byDay[x.date] = (byDay[x.date] || 0) + x.qty; });
       var items = []; for (var i = 0; i < days; i++) { var dd = addDays(p.from, i); items.push({ l: dm(dd), v: byDay[dd] || 0 }); }
@@ -645,7 +658,7 @@
     var g = [
       ['الفلوس', ['مبيعات الشهر ده', 'اتحصّل كام الأسبوع ده؟', 'مين أكتر مركز عليه فلوس؟'].concat(x.money).concat(allowed('profit') ? ['الأرباح الشهر اللي فات'] : [])],
       ['المراكز', ['حساب ' + ((A('customers')[0] || {}).name || 'مركز النور'), 'مين متأخر في الدفع؟', 'مراكز وقفت سحب'].concat(x.centers)],
-      ['المخزن', ['إيه اللي قرب يخلص؟', 'طلعنا قد إيه ورق الشهر ده؟', 'أكتر صنف بيتباع'].concat(x.stock)],
+      ['المخزن', ['طلعنا إيه ورق النهارده؟', 'إيه اللي قرب يخلص؟', 'طلعنا قد إيه ورق الشهر ده؟', 'أكتر صنف بيتباع'].concat(x.stock)],
       ['مقارنات وحسابات', ['قارن الشهر ده بالشهر اللي فات', 'أعمل إيه النهارده؟', '1500*12'].concat(x.decide)]
     ];
     return { icon: 'spark', title: 'بتعرف تسألني عن إيه؟', sub: 'اكتب بطريقتك — بفهم الفترة واسم المركز أو الصنف',
@@ -1459,14 +1472,14 @@
       return '<span class="' + (i === n - 1 ? 'now' : '') + (x.v ? '' : ' zero') + '" style="height:' + Math.max(3, Math.round(Math.max(0, x.v) / mx * 100)) + '%" title="' + esc(x.l + ': ' + (sp.fmt ? sp.fmt(x.v) : num(x.v))) + '"></span>';
     }).join('') + '</div><div class="axa-spark-x"><span>' + esc(sp.items[0].l) + '</span><span>' + esc(sp.items[n - 1].l) + '</span></div></div>';
   }
-  function rowsHtml(R, ordered) {
+  function rowsHtml(R, ordered, title) {
     if (!R || !R.length) return '';
     var tag = ordered ? 'ol' : 'ul';
-    return '<' + tag + ' class="axa-rows' + (ordered ? ' ord' : '') + '">' + R.map(function (r) {
+    return (title ? '<div class="axa-block"><h4>' + esc(title) + '</h4>' : '') + '<' + tag + ' class="axa-rows' + (ordered ? ' ord' : '') + '">' + R.map(function (r) {
       var btns = (r.btns || []).map(function (b) { return b.href ? '<a class="axa-mini" href="' + esc(b.href) + '">' + esc(b.t) + '</a>' : '<button type="button" class="axa-mini' + (b.wa ? ' wa' : '') + '" onclick="' + b.on + '">' + esc(b.t) + '</button>'; }).join('');
       var main = '<span class="dot t-' + (r.tone || 'n') + '"></span><span class="m"><b>' + esc(r.l) + '</b>' + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</span>' + (r.v ? '<em>' + esc(r.v) + '</em>' : '');
       return '<li>' + (r.on ? '<button type="button" class="axa-rowb" onclick="' + r.on + '">' + main + '</button>' : '<div class="axa-rowb">' + main + '</div>') + (btns ? '<div class="axa-rowa">' + btns + '</div>' : '') + '</li>';
-    }).join('') + '</' + tag + '>';
+    }).join('') + '</' + tag + '>' + (title ? '</div>' : '');
   }
   function groupsHtml(G) {
     if (!G) return '';
@@ -1497,7 +1510,7 @@
     return '<div class="axa-slip ax-hl-off' + (r.tone ? ' t-' + r.tone : '') + '">' +
       '<header><span class="axa-ic">' + ic(r.icon) + '</span><div><b>' + esc(r.title) + '</b>' + (r.sub ? '<span>' + esc(r.sub) + '</span>' : '') + '</div></header>' +
       (r.heard ? '<p class="axa-heard">فهمت سؤالك كده: «' + esc(r.heard) + '»</p>' : '') +
-      ledgerHtml(r.ledger, r.compare) + sparkHtml(r.spark) + barsHtml(r.bars) + barsHtml(r.bars2) + rowsHtml(r.rows, r.ordered) + groupsHtml(r.groups) +
+      ledgerHtml(r.ledger, r.compare) + sparkHtml(r.spark) + barsHtml(r.bars) + barsHtml(r.bars2) + rowsHtml(r.rows, r.ordered, r.rowsTitle) + groupsHtml(r.groups) +
       (r.note ? '<p class="axa-note">' + r.note + '</p>' : '') +
       actsHtml(r.acts) +
       '<footer><time>' + at + '</time><button type="button" onclick="AXA.run(\'c' + id + '\')" title="انسخ الرد">' + ic('copy') + '<span>نسخ</span></button>' +
@@ -1649,7 +1662,7 @@
   var CATS = [
     { k: 'money', name: 'الفلوس', icon: 'cash', qs: function () { var x = moreQs(); return ['مبيعات الشهر ده', 'اتحصّل كام الأسبوع ده؟', 'مين أكتر مركز عليه فلوس؟'].concat(x.money).concat(allowed('profit') ? ['الأرباح الشهر ده'] : []); } },
     { k: 'centers', name: 'المراكز', icon: 'building', qs: function () { return ['مين متأخر في الدفع؟', 'مين هيسحب الأسبوع ده؟', 'أكتر المراكز شراءً الشهر ده', 'مراكز وقفت سحب'].concat(moreQs().centers); } },
-    { k: 'stock', name: 'المخزن', icon: 'box', qs: function () { return ['إيه اللي قرب يخلص؟', 'طلعنا قد إيه ورق الشهر ده؟', 'أكتر صنف بيتباع'].concat(moreQs().stock); } },
+    { k: 'stock', name: 'المخزن', icon: 'box', qs: function () { return ['طلعنا إيه ورق النهارده؟', 'إيه اللي قرب يخلص؟', 'طلعنا قد إيه ورق الشهر ده؟', 'أكتر صنف بيتباع'].concat(moreQs().stock); } },
     { k: 'decide', name: 'قرارات', icon: 'scale', qs: function () { return ['أعمل إيه النهارده؟', 'قارن الشهر ده بالشهر اللي فات'].concat(allowed('suppliers') ? ['عليا كام للموردين؟'] : []).concat(moreQs().decide); } }
   ];
   function quickHtml() {

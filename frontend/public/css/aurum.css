@@ -6598,3 +6598,12 @@ html.aurum #page-content [role="tablist"]:not(.pxs-tiles):not(.fc-cal):not(.skh-
 .axt-stuck svg { flex: none; width: 20px; height: 20px; color: #FFB020; margin-top: 2px; }
 .axt-stuck div { display: flex; flex-direction: column; gap: 3px; }
 .axt-stuck b { font-size: 14px; } .axt-stuck span { font-size: 12.5px; line-height: 1.7; opacity: .85; }
+
+/* 4.59 · the assistant's answers in plain white (no coloured gradient): white title and text, soft grey for the small lines */
+html.aurum .axa-slip > header b,
+html.aurum .axa-slip :is(header div > span, dt, dd, .l, .v, small, h4, .axa-note, .m b, .m small, li em, p) {
+  background: none !important; -webkit-background-clip: border-box !important; background-clip: border-box !important; -webkit-text-fill-color: currentColor !important; }
+html.aurum .axa-slip > header b, html.aurum .axa-slip :is(dd, .l, .v, .m b, li em, .axa-note, p) { color: #F4F0F0 !important; }
+html.aurum .axa-slip :is(header div > span, dt, small, .m small, h4) { color: #A39A9B !important; }
+html.aurum[data-theme="light"] .axa-slip > header b, html.aurum[data-theme="light"] .axa-slip :is(dd, .l, .v, .m b, li em, .axa-note, p) { color: #16110F !important; }
+html.aurum[data-theme="light"] .axa-slip :is(header div > span, dt, small, .m small, h4) { color: #6E6567 !important; }
