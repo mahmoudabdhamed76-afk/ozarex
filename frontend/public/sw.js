@@ -1,8 +1,8 @@
 'use strict';
 
-const CACHE      = 'erp-v3.24';   // bump on every release that changes a cached file (4.59 assistant: paper out today + white answers)
+const CACHE      = 'erp-v3.25';   // bump on every release that changes a cached file (4.60 الموظفين: attendance by location)
 // relative to the SW scope, so it also works when the app lives under APP_PATH
-const APP_SHELL  = ['./', './index.html', './manifest.json', './css/aurum.css', './css/ads.css', './js/aurum.js', './js/glowchart.js', './js/stockhub.js', './js/stockcount.js', './js/debts.js', './js/business.js', './js/custody.js', './js/axcore.js', './js/rules.js', './js/forecast.js', './js/purchases.js', './js/xlsx.js', './js/credit.js', './js/monthly.js', './js/notify.js', './js/approvals.js', './js/security.js', './js/aging.js', './js/cheques.js', './js/profit.js', './js/purchase.js', './js/requests.js', './js/isscards.js', './js/users.js', './js/assistant.js', './js/papermeter.js', './js/ticker.js', './js/cabfig.js', './js/pulsescene.js', './js/mhome.js', './js/marker.js', './js/picker.js', './js/auditx.js', './js/fxtape.js', './js/forcepw.js', './js/centerstmt.js', './js/navsmart.js', './js/deskmore.js', './js/aibot.js', './js/adscore.js', './js/adsadmin.js', './js/settingsx.js', './js/sales.js', './js/glassnav.js', './js/branchstats.js', './js/branches.js', './js/returns.js', './js/cashbook.js', './js/fulusi.js', './js/pushx.js', './js/consumables.js', './vendor/gsap.min.js', './vendor/hairline.js',
+const APP_SHELL  = ['./', './index.html', './manifest.json', './css/aurum.css', './css/ads.css', './js/aurum.js', './js/glowchart.js', './js/stockhub.js', './js/stockcount.js', './js/debts.js', './js/business.js', './js/custody.js', './js/axcore.js', './js/rules.js', './js/forecast.js', './js/purchases.js', './js/xlsx.js', './js/credit.js', './js/monthly.js', './js/notify.js', './js/approvals.js', './js/security.js', './js/aging.js', './js/cheques.js', './js/profit.js', './js/purchase.js', './js/requests.js', './js/isscards.js', './js/users.js', './js/assistant.js', './js/papermeter.js', './js/ticker.js', './js/cabfig.js', './js/pulsescene.js', './js/mhome.js', './js/marker.js', './js/picker.js', './js/auditx.js', './js/fxtape.js', './js/forcepw.js', './js/centerstmt.js', './js/navsmart.js', './js/deskmore.js', './js/aibot.js', './js/adscore.js', './js/adsadmin.js', './js/settingsx.js', './js/sales.js', './js/glassnav.js', './js/branchstats.js', './js/branches.js', './js/returns.js', './js/cashbook.js', './js/fulusi.js', './js/pushx.js', './js/consumables.js', './js/staffadmin.js', './vendor/gsap.min.js', './vendor/hairline.js',
                     './fonts/fonts.css', './vendor/chart.umd.js', './vendor/modern-screenshot.js',
                     './icons/logo-square.png'];
 const DB_NAME    = 'erp-offline';
@@ -34,6 +34,7 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (url.pathname.includes('/api/')) return; // never cache API
   if (/\/p\/[A-Za-z0-9]+\/?$/.test(url.pathname)) return; // a center's live link — always fresh
+  if (/\/staff(\/|$)/.test(url.pathname)) return; // 4.60 · the employees' own page — always fresh, never the ERP shell
   if (url.origin !== self.location.origin) return;
 
   // Pages: network-first so a new release shows immediately; cache only when offline

@@ -22,11 +22,11 @@ const AX = require(process.env.PUBLIC_DIR ? path.join(process.env.PUBLIC_DIR, 'j
 
 /* ── the pages a role gets when the admin did not choose them one by one (== index.html PERMISSIONS) ── */
 const ROLE_PAGES = {
-  admin: ['dashboard', 'customers', 'issuances', 'forecast', 'invoices', 'payments', 'aging', 'transfers', 'cheques', 'debts', 'suppliers', 'purchases', 'inventory', 'stock', 'expenses', 'reports', 'monthly', 'profit', 'aiassistant', 'approvals', 'requests', 'users', 'audit', 'security', 'settings'],
+  admin: ['dashboard', 'customers', 'issuances', 'forecast', 'invoices', 'payments', 'aging', 'transfers', 'cheques', 'debts', 'suppliers', 'purchases', 'inventory', 'stock', 'expenses', 'reports', 'monthly', 'profit', 'aiassistant', 'approvals', 'requests', 'users', 'staff', 'audit', 'security', 'settings'],
   accountant: ['dashboard', 'customers', 'issuances', 'forecast', 'invoices', 'payments', 'aging', 'transfers', 'cheques', 'debts', 'suppliers', 'purchases', 'expenses', 'reports', 'monthly', 'profit', 'aiassistant', 'approvals', 'requests'],
   sales: ['dashboard', 'customers', 'issuances', 'forecast', 'invoices', 'payments', 'aging', 'cheques', 'inventory', 'stock', 'aiassistant', 'approvals', 'requests']
 };
-const ADMIN_ONLY_PAGES = ['users', 'audit', 'security', 'settings'];
+const ADMIN_ONLY_PAGES = ['users', 'staff', 'audit', 'security', 'settings'];
 const ALWAYS_PAGES = ['approvals', 'requests', 'dashboard'];
 
 /* every data collection the app has */

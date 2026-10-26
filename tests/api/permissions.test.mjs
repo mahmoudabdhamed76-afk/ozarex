@@ -156,5 +156,5 @@ test('C1 (fixed): a user limited to Dashboard+Issuances cannot edit supplier rec
 test('control: admin-only pages for the UI are listed the same in browser and server (axcore)', async () => {
   const r = await req(s.base, 'GET', '/js/axcore.js');
   assert.equal(r.status, 200);
-  assert.match(r.text, /ADMIN_ONLY_PAGES = \['users', 'audit', 'settings', 'security'\]/);
+  assert.match(r.text, /ADMIN_ONLY_PAGES = \['users', 'audit', 'settings', 'security', 'staff'\]/);
 });

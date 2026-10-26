@@ -26,6 +26,7 @@ const transfers = require('./src/transfers');
 try { transfers.recover(); } catch (e) { console.error('[transfers] recover:', e.message); }
 const portal = require('./src/portal');
 const webpush = require('./src/webpush');
+const staff = require('./src/staff');
 const digest = require('./src/digest');
 /* 4.39 · the daily summary + instant alerts read every active branch */
 const digestCtx = () => ({
@@ -305,6 +306,12 @@ const server = http.createServer(async (req, res) => {
     /* a center's own read-only page (token link) */
     if (pathname.startsWith('/p/') && portal.handle(req, res, pathname, () => branches.allStores().map(st => st.data()))) return;   // 4.32 · a center's link works in any branch
 
+    /* 4.60 · الموظفين: the employee's own page (/staff) and its API — his own login, never the ERP's */
+    if (pathname === '/staff/') { res.writeHead(302, { Location: APP_PATH + '/staff' }); return res.end(); }
+    if (pathname === '/staff') return serveStatic(req, res, path.join(PUBLIC, 'staff.html'));
+    if (pathname === '/staff/manifest.json') return sendJSON(res, 200, { name: 'حضور وانصراف', short_name: 'حضوري', start_url: '../staff', scope: '../', display: 'standalone', background_color: '#0c0809', theme_color: '#0c0809', lang: 'ar', dir: 'rtl', icons: [{ src: '../icons/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '../icons/icon-512.png', sizes: '512x512', type: 'image/png' }] }, { 'Cache-Control': 'public, max-age=3600' });
+    if (pathname.startsWith('/staff/api/')) return await staff.handlePublic(req, res, pathname, { sendJSON, readBody, settings: () => (store.data() || {}).settings || {} });
+
     /* ── login / logout / who am I ── */
     if (pathname === '/api/login' && req.method === 'POST') {
       const b = (await readBody(req, 0.02)) || {};
@@ -352,6 +359,9 @@ const server = http.createServer(async (req, res) => {
         if (!st || !branches.get(bid)) return sendJSON(res, 404, { error: 'branch_not_found', message: 'الفرع ده مش موجود' });
         if (!branches.canUse(me, bid)) return sendJSON(res, 403, { error: 'branch_forbidden', message: 'مالكش صلاحية على الفرع ده' });
       }
+
+      /* 4.60 · الموظفين: the manager's side (admin only) */
+      if (pathname === '/api/staff' || pathname.startsWith('/api/staff/')) { if (!admin) return adminOnly(); return await staff.handleAdmin(req, res, pathname, me, { sendJSON, readBody }); }
 
       /* 4.41 · ads: everyone reads their feed + records views/clicks; only admins manage */
       if (pathname === '/api/ads' || pathname.startsWith('/api/ads/')) return await ads.handle(req, res, pathname, me);
