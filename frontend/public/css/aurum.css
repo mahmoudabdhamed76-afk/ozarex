@@ -6830,3 +6830,8 @@ html[dir=rtl] .rd-man { transform: translateX(50%); }
 .stf-vt.on { background: rgba(30,154,76,.15); border-color: #1E9A4C; color: #1E9A4C; font-weight: 700; }
 @media (max-width: 768px) { .stf-flist { grid-template-columns: 1fr; } .rd-road { margin-inline: 14px; } }
 @media (prefers-reduced-motion: reduce) { .rd-man.walk, .stf-party i, .pt-msg { animation: none; } }
+/* 4.63.1 · the center picker in «مهمة جديدة» — a visible list (iPhone hides <datalist>) */
+.stf-cpick { margin-top: 8px; max-height: 260px; overflow: auto; border: 1px solid var(--ax-line); border-radius: 14px; padding: 6px; display: flex; flex-direction: column; gap: 5px; -webkit-overflow-scrolling: touch; }
+.stf-cpi { display: block; width: 100%; text-align: right; border: 1px solid transparent; background: var(--ax-surface-2, rgba(128,128,128,.08)); color: inherit; border-radius: 11px; padding: 9px 12px; cursor: pointer; font: inherit; }
+.stf-cpi b { display: block; font-size: 14px; } .stf-cpi small { color: var(--ax-muted); font-size: 11.5px; }
+.stf-cpi.on { border-color: var(--ax-primary, #E5232F); background: rgba(229,35,47,.12); }
