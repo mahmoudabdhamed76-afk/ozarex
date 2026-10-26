@@ -269,6 +269,24 @@
       return '<div class="stf-rwi ax-hl-off"><span class="st">' + (r.stars ? '⭐'.repeat(r.stars) : '🏆') + '</span><div><b>' + esc(r.emp) + (r.amount ? ' · ' + r.amount.toLocaleString('en-US') + ' ج' : '') + '</b><small>' + esc(r.message || '—') + '</small></div><span class="sn ' + (r.seen_at ? 'ok' : '') + '">' + (r.seen_at ? '👀 شافها ' + hm(r.seen_at) : 'لسه ما شافهاش') + '</span><button class="rd-x" data-a="rwdel" data-id="' + r.id + '" title="مسح">✕</button></div>'; }).join('') + '</div></div>';
     return h;
   }
+  function wipeModal(id) {
+    var e = empById(id); if (!e) return;
+    openModal('🧹 ريست ' + esc(e.name),
+      '<p style="line-height:1.9;margin:0 0 10px">هيتمسح كل اللي متسجّل لـ <b>' + esc(e.name) + '</b> وكأنه أكونت جديد:</p>' +
+      '<ul class="stf-wl"><li>الحضور والانصراف وساعات الشغل والتأخير</li><li>الزيارات والمراكز اللي اشتغل فيها</li><li>المهام ومساراتها والمواقع على الخريطة</li><li>المكافآت</li></ul>' +
+      '<label class="stf-sw" style="margin-top:10px"><input type="checkbox" id="wp-f"><span><b>امسح حلوله من بنك الأعطال كمان</b><small>لو سبتها، زمايله هيفضلوا يلاقوا الحلول اللي سجّلها</small></span></label>' +
+      '<p class="stf-note" style="color:#E5232F">⚠️ مش هتقدر ترجّع اللي اتمسح. اسم المستخدم وكلمة السر والصورة هيفضلوا زي ما هما.</p>' +
+      '<div class="form-group"><label>اكتب <b>ريست</b> علشان تأكد</label><input class="form-control" id="wp-c" autocomplete="off"></div>',
+      '<button class="btn btn-danger" id="wp-go" style="background:#E5232F;color:#fff">🧹 امسح كل حاجة</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+    document.getElementById('wp-go').onclick = function () {
+      if (document.getElementById('wp-c').value.trim() !== 'ريست') { T('اكتب كلمة «ريست» الأول', 'error'); return; }
+      api('POST', '/task/reset', { emp_id: id, all: true, faults: document.getElementById('wp-f').checked }).then(function (r) {
+        var c = r.counts || {}; closeModal();
+        T('اتمسح: ' + (c.att || 0) + ' حضور · ' + (c.visits || 0) + ' زيارة · ' + (c.tasks || 0) + ' مهمة' + (c.faults ? ' · ' + c.faults + ' حل' : '') + ' ✅');
+        load();
+      }).catch(function (er) { T(er.message, 'error'); });
+    };
+  }
   function rewardModal(id) {
     var e = empById(id); if (!e) return;
     var st = 3;
@@ -531,7 +549,7 @@
         '<div class="stf-meta">' + esc(e.job || '—') + ' · <code>' + esc(e.username) + '</code></div>' +
         '<div class="stf-meta">شغل من ' + t12(e.rules.start) + ' لـ ' + t12(e.rules.end) + ' · إجازة ' + esc(rest || 'مفيش') + (e.track ? '' : ' · من غير تتبع') + '</div>' +
         '<div class="stf-meta faint">' + (e.last_login_at ? 'آخر دخول ' + dmy(e.last_login_at.slice(0, 10)) + ' ' + hm(e.last_login_at) : 'لسه ما دخلش') + '</div></div>' +
-        '<div class="stf-acts"><button class="btn btn-sm btn-primary" data-a="send" data-id="' + e.id + '">🔑 ابعت البيانات</button><button class="btn btn-sm btn-secondary" data-a="edit" data-id="' + e.id + '">✏ تعديل</button>' + (e.active ? '<button class="btn btn-sm btn-secondary" data-a="reward" data-id="' + e.id + '">🏆 مكافأة</button><button class="btn btn-sm btn-ghost" data-a="treset" data-id="' + e.id + '" title="يمسح كل المهام المتسجلة على الموظف">🧹 ريست المهام</button>' : '') + '</div></div>';
+        '<div class="stf-acts"><button class="btn btn-sm btn-primary" data-a="send" data-id="' + e.id + '">🔑 ابعت البيانات</button><button class="btn btn-sm btn-secondary" data-a="edit" data-id="' + e.id + '">✏ تعديل</button>' + (e.active ? '<button class="btn btn-sm btn-secondary" data-a="reward" data-id="' + e.id + '">🏆 مكافأة</button><button class="btn btn-sm btn-ghost" data-a="treset" data-id="' + e.id + '" title="يمسح كل حاجة متسجّلة للموظف">🧹 ريست</button>' : '') + '</div></div>';
     }).join('') + '</div>';
   }
 
@@ -582,7 +600,7 @@
       return '<div><span>' + esc(String(r.at).slice(5, 16)) + '</span><b>' + esc(r.who) + '</b><span>' + esc(logName(r.action)) + '</span><small>' + esc(logDetail(r.detail)) + '</small></div>'; }).join('') : '<p class="stf-note">لسه مفيش عمليات</p>') + '</div></div>';
     return h;
   }
-  function logName(a) { return { 'emp.create': 'ضاف موظف', 'emp.update': 'عدّل موظف', 'emp.reset': 'كلمة سر جديدة', 'emp.delete': 'مسح موظف', 'cfg.save': 'عدّل الإعدادات', 'att.add': 'ضاف حضور يدوي', 'att.edit': 'عدّل حضور', 'att.delete': 'مسح حضور', 'center.pin': 'ثبّت مكان مركز', 'center.clear': 'مسح مكان مركز' }[a] || a; }
+  function logName(a) { return { 'emp.create': 'ضاف موظف', 'emp.update': 'عدّل موظف', 'emp.reset': 'كلمة سر جديدة', 'emp.delete': 'مسح موظف', 'cfg.save': 'عدّل الإعدادات', 'att.add': 'ضاف حضور يدوي', 'att.edit': 'عدّل حضور', 'att.delete': 'مسح حضور', 'center.pin': 'ثبّت مكان مركز', 'center.clear': 'مسح مكان مركز', 'emp.wipe': 'ريست موظف', 'task.reset': 'ريست مهام' }[a] || a; }
   function logDetail(d) { try { var o = JSON.parse(d || '{}'); return o.name || o.emp || ''; } catch (e) { return ''; } }
   function siteRow(s) {
     return '<div class="stf-site" data-id="' + esc(s.id || '') + '"><input class="form-control s-n" placeholder="اسم المكان (مثلاً: مكتب منوف)" value="' + esc(s.name || '') + '">' +
@@ -602,7 +620,7 @@
     if (a === 'troute') return routeModal(id);
     if (a === 'reward') return rewardModal(id);
     if (a === 'rwdel') { if (!confirm('تمسح المكافأة دي؟')) return; return api('POST', '/reward/delete', { id: Number(id) }).then(function () { T('اتمسحت'); load(); }).catch(function (e) { T(e.message, 'error'); }); }
-    if (a === 'treset') { var em = empById(id); if (!confirm('تمسح كل المهام المتسجلة على ' + (em ? em.name : 'الموظف') + '؟ (مش هتقدر ترجّعها)')) return; return api('POST', '/task/reset', { emp_id: id }).then(function (r) { T('اتمسحت ' + r.n + ' مهمة ✅'); if (S.tab === 'live') refreshLive(); }).catch(function (e) { T(e.message, 'error'); }); }
+    if (a === 'treset') return wipeModal(id);
     if (a === 'tcancel') { if (!confirm('تلغي المهمة دي؟')) return; return api('POST', '/task/cancel', { id: Number(id) }).then(function () { T('اتلغت المهمة'); refreshLive(); }).catch(function (e) { T(e.message, 'error'); }); }
     if (a === 'fadd') return faultModal();
     if (a === 'fvote') return api('POST', '/fault/vote', { id: Number(id) }).then(function (r) { el.textContent = '👍 ' + r.votes; el.classList.toggle('on', r.voted); }).catch(function (e) { T(e.message, 'error'); });

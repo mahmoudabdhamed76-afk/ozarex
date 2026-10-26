@@ -287,12 +287,32 @@ module.exports = function init(H) {
     return { task: Object.assign(taskOut(t), { emp: t.emp_name }), points, km: Math.round(km * 10) / 10, center: c && c.lat != null ? { name: c.name, lat: c.lat, lng: c.lng } : null };
   }
   /* «ريست» — wipe every job registered on one employee */
-  function resetTasks(empId, who) {
+  /* «ريست» — the employee starts over like a new account: every attendance, visit, location, job and reward of his is wiped
+     (his login, photo and settings stay; his fixes stay in the shared fault bank unless asked) */
+  function resetTasks(empId, who, opt) {
     const e = db.prepare('SELECT * FROM staff_emp WHERE id = ?').get(str(empId, 20)); if (!e) fail(404, 'الموظف مش موجود');
-    const n = db.prepare('DELETE FROM staff_task WHERE emp_id = ?').run(e.id).changes;
-    db.prepare('UPDATE staff_visit SET task_id = NULL WHERE emp_id = ?').run(e.id);
-    log(who, 'task.reset', { emp: e.name, n: Number(n) });
-    return { ok: true, n: Number(n) };
+    opt = opt || {};
+    const n = {};
+    db.exec('BEGIN');
+    try {
+      n.tasks = Number(db.prepare('DELETE FROM staff_task WHERE emp_id = ?').run(e.id).changes);
+      if (opt.all !== false) {
+        n.att = Number(db.prepare('DELETE FROM staff_att WHERE emp_id = ?').run(e.id).changes);
+        n.visits = Number(db.prepare('DELETE FROM staff_visit WHERE emp_id = ?').run(e.id).changes);
+        n.locs = Number(db.prepare('DELETE FROM staff_loc WHERE emp_id = ?').run(e.id).changes);
+        n.rewards = Number(db.prepare('DELETE FROM staff_reward WHERE emp_id = ?').run(e.id).changes);
+        db.prepare('DELETE FROM staff_fault_vote WHERE who = ?').run('e:' + e.id);
+      } else db.prepare('UPDATE staff_visit SET task_id = NULL WHERE emp_id = ?').run(e.id);
+      if (opt.faults) {
+        const ids = db.prepare('SELECT id FROM staff_fault WHERE emp_id = ?').all(e.id).map(r => r.id);
+        for (const id of ids) db.prepare('DELETE FROM staff_fault_vote WHERE fault_id = ?').run(id);
+        n.faults = Number(db.prepare('DELETE FROM staff_fault WHERE emp_id = ?').run(e.id).changes);
+      }
+      db.exec('COMMIT');
+    } catch (er) { db.exec('ROLLBACK'); throw er; }
+    for (const f of db.prepare('SELECT id FROM staff_fault').all()) db.prepare('UPDATE staff_fault SET votes = (SELECT COUNT(*) FROM staff_fault_vote WHERE fault_id = ?) WHERE id = ?').run(f.id, f.id);
+    log(who, 'emp.wipe', { emp: e.name, n });
+    return { ok: true, n: n.tasks, counts: n };
   }
 
   /* ───────── 4.65 · المكافآت والتقدير ───────── */
@@ -376,7 +396,7 @@ module.exports = function init(H) {
     if (get && p === '/centers') return send(200, { list: centersAll().map(c => ({ key: c.key, name: c.name, branch: c.branch, known: c.lat != null })) }), true;
     if (req.method !== 'POST') return false;
     if (p === '/task') return send(200, createTask(await body(), who)), true;
-    if (p === '/task/reset') return send(200, resetTasks((await body()).emp_id, who)), true;
+    if (p === '/task/reset') { const b = await body(); return send(200, resetTasks(b.emp_id, who, { all: b.all !== false, faults: !!b.faults })), true; }
     if (p === '/reward') return send(200, giveReward(await body(), who)), true;
     if (p === '/reward/delete') { const b = await body(); db.prepare('DELETE FROM staff_reward WHERE id = ?').run(Number(b.id)); log(who, 'reward.delete', { id: b.id }); return send(200, { ok: true }), true; }
     if (p === '/task/cancel') return send(200, cancelTask((await body()).id, who)), true;

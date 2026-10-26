@@ -6936,3 +6936,4 @@ html[dir=rtl] .rd-man { transform: translateX(50%); }
 .tkc.st-cancel { background: #f4f1f0; border-color: #ddd; opacity: .75; }
 @media (max-width: 600px) { .dy-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .stf-tl > div > span { width: 66px !important; white-space: nowrap; font-size: 12px; }
+.stf-wl { margin: 0 0 6px; padding-inline-start: 20px; line-height: 2; }
