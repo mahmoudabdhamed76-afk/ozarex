@@ -389,6 +389,27 @@ function adminApi(req, res, pathname, me, h) {
       return sendJSON(res, 200, { ok: true });
     });
   }
+  /* 4.86 · ريست لمركز: يمسح طلبات الورق أو الصيانة (أو الاتنين) من صفحته ومن «الطلبات» */
+  if (req.method === 'POST' && pathname === '/api/portal/reset') {
+    return readBody(req, 0.02).then(b => {
+      b = b || {}; const cid = String(b.cid || '').slice(0, 80); if (!cid) return sendJSON(res, 400, { error: 'bad', message: 'المركز مش محدد' });
+      const kinds = (Array.isArray(b.kinds) ? b.kinds : []).filter(k => k === 'order' || k === 'maint'); if (!kinds.length) return sendJSON(res, 400, { error: 'bad', message: 'اختار هتعمل ريست لإيه' });
+      const ids = db.prepare('SELECT id FROM portal_req WHERE customer_id = ? AND kind IN (' + kinds.map(() => '?').join(',') + ')').all(cid, ...kinds).map(r => r.id);
+      db.exec('BEGIN');
+      try {
+        ids.forEach(id => { db.prepare('DELETE FROM portal_photo WHERE req_id = ?').run(id); db.prepare('DELETE FROM portal_req WHERE id = ?').run(id); });
+        db.exec('COMMIT');
+      } catch (er) { db.exec('ROLLBACK'); throw er; }
+      try { NT.event('portal', { kind: 'status' }); } catch (e) {}
+      return sendJSON(res, 200, { ok: true, n: ids.length });
+    });
+  }
+  if (req.method === 'GET' && pathname === '/api/portal/counts') {
+    const cid = String(q.get('cid') || '').slice(0, 80);
+    const rows = db.prepare('SELECT kind, COUNT(*) AS n FROM portal_req WHERE customer_id = ? GROUP BY kind').all(cid), o = { order: 0, maint: 0 };
+    rows.forEach(r => { o[r.kind === 'maint' ? 'maint' : 'order'] += r.n; });
+    return sendJSON(res, 200, o);
+  }
   if (req.method === 'POST' && pathname === '/api/portal/request/delete') {
     return readBody(req, 0.02).then(b => { db.prepare('DELETE FROM portal_req WHERE id = ?').run(Number((b || {}).id)); db.prepare('DELETE FROM portal_photo WHERE req_id = ?').run(Number((b || {}).id)); try { NT.event('portal', { kind: 'status' }); } catch (e) {} return sendJSON(res, 200, { ok: true }); });
   }

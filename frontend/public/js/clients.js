@@ -74,6 +74,8 @@
       '.cl-rf{display:flex;gap:6px;margin-bottom:12px}.cl-rf button{border:1px solid var(--cl-l);background:transparent;color:inherit;font:inherit;font-size:13px;padding:7px 14px;border-radius:999px;cursor:pointer;opacity:.75}.cl-rf button.on{background:var(--cl-a);border-color:transparent;color:#fff;opacity:1}',
       '.cl-emp{text-align:center;padding:36px 12px;opacity:.7;border:1px dashed var(--cl-l);border-radius:18px}.cl-emp i{font-style:normal;font-size:34px;display:block;margin-bottom:6px}',
       '.cl-note{font-size:12.5px;opacity:.6;margin-top:12px}',
+      '.cl-rsl{display:flex;flex-direction:column;gap:10px;margin-top:10px}.cl-rs{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;border:1px solid var(--ax-line,rgba(255,255,255,.1));cursor:pointer}',
+      '.cl-rs input{width:20px;height:20px;accent-color:#14b8a6}.cl-rs .ic{font-size:24px}.cl-rs .tx b{display:block;font-size:15px}.cl-rs .tx small{font-size:12.5px;opacity:.7}.cl-rs:has(input:disabled){opacity:.5;cursor:default}',
       '.nav-item .badge.cl-badge{background:#ef4444!important;color:#fff!important;animation:clPulse 1.6s ease-in-out infinite}@keyframes clPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.55)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}'
     ].join('\n');
     document.head.appendChild(s);
@@ -101,6 +103,7 @@
           '<div class="cl-a"><a class="btn btn-secondary btn-sm" href="' + esc(url(r.tok)) + '" target="_blank" rel="noopener">👁 فتح</a>' +
           (ph ? '<button class="btn btn-secondary btn-sm cl-wa" onclick="AXClients.wa(\'' + c.id + '\')">واتساب</button>' : '') +
           '<button class="btn btn-secondary btn-sm" onclick="AXClients.qr(\'' + c.id + '\')">▦ باركود</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="AXClients.reset(\'' + c.id + '\')" title="امسح طلبات الورق أو الصيانة من صفحة المركز">🧹 ريست</button>' +
           '<button class="btn btn-ghost btn-sm" onclick="AXClients.rotate(\'' + c.id + '\')">↻ لينك جديد</button>' +
           '<button class="btn btn-ghost btn-sm" onclick="AXClients.stop(\'' + c.id + '\')">⏸ إيقاف</button></div>'
         : '<div class="cl-a"><button class="btn btn-primary btn-sm" onclick="AXClients.make(\'' + c.id + '\')">🔗 اعمل لينك للمركز ده</button></div>') +
@@ -478,6 +481,27 @@
     });
   }
 
+  /* 4.86 · ريست طلبات مركز: يختار ورق / صيانة / الاتنين */
+  function resetModal(cid) {
+    var c = A('customers').filter(function (x) { return x.id === cid; })[0]; if (!c) return;
+    api('GET', '/counts?cid=' + encodeURIComponent(cid)).then(function (n) {
+      var row = function (k, ic, t, cnt) { return '<label class="cl-rs"><input type="checkbox" value="' + k + '"' + (cnt ? ' checked' : ' disabled') + '><span class="ic">' + ic + '</span><span class="tx"><b>' + t + '</b><small>' + (cnt ? cnt + ' طلب هيتمسح' : 'مفيش طلبات') + '</small></span></label>'; };
+      openModal('🧹 ريست طلبات ' + esc(c.name),
+        '<p class="ax-modal-lead">اختار تمسح إيه من صفحة المركز ومن «الطلبات». الحسابات والفواتير والصرف مش بتتأثر.</p>' +
+        '<div class="cl-rsl">' + row('order', '📦', 'طلبات الورق', n.order) + row('maint', '🛠', 'طلبات الصيانة (والصور)', n.maint) + '</div>',
+        '<button class="btn btn-primary" id="cl-rs-go"' + (n.order || n.maint ? '' : ' disabled') + '>🧹 اعمل ريست</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+      var go = document.getElementById('cl-rs-go');
+      if (go) go.onclick = function () {
+        var kinds = [].map.call(document.querySelectorAll('.cl-rs input:checked'), function (i) { return i.value; });
+        if (!kinds.length) return T('اختار ورق أو صيانة', 'error');
+        api('POST', '/reset', { cid: cid, kinds: kinds }).then(function (r) {
+          if (typeof closeModal === 'function') closeModal();
+          ui.rq = null; T('🧹 اتمسح ' + r.n + ' طلب — صفحة المركز بقت نضيفة'); refreshCount(); render();
+        }).catch(function (e) { T(e.message, 'error'); });
+      };
+    }).catch(function (e) { T(e.message, 'error'); });
+  }
+
   /* ── actions ── */
   function save(p) { S()._portal = p; if (typeof DB !== 'undefined' && DB.save) DB.save(); }
   function make(cid) { var p = Object.assign({}, links()); p[cid] = newToken(); save(p); ui.open[cid] = true; T('اتعمل اللينك ✅ — والباركود بتاعه جاهز «▦ باركود»'); render(); }
@@ -530,7 +554,7 @@
   };
   window.AXClients = {
     render: render, make: make, makeAll: makeAll, shortAll: shortAll, rotate: rotate, stop: stop, copy: copy, wa: wa,
-    st: setSt, del: del, _pop: showPop, assign: assign, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, stockShow: stockShow, stockToggle: stockToggle, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
+    st: setSt, del: del, _pop: showPop, assign: assign, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, reset: resetModal, stockShow: stockShow, stockToggle: stockToggle, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
     tab: function (t) { ui.tab = t; if (t === 'req') ui.rq = null; render(); },
     rf: function (f) { ui.rf = f; render(); },
     grp: function (k) { ui.grp[k] = !ui.grp[k]; render(); },
