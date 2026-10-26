@@ -122,21 +122,31 @@ test('I11: offline, a wrong password never opens the saved copy', async ({ page,
 });
 
 test('I11: offline, one user can never open another user\'s saved copy on a shared device', async ({ page, server, context }) => {
+  /* three full app starts, a service-worker install (~80 files) and an offline reload: under the whole suite's load this
+     takes longer than an ordinary test — the budget is sized for that (test.slow), no assertion is relaxed */
+  test.slow();
   /* the clerk signs in once (his offline check is stored), then the admin uses the same device without signing out the clerk first */
   await formLogin(page, server.base, USERS.sales.username, USERS.sales.password);
-  await page.waitForTimeout(1500);
+  await page.waitForFunction(u => { try { return !!JSON.parse(localStorage.getItem('emx_offline_auth') || '{}')[u]; } catch (_) { return false; } }, USERS.sales.username);   // the clerk's offline check is stored
   await page.evaluate(() => { localStorage.removeItem('emx_tok'); });
   await context.clearCookies();
   await formLogin(page, server.base, 'admin', ADMIN_PASSWORD);
-  await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, null, { timeout: 15_000 });
-  await page.waitForTimeout(2000);
+  /* Phase 7.1 · wait for the real states the offline reload needs, not for fixed times (under the full suite's load the
+     service worker's install — it caches ~80 files — took longer than the old 15 s poll):
+     the worker is active and controls this page (so its app-shell cache is complete), and the admin's offline copy is written */
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+    if (!navigator.serviceWorker.controller) await new Promise(r => navigator.serviceWorker.addEventListener('controllerchange', r, { once: true }));
+  });
+  await page.waitForFunction(() => OfflineManager.snapshotStatus.ok === true && !!JSON.parse(localStorage.getItem('emx_offline_auth') || '{}').admin);
+  await page.evaluate(() => OfflineManager.snapshotSettled());
   await context.setOffline(true);
   await page.reload().catch(() => {});
   await expect(page.locator('#login-page')).toBeVisible({ timeout: 15_000 });
   await page.fill('#login-username', USERS.sales.username);
   await page.fill('#login-password', USERS.sales.password);
   await page.click('#login-form button[type=submit], #login-form .lgn-btn');
-  await page.waitForTimeout(2500);
+  await expect(page.locator('.toast.error', { hasText: 'مفيش اتصال بالسيرفر' })).toBeVisible();   // the offline attempt has finished: refused (the warning at reload is another toast)
   await expect(page.locator('#app')).toBeHidden();          // the saved copy is the admin's — the clerk's password does not open it
   await context.setOffline(false);
 });
