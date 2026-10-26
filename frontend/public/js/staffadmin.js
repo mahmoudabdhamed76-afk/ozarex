@@ -32,7 +32,7 @@
   function dmy(d) { var p = String(d).split('-'); return (+p[2]) + '/' + (+p[1]); }
   function api(method, path, body) {
     return fetch(API + '/api/staff' + path, { method: method, credentials: 'same-origin', cache: 'no-store', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
-      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error((j && j.message) || 'محصلش — جرّب تاني'); return j; }); });
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (r.status === 423 && !/\/lock/.test(path)) { setTimeout(lockScreen, 0); throw new Error((j && j.message) || 'مقفول'); } if (!r.ok) throw new Error((j && j.message) || 'محصلش — جرّب تاني'); return j; }); });
   }
   function link(u) { return (/^https?:/i.test(API) ? API : location.origin + API).replace(/\/$/, '') + '/staff' + (u ? '?u=' + encodeURIComponent(u) : ''); }
   function maps(lat, lng) { return 'https://www.google.com/maps?q=' + lat + ',' + lng; }
@@ -380,13 +380,35 @@
   });
 
   /* ════════ page ════════ */
+  /* 4.71 · قفل بباسوورد */
+  function lockScreen() {
+    var root = document.getElementById('page-content'); if (!root) return;
+    clearInterval(S.timer); S.boot = null; S.unlocked = false;
+    root.innerHTML = '<div class="page-header stf-head"><div><h2 class="page-title">الموظفين</h2><p class="page-subtitle">القسم ده محمي بباسوورد</p></div></div>' +
+      '<div class="card stf-form stf-lock"><div class="stf-lk">🔒</div><div class="form-group"><label>باسوورد قسم الموظفين</label><input class="form-control" id="lk-p" type="password" autocomplete="off" placeholder="اكتب الباسوورد"></div>' +
+      '<button class="btn btn-primary" id="lk-go">فتح</button><div class="stf-sub" id="lk-e" style="color:#e5484d;margin-top:8px"></div></div>';
+    var go = function () {
+      api('POST', '/lock/open', { password: document.getElementById('lk-p').value }).then(function () { S.unlocked = true; render(); })
+        .catch(function (e) { var x = document.getElementById('lk-e'); if (x) x.textContent = e.message; var i = document.getElementById('lk-p'); if (i) { i.value = ''; i.focus(); } });
+    };
+    document.getElementById('lk-go').onclick = go; document.getElementById('lk-p').onkeydown = function (e) { if (e.key === 'Enter') go(); };
+    setTimeout(function () { var i = document.getElementById('lk-p'); if (i) i.focus(); }, 50);
+  }
+  function lockClose() { api('POST', '/lock/close', {}).then(function () { lockScreen(); }); }
+  function lockChange() {
+    openModal('🔑 تغيير باسوورد القسم', '<div class="form-group"><label>الباسوورد الحالي</label><input class="form-control" id="lc-o" type="password" autocomplete="off"></div>' +
+      '<div class="form-group"><label>الباسوورد الجديد (6 حروف على الأقل)</label><input class="form-control" id="lc-n" type="password" autocomplete="off"></div>' +
+      '<button class="btn btn-primary" id="lc-go">حفظ</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+    document.getElementById('lc-go').onclick = function () { api('POST', '/lock/change', { old: document.getElementById('lc-o').value, password: document.getElementById('lc-n').value }).then(function () { closeModal(); T('اتغيّر — اكتبه تاني للدخول'); lockScreen(); }).catch(function (e) { T(e.message, 'error'); }); };
+  }
   function render() {
     var root = document.getElementById('page-content'); if (!root) return;
+    if (!S.unlocked) { root.innerHTML = '<div class="stf-load">بنحمّل…</div>'; return api('GET', '/lock').then(function (r) { if (r.unlocked) { S.unlocked = true; render(); } else lockScreen(); }).catch(function () { lockScreen(); }); }
     clearInterval(S.timer);
     root.innerHTML =
       '<div class="page-header stf-head"><div><h2 class="page-title">الموظفين</h2><p class="page-subtitle">حضور وانصراف بالموقع من لينك خاص بكل موظف</p></div>' +
-      '<div class="page-actions"><button class="btn btn-secondary" data-a="link">🔗 اللينك</button><button class="btn btn-primary" data-a="new">＋ موظف</button></div></div>' +
-      '<div class="stf-tabs" id="stf-tabs">' + [['live', 'النهارده'], ['centers', 'المراكز'], ['faults', 'الأعطال'], ['emps', 'الموظفين'], ['report', 'التقرير'], ['cfg', 'الإعدادات']].map(function (t) {
+      '<div class="page-actions"><button class="btn btn-secondary" data-a="lockclose" title="اقفل القسم">🔒 قفل</button><button class="btn btn-secondary" data-a="lockchg" title="تغيير الباسوورد">🔑</button><button class="btn btn-secondary" data-a="link">🔗 اللينك</button><button class="btn btn-primary" data-a="new">＋ موظف</button></div></div>' +
+      '<div class="stf-tabs" id="stf-tabs">' + [['live', 'النهارده'], ['centers', 'المراكز'], ['faults', 'الأعطال'], ['emps', 'الموظفين'], ['report', 'التقرير'], ['pay', 'المرتبات'], ['cfg', 'الإعدادات']].map(function (t) {
         return '<button data-t="' + t[0] + '" class="' + (S.tab === t[0] ? 'on' : '') + '">' + t[1] + '</button>'; }).join('') + '</div>' +
       '<div id="stf-body"><div class="stf-load">بنحمّل…</div></div>';
     root.onclick = onClick;
@@ -404,6 +426,7 @@
     api('GET', '/bootstrap').then(function (b) {
       S.boot = b;
       if (S.tab === 'live') return api('GET', '/live').then(function (l) { S.live = l; keepTstat(l); S.fast = (l.tasks || []).some(function (t) { return t.status !== 'done' && t.status !== 'cancel'; }); paint(); S.timer = setInterval(refreshLive, S.fast ? 10000 : 30000); });
+      if (S.tab === 'pay') return api('GET', '/pay?month=' + (S.pmonth || '')).then(function (r) { S.pay = r; S.pmonth = r.month; paint(); });
       if (S.tab === 'report') return api('GET', '/report?month=' + (S.month || '')).then(function (r) { S.report = r; S.month = r.month; paint(); });
       if (S.tab === 'emps') return api('GET', '/rewards').then(function (r) { S.rewards = r; paint(); });
       if (S.tab === 'cfg') return api('GET', '/log').then(function (l) { S.logs = l.rows; paint(); });
@@ -427,7 +450,7 @@
   }
   function paint() {
     var body = document.getElementById('stf-body'); if (!body) return;
-    body.innerHTML = S.tab === 'live' ? liveHtml() : S.tab === 'centers' ? centersHtml() : S.tab === 'faults' ? faultsHtml() : S.tab === 'emps' ? empsHtml() : S.tab === 'report' ? reportHtml() : cfgHtml();
+    body.innerHTML = S.tab === 'live' ? liveHtml() : S.tab === 'centers' ? centersHtml() : S.tab === 'faults' ? faultsHtml() : S.tab === 'emps' ? empsHtml() : S.tab === 'report' ? reportHtml() : S.tab === 'pay' ? payHtml() : cfgHtml();
     if (S.tab === 'live' && S.live) { animSteps(); keepPrev(S.live); }
     if (S.tab === 'live' && S.live && S.live.list.length) drawLive(false);
     if (S.tab === 'centers' && S.visits) drawCenters();
@@ -609,8 +632,95 @@
       '<button class="btn btn-sm btn-secondary" data-a="here" title="خد موقعي الحالي">📍 هنا</button><button class="btn btn-sm btn-ghost" data-a="rmsite" title="حذف">✕</button></div>';
   }
 
+
+  /* ════════ 4.70 · المرتبات ════════ */
+  function mny(n) { n = Math.round((Number(n) || 0) * 100) / 100; return n.toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+  function payHtml() {
+    var P = S.pay, m = P.month.split('-'), T0 = P.totals;
+    var h = '<div class="stf-bar"><div class="stf-mn"><button class="btn btn-secondary btn-sm" data-a="ppm" data-d="-1">‹</button><b>' + MON[+m[1] - 1] + ' ' + m[0] + '</b><button class="btn btn-secondary btn-sm" data-a="ppm" data-d="1"' + (P.month >= today().slice(0, 7) ? ' disabled' : '') + '>›</button></div><div class="stf-spacer"></div>' +
+      '<button class="btn btn-secondary btn-sm" data-a="pcfg">⚙ قواعد الحساب</button><button class="btn btn-secondary btn-sm" data-a="pall">🖨 كشف الكل</button></div>';
+    h += '<div class="stf-stats"><div><b>' + mny(T0.net) + '</b><span>صافي المرتبات (ج)</span></div><div><b>' + mny(T0.salary) + '</b><span>أساسي</span></div><div><b>' + mny(T0.ot + T0.rewards + T0.bonus) + '</b><span>إضافي ومكافآت</span></div><div class="' + (T0.lateDed + T0.absDed + T0.ded ? 'st-out' : '') + '"><b>' + mny(T0.lateDed + T0.absDed + T0.ded) + '</b><span>خصومات</span></div><div><b>' + mny(T0.inst) + '</b><span>أقساط سلف</span></div></div>';
+    if (!P.rows.length) return h + '<div class="card stf-empty"><p>مفيش موظفين.</p></div>';
+    h += '<div class="card"><div class="table-scroll"><table class="data-table stf-table"><thead><tr><th>الموظف</th><th>الأساسي</th><th>تأخير</th><th>غياب</th><th>إضافي</th><th>مكافآت</th><th>بنود</th><th>قسط سلفة</th><th>الصافي</th><th></th></tr></thead><tbody>' +
+      P.rows.map(function (r) {
+        return '<tr class="ax-hl-off"><td><b>' + esc(r.name) + '</b><div class="stf-meta">' + esc(r.job) + ' · حضر ' + r.present + ' من ' + r.expected + '</div></td>' +
+          '<td>' + (r.set ? mny(r.salary) : '<span class="bad">مش محدد</span>') + ' <button class="btn btn-secondary btn-sm" data-a="psal" data-id="' + r.emp_id + '">✎</button></td>' +
+          '<td class="' + (r.lateDed ? 'bad' : '') + '">' + (r.lateDed ? '−' + mny(r.lateDed) + '<div class="stf-meta">' + r.lateMin + ' د</div>' : '—') + '</td>' +
+          '<td class="' + (r.absDed ? 'bad' : '') + '">' + (r.absDed ? '−' + mny(r.absDed) + '<div class="stf-meta">' + r.absent + ' يوم</div>' : '—') + '</td>' +
+          '<td>' + (r.ot ? '+' + mny(r.ot) : '—') + '</td><td>' + (r.rewards ? '+' + mny(r.rewards) : '—') + '</td>' +
+          '<td>' + ((r.bonus ? '+' + mny(r.bonus) : '') + ' ' + (r.ded ? '−' + mny(r.ded) : '') || '—') + '</td>' +
+          '<td class="' + (r.inst ? 'bad' : '') + '">' + (r.inst ? '−' + mny(r.inst) : '—') + '</td>' +
+          '<td><b>' + mny(r.net) + '</b></td>' +
+          '<td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" data-a="padj" data-id="' + r.emp_id + '" title="مكافأة / خصم">＋/−</button> <button class="btn btn-secondary btn-sm" data-a="ploan" data-id="' + r.emp_id + '" title="سلفة">💳</button> <button class="btn btn-secondary btn-sm" data-a="pslip" data-id="' + r.emp_id + '" title="طباعة كشف">🖨</button></td></tr>';
+      }).join('') + '</tbody></table></div></div>';
+    if (P.adjs.length) h += '<div class="card stf-form"><div class="card-header"><h3 class="card-title">بنود الشهر</h3></div>' + P.adjs.map(function (a) {
+      return '<div class="stf-rwi ax-hl-off"><span class="st">' + (a.kind === 'bonus' ? '➕' : '➖') + '</span><div><b>' + esc(a.emp_name) + ' · ' + mny(a.amount) + ' ج</b><small>' + esc(a.note || (a.kind === 'bonus' ? 'مكافأة' : 'خصم')) + '</small></div><button class="rd-x" data-a="padel" data-id="' + a.id + '" title="مسح">✕</button></div>'; }).join('') + '</div>';
+    if (P.loans.length) h += '<div class="card stf-form"><div class="card-header"><h3 class="card-title">💳 السلف الجارية</h3></div>' + P.loans.map(function (l) {
+      return '<div class="stf-rwi ax-hl-off"><span class="st">💳</span><div><b>' + esc(l.emp_name) + ' · ' + mny(l.total) + ' ج على ' + l.n + ' قسط (' + mny(l.per) + ')</b><small>اتسدد ' + mny(l.paid) + ' · باقي ' + mny(l.left) + ' · آخر قسط ' + l.end_month + (l.note ? ' · ' + esc(l.note) : '') + '</small></div><button class="rd-x" data-a="pldel" data-id="' + l.id + '" title="إيقاف">✕</button></div>'; }).join('') + '</div>';
+    return h + '<p class="stf-note">الحساب: اليوم = الأساسي ÷ ' + P.cfg.pay_days + '، والساعة = اليوم ÷ ساعات الوردية. التأخير والغياب والإضافي بيتحسبوا من الحضور والانصراف المسجّل تلقائي.</p>';
+  }
+  function salaryModal(id) {
+    var r = S.pay.rows.filter(function (x) { return x.emp_id === id; })[0]; if (!r) return;
+    openModal('💰 مرتب ' + esc(r.name), '<div class="form-group"><label>المرتب الأساسي الشهري (ج)</label><input class="form-control" id="ps-v" type="number" min="0" inputmode="decimal" value="' + (r.salary || '') + '"></div>' +
+      '<button class="btn btn-primary" id="ps-go">حفظ</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+    document.getElementById('ps-go').onclick = function () { api('POST', '/pay/salary', { emp_id: id, salary: document.getElementById('ps-v').value }).then(function () { closeModal(); T('اتحفظ'); load(); }).catch(function (e) { T(e.message, 'error'); }); };
+  }
+  function adjModal(id) {
+    var r = S.pay.rows.filter(function (x) { return x.emp_id === id; })[0]; if (!r) return; var kind = 'bonus';
+    openModal('➕➖ بند على ' + esc(r.name), '<div class="form-group"><label>النوع</label><div class="stf-seg" id="pa-k"><button type="button" data-k="bonus" class="on">➕ مكافأة / زيادة</button><button type="button" data-k="deduct">➖ خصم</button></div></div>' +
+      '<div class="form-group"><label>المبلغ (ج)</label><input class="form-control" id="pa-a" type="number" min="0" inputmode="decimal"></div>' +
+      '<div class="form-group"><label>السبب</label><input class="form-control" id="pa-n" maxlength="120" placeholder="مثلاً: عمولة تحصيل"></div>' +
+      '<button class="btn btn-primary" id="pa-go">حفظ</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+    [].forEach.call(document.querySelectorAll('#pa-k button'), function (b) { b.onclick = function () { kind = b.dataset.k; [].forEach.call(document.querySelectorAll('#pa-k button'), function (x) { x.classList.toggle('on', x === b); }); }; });
+    document.getElementById('pa-go').onclick = function () { api('POST', '/pay/adj', { emp_id: id, month: S.pay.month, kind: kind, amount: document.getElementById('pa-a').value, note: document.getElementById('pa-n').value }).then(function () { closeModal(); T('اتسجّل'); load(); }).catch(function (e) { T(e.message, 'error'); }); };
+  }
+  function loanModal(id) {
+    var r = S.pay.rows.filter(function (x) { return x.emp_id === id; })[0]; if (!r) return;
+    openModal('💳 سلفة لـ ' + esc(r.name), '<div class="form-group"><label>قيمة السلفة (ج)</label><input class="form-control" id="pl-t" type="number" min="0" inputmode="decimal"></div>' +
+      '<div class="form-group"><label>عدد الأقساط (شهور)</label><input class="form-control" id="pl-n" type="number" min="1" max="60" value="3"></div>' +
+      '<div class="form-group"><label>أول قسط من شهر</label><input class="form-control" id="pl-m" type="month" value="' + S.pay.month + '"></div>' +
+      '<div class="form-group"><label>ملاحظة</label><input class="form-control" id="pl-o" maxlength="120"></div><div class="stf-sub" id="pl-s"></div>' +
+      '<button class="btn btn-primary" id="pl-go">سجّل السلفة</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+    var sm = function () { var t = +document.getElementById('pl-t').value, n = +document.getElementById('pl-n').value; document.getElementById('pl-s').textContent = t > 0 && n > 0 ? 'القسط الشهري ≈ ' + mny(t / n) + ' ج' : ''; };
+    document.getElementById('pl-t').oninput = sm; document.getElementById('pl-n').oninput = sm;
+    document.getElementById('pl-go').onclick = function () { api('POST', '/pay/loan', { emp_id: id, total: document.getElementById('pl-t').value, n: document.getElementById('pl-n').value, start_month: document.getElementById('pl-m').value, note: document.getElementById('pl-o').value }).then(function () { closeModal(); T('اتسجّلت السلفة'); load(); }).catch(function (e) { T(e.message, 'error'); }); };
+  }
+  function payCfgModal() {
+    var c = S.pay.cfg;
+    openModal('⚙ قواعد حساب المرتب', '<div class="form-group"><label>أيام الشهر للحساب</label><input class="form-control" id="pc-d" type="number" min="20" max="31" value="' + c.pay_days + '"></div>' +
+      '<div class="form-group"><label>معامل خصم التأخير (1 = بالساعة العادية)</label><input class="form-control" id="pc-l" type="number" step="0.25" min="0" max="5" value="' + c.late_mult + '"></div>' +
+      '<div class="form-group"><label>معامل خصم الغياب (1 = يوم بيوم، 2 = يومين)</label><input class="form-control" id="pc-a" type="number" step="0.25" min="0" max="5" value="' + c.absent_mult + '"></div>' +
+      '<div class="form-group"><label>معامل الإضافي (1.5 = ساعة ونص)</label><input class="form-control" id="pc-o" type="number" step="0.25" min="0" max="5" value="' + c.ot_mult + '"></div>' +
+      '<button class="btn btn-primary" id="pc-go">حفظ</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+    document.getElementById('pc-go').onclick = function () { api('POST', '/pay/cfg', { pay_days: document.getElementById('pc-d').value, late_mult: document.getElementById('pc-l').value, absent_mult: document.getElementById('pc-a').value, ot_mult: document.getElementById('pc-o').value }).then(function () { closeModal(); T('اتحفظت'); load(); }).catch(function (e) { T(e.message, 'error'); }); };
+  }
+  /* a printable payslip — one employee, or everyone (one per page) */
+  function paySlip(id) {
+    var P = S.pay, list = P.rows.filter(function (r) { return !id || r.emp_id === id; }), m = P.month.split('-');
+    var row = function (k, v, c) { return '<tr><td>' + k + '</td><td class="' + (c || '') + '">' + v + '</td></tr>'; };
+    var html = '<!doctype html><html dir="rtl" lang="ar"><meta charset="utf-8"><title>كشف مرتب</title><style>body{font:15px Tahoma,Arial,sans-serif;margin:0;color:#111}.p{padding:28px 34px;page-break-after:always;max-width:640px;margin:auto}h1{font-size:20px;margin:0 0 4px}.s{color:#666;margin-bottom:16px}table{width:100%;border-collapse:collapse}td{padding:7px 4px;border-bottom:1px solid #ddd}td:last-child{text-align:left;font-weight:700;direction:ltr}.m{color:#b00}.pl{color:#070}.t td{border-top:2px solid #111;font-size:17px}.sg{display:flex;justify-content:space-between;margin-top:46px;color:#555}</style><body>' +
+      list.map(function (r) {
+        return '<div class="p"><h1>كشف مرتب — ' + esc(r.name) + '</h1><div class="s">' + esc(r.job || '') + ' · ' + MON[+m[1] - 1] + ' ' + m[0] + ' · حضر ' + r.present + ' من ' + r.expected + ' يوم</div><table>' +
+          row('المرتب الأساسي', mny(r.salary)) + (r.ot ? row('إضافي', '+' + mny(r.ot), 'pl') : '') + (r.rewards ? row('مكافآت وتقدير', '+' + mny(r.rewards), 'pl') : '') + (r.bonus ? row('مكافآت / زيادات', '+' + mny(r.bonus), 'pl') : '') +
+          (r.lateDed ? row('خصم تأخير (' + r.lateMin + ' دقيقة)', '−' + mny(r.lateDed), 'm') : '') + (r.absDed ? row('خصم غياب (' + r.absent + ' يوم)', '−' + mny(r.absDed), 'm') : '') + (r.ded ? row('خصومات أخرى', '−' + mny(r.ded), 'm') : '') + (r.inst ? row('قسط سلفة', '−' + mny(r.inst), 'm') : '') +
+          row('الصافي', mny(r.net) + ' ج').replace('<tr>', '<tr class="t">') + '</table><div class="sg"><span>توقيع المدير: ........................</span><span>توقيع الموظف: ........................</span></div></div>';
+      }).join('') + '<script>window.onload=function(){window.print()}<\/script></body></html>';
+    var w = window.open('', '_blank'); if (!w) return T('المتصفح منع نافذة الطباعة — اسمح بالنوافذ المنبثقة', 'error');
+    w.document.open(); w.document.write(html); w.document.close();
+  }
   /* ════════ actions ════════ */
   function act(a, id, d, el) {
+    if (a === 'ppm') { var q = S.pmonth.split('-'), dq = new Date(Date.UTC(+q[0], +q[1] - 1 + Number(d), 1)); S.pmonth = dq.getUTCFullYear() + '-' + p2(dq.getUTCMonth() + 1); return load(); }
+    if (a === 'lockclose') { S.unlocked = false; return lockClose(); }
+    if (a === 'lockchg') return lockChange();
+    if (a === 'psal') return salaryModal(id);
+    if (a === 'padj') return adjModal(id);
+    if (a === 'ploan') return loanModal(id);
+    if (a === 'pcfg') return payCfgModal();
+    if (a === 'pslip') return paySlip(id);
+    if (a === 'pall') return paySlip('');
+    if (a === 'padel') { if (!confirm('تمسح البند ده؟')) return; return api('POST', '/pay/adj/delete', { id: Number(id) }).then(function () { T('اتمسح'); load(); }).catch(function (e) { T(e.message, 'error'); }); }
+    if (a === 'pldel') { if (!confirm('توقف السلفة دي؟ الأقساط الجاية مش هتتخصم.')) return; return api('POST', '/pay/loan/delete', { id: Number(id) }).then(function () { T('اتوقفت'); load(); }).catch(function (e) { T(e.message, 'error'); }); }
     if (a === 'new') return empForm();
     if (a === 'edit') return empForm(id);
     if (a === 'send') return sendCreds(id);

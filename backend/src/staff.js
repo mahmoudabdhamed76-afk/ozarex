@@ -69,7 +69,7 @@ function centersAll() {
   _ccAt = Date.now();
   return _cc;
 }
-let X = null;
+let X = null, PAY = null;
 const centerByKey = k => centersAll().find(c => c.key === k) || null;
 function centersFor(e) { const all = centersAll(); return e && e.branch_id ? all.filter(c => c.branch === e.branch_id) : all; }
 const PURPOSES = ['توصيل ورق', 'تحصيل', 'متابعة / زيارة', 'صيانة / تجربة', 'استلام مرتجع', 'تاني'];
@@ -623,6 +623,33 @@ sweep(); setInterval(sweep, 6 * 3600e3).unref();
 /* 4.63 · notifications + بنك الأعطال + المهام */
 X = require('./staffx')({ db, nowLocal, tsMin, haversine, num, str, fail, centerByKey, centersAll, centerRadius, cfg, openRecord, log, logLoc, startVisit, endVisit, home });
 
+/* 4.70 · المرتبات */
+PAY = require('./staffpay')({ db, report, rulesOf, cfg, cfgSet, str, fail, log, nowLocal });
+
+
+/* 4.71 · قفل قسم الموظفين بباسوورد — كل /api/staff/* (غير /lock) محتاج فك القفل الأول. الباسوورد متخزّن hash مش نص. */
+const LOCK_DEFAULT = 'scrypt$aed76a4b8daed12078ec432e5262ce71$dc9b3939408837c7b451b54bc726c2a164a223252e6ce5d604667aeacbed5ec69af9f4912436f642dd59966e75650a7bff4ab2331fa2c2c61931fdb71bff3d3a';
+const UNLOCKED = new Map();                   // token -> { user, exp }
+const TRIES = new Map();                      // user -> { n, until }
+const LOCK_MS = 12 * 3600e3;
+function lockHash() { const r = db.prepare("SELECT value FROM staff_cfg WHERE key = 'lock_hash'").get(); return r ? r.value : LOCK_DEFAULT; }
+function cookieOf(req, k) { const m = new RegExp('(?:^|;\\s*)' + k + '=([^;]+)').exec(req.headers.cookie || ''); return m ? m[1] : ''; }
+function unlockedFor(req, user) {
+  const t = cookieOf(req, 'ozs_unlock'), x = t && UNLOCKED.get(t);
+  if (x && x.user === user && x.exp > Date.now()) return true;
+  if (x) UNLOCKED.delete(t);
+  return false;
+}
+function checkLock(pw, user) {
+  const tr = TRIES.get(user) || { n: 0, until: 0 };
+  if (tr.until > Date.now()) fail(429, 'حاولت كتير — استنى دقيقتين وجرّب تاني');
+  if (!require('./auth').verifyPassword(String(pw || ''), lockHash())) {
+    tr.n++; if (tr.n >= 5) { tr.n = 0; tr.until = Date.now() + 120e3; } TRIES.set(user, tr);
+    fail(403, 'الباسوورد غلط');
+  }
+  TRIES.delete(user);
+}
+
 /* the employee's photo as an image (the admin's list, the map, his own header) */
 function sendPhoto(res, e) {
   const m = e && e.photo ? /^data:(image\/[a-z]+);base64,(.+)$/.exec(e.photo) : null;
@@ -716,6 +743,23 @@ async function handleAdmin(req, res, pathname, me, h) {
     const p = pathname.slice('/api/staff'.length) || '/';
     const get = req.method === 'GET';
     const body = async () => (await readBody(req, 0.05)) || {};
+    const sec = '; Path=/; HttpOnly; SameSite=Strict' + (/^https/i.test(String(req.headers['x-forwarded-proto'] || '')) ? '; Secure' : '');
+    if (get && p === '/lock') return sendJSON(res, 200, { unlocked: unlockedFor(req, who) });
+    if (p === '/lock/open' && req.method === 'POST') {
+      checkLock((await body()).password, who);
+      const t = crypto.randomBytes(24).toString('hex'); UNLOCKED.set(t, { user: who, exp: Date.now() + LOCK_MS });
+      for (const [k, v] of UNLOCKED) if (v.exp < Date.now()) UNLOCKED.delete(k);
+      log(who, 'lock.open');
+      return sendJSON(res, 200, { ok: true }, { 'Set-Cookie': 'ozs_unlock=' + t + sec + '; Max-Age=' + LOCK_MS / 1000 });
+    }
+    if (p === '/lock/close' && req.method === 'POST') { UNLOCKED.delete(cookieOf(req, 'ozs_unlock')); return sendJSON(res, 200, { ok: true }, { 'Set-Cookie': 'ozs_unlock=' + sec + '; Max-Age=0' }); }
+    if (!unlockedFor(req, who)) return sendJSON(res, 423, { error: 'locked', message: 'قسم الموظفين مقفول — اكتب الباسوورد' });
+    if (p === '/lock/change' && req.method === 'POST') {
+      const b = await body(); checkLock(b.old, who);
+      const n = String(b.password || ''); if (n.length < 6 || n.length > 100) fail(400, 'الباسوورد الجديد من 6 حروف على الأقل');
+      cfgSet('lock_hash', require('./auth').hashPassword(n)); UNLOCKED.clear(); log(who, 'lock.change');
+      return sendJSON(res, 200, { ok: true }, { 'Set-Cookie': 'ozs_unlock=' + sec + '; Max-Age=0' });
+    }
     if (get && p === '/bootstrap') return sendJSON(res, 200, bootstrap());
     if (get && p === '/live') return sendJSON(res, 200, live());
     if (get && p === '/photo') return sendPhoto(res, db.prepare('SELECT * FROM staff_emp WHERE id = ?').get(str(q.get('id'), 20)));
@@ -732,6 +776,7 @@ async function handleAdmin(req, res, pathname, me, h) {
       if (p === '/center') return sendJSON(res, 200, pinCenter(await body(), who));
       if (p === '/att/delete') return sendJSON(res, 200, delAtt((await body()).id, who));
     }
+    if (await PAY.route(req, res, p, who, body, (st, o) => sendJSON(res, st, o), q)) return;
     if (await X.adminRoute(req, res, p, who, body, (st, o) => sendJSON(res, st, o))) return;
     return sendJSON(res, 404, { error: 'not_found' });
   } catch (er) {
@@ -740,4 +785,4 @@ async function handleAdmin(req, res, pathname, me, h) {
   }
 }
 
-module.exports = { handlePublic, handleAdmin, setSource, setNotify: n => X.setNotify(n), _test: { nowLocal, calc, rulesOf, tsMin } };
+module.exports = { handlePublic, handleAdmin, setSource, setNotify: n => X.setNotify(n), _test: { payroll: m => PAY.payroll(m), nowLocal, calc, rulesOf, tsMin } };

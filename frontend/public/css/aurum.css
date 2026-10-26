@@ -6937,3 +6937,10 @@ html[dir=rtl] .rd-man { transform: translateX(50%); }
 @media (max-width: 600px) { .dy-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .stf-tl > div > span { width: 66px !important; white-space: nowrap; font-size: 12px; }
 .stf-wl { margin: 0 0 6px; padding-inline-start: 20px; line-height: 2; }
+
+/* 4.70 · المرتبات */
+.stf-seg{display:flex;gap:8px}.stf-seg button{flex:1;padding:10px;border-radius:12px;border:1px solid var(--ax-line,#ddd);background:transparent;color:inherit;font:inherit;cursor:pointer}
+.stf-seg button.on{background:var(--ax-accent,#e3342f);color:#fff;border-color:transparent}
+
+/* 4.71 · قفل الموظفين */
+.stf-lock{max-width:380px;margin:30px auto;text-align:center}.stf-lk{font-size:46px;margin-bottom:10px}
