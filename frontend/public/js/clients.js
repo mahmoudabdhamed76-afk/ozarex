@@ -15,11 +15,16 @@
   function T(m, t) { if (typeof toast === 'function') toast(m, t || 'success'); }
   function today() { var d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); }
   function base() { return typeof API_BASE !== 'undefined' && API_BASE ? API_BASE : location.origin; }
-  function url(tok) { return base().replace(/\/$/, '') + '/p/' + tok; }
+  function url(tok) { return base().replace(/\/$/, '') + (String(tok).length <= 12 ? '/c/' : '/p/') + tok; }
   function phoneOf(c) { try { return typeof normalizeEgyptianPhone === 'function' ? normalizeEgyptianPhone(c.phone) : String(c.phone || '').replace(/\D/g, ''); } catch (e) { return ''; } }
   function company() { return S().companyName || 'Ozarex'; }
   function links() { return S()._portal || {}; }
-  function newToken() { var a = new Uint8Array(24); (window.crypto || window.msCrypto).getRandomValues(a); return Array.from(a, function (b) { return b.toString(16).padStart(2, '0'); }).join(''); }
+  function newToken() {   // 4.73 · short code (8 letters/digits) → /c/xxxxxxxx
+    var AB = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789', used = {}, L = (S()._portal || {}), k, t;
+    for (k in L) used[L[k]] = 1;
+    do { var a = new Uint8Array(8); (window.crypto || window.msCrypto).getRandomValues(a); t = Array.from(a, function (b) { return AB.charAt(b % AB.length); }).join(''); } while (used[t]);
+    return t;
+  }
   function norm(s) { return String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/\s+/g, ' ').trim(); }
 
   function rows() {
@@ -52,7 +57,7 @@
       .sort(function (a, b) { return b.n - a.n || b.bal - a.bal || String(a.c.name).localeCompare(String(b.c.name), 'ar'); });
     root.innerHTML =
       '<div class="page-header"><div><h2 class="page-title">متابعة العملاء</h2><p class="page-subtitle">لينك لكل مركز يشوف منه فواتيره والورق اللي وصله باليوم أو بالشهر أو بالسنة — من غير ما يدخل البرنامج</p></div>' +
-      '<div class="page-actions">' + (all.length > on ? '<button class="btn btn-primary" onclick="AXClients.makeAll()">🔗 اعمل لينك لكل المراكز (' + (all.length - on) + ')</button>' : '') + '</div></div>' +
+      '<div class="page-actions">' + (all.some(function (r) { return r.tok && r.tok.length > 12; }) ? '<button class="btn btn-secondary" onclick="AXClients.shortAll()">✂ اختصر اللينكات الطويلة</button>' : '') + (all.length > on ? '<button class="btn btn-primary" onclick="AXClients.makeAll()">🔗 اعمل لينك لكل المراكز (' + (all.length - on) + ')</button>' : '') + '</div></div>' +
       '<div class="cl-st"><div><b>' + all.length + '</b><span>مركز</span></div><div class="ok"><b>' + on + '</b><span>ليهم لينك</span></div><div><b>' + (all.length - on) + '</b><span>من غير لينك</span></div></div>' +
       '<div class="cl-bar"><input class="form-control cl-q" placeholder="🔍 دوّر على مركز بالاسم أو التليفون" value="' + esc(ui.q) + '" oninput="AXClients.search(this.value)">' +
       '<div class="cl-seg">' + [['all', 'الكل'], ['on', 'ليهم لينك'], ['off', 'من غير لينك']].map(function (x) { return '<button class="' + (ui.f === x[0] ? 'on' : '') + '" onclick="AXClients.filter(\'' + x[0] + '\')">' + x[1] + '</button>'; }).join('') + '</div></div>' +
@@ -65,6 +70,11 @@
     var p = Object.assign({}, links()), n = 0;
     A('customers').forEach(function (c) { if (!p[c.id]) { p[c.id] = newToken(); n++; } });
     if (!n) return; save(p); T('اتعمل ' + n + ' لينك ✅'); render();
+  }
+  function shortAll() {
+    var go = function () { var p = Object.assign({}, links()), n = 0; Object.keys(p).forEach(function (k) { if (String(p[k]).length > 12) { S()._portal = p; p[k] = newToken(); n++; } }); save(p); T('اتختصر ' + n + ' لينك — ابعت اللينكات الجديدة للمراكز'); render(); };
+    var msg = 'هتتعمل لينكات قصيرة بدل الطويلة، واللينكات الطويلة القديمة هتقف — لازم تبعت الجديدة للمراكز. تكمل؟';
+    if (typeof confirmDialog === 'function') confirmDialog(msg, go); else if (confirm(msg)) go();
   }
   function rotate(cid) {
     var go = function () { var p = Object.assign({}, links()); p[cid] = newToken(); save(p); T('اتعمل لينك جديد — القديم وقف'); render(); };
@@ -90,7 +100,7 @@
     render();
   };
   window.AXClients = {
-    render: render, make: make, makeAll: makeAll, rotate: rotate, stop: stop, copy: copy, wa: wa,
+    render: render, make: make, makeAll: makeAll, shortAll: shortAll, rotate: rotate, stop: stop, copy: copy, wa: wa,
     filter: function (f) { ui.f = f; render(); },
     search: function (q) { ui.q = String(q || ''); clearTimeout(ui.t); ui.t = setTimeout(function () { render(); var i = document.querySelector('.cl-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 220); }
   };

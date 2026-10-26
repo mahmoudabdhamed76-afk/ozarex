@@ -27,6 +27,7 @@
   function phoneOf(c) { try { return typeof normalizeEgyptianPhone === 'function' ? normalizeEgyptianPhone(c.phone) : String(c.phone || '').replace(/\D/g, ''); } catch (e) { return ''; } }
   function company() { var s = S(); return s.companyName || 'Ozarex'; }
   function base() { return typeof API_BASE !== 'undefined' ? API_BASE : location.origin; }
+  function plink(tok) { return base().replace(/\/$/, '') + (String(tok).length <= 12 ? '/c/' : '/p/') + tok; }
   function daysTxt(n) { return n === 0 ? 'النهارده' : n === 1 ? 'يوم' : n === 2 ? 'يومين' : n + (n <= 10 ? ' أيام' : ' يوم'); }
 
   function rows() {
@@ -111,7 +112,7 @@
       st.rows.forEach(function (r) { L.push('   ' + dm(r.date) + ' — ' + r.label + ': ' + (r.debit ? money(r.debit) : '−' + money(r.credit))); });
     }
     var tok = (S()._portal || {})[cid];
-    if (tok) L.push('', '🔗 حسابكم كامل في أي وقت: ' + base() + '/p/' + tok);
+    if (tok) L.push('', '🔗 حسابكم كامل في أي وقت: ' + plink(tok));
     L.push('', 'شكراً لتعاملكم معانا 🙏');
     if (s.companyPhone) L.push('📞 ' + s.companyPhone);
     return L.join('\n');
@@ -147,13 +148,15 @@
   function statement(cid) { if (typeof viewCustomerStatement === 'function') viewCustomerStatement(cid); }
 
   /* ── the center's own link (read-only page on the server: /p/<token>) ── */
-  function newToken() {
-    var a = new Uint8Array(24); (window.crypto || window.msCrypto).getRandomValues(a);
-    return Array.from(a, function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+  function newToken() {   // 4.73 · short code (8 letters/digits) → /c/xxxxxxxx
+    var AB = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789', used = {}, L = (S()._portal || {}), k, t;
+    for (k in L) used[L[k]] = 1;
+    do { var a = new Uint8Array(8); (window.crypto || window.msCrypto).getRandomValues(a); t = Array.from(a, function (b) { return AB.charAt(b % AB.length); }).join(''); } while (used[t]);
+    return t;
   }
   function portal(cid) {
     var c = A('customers').find(function (x) { return x.id === cid; }); if (!c) return;
-    var tok = (S()._portal || {})[cid], url = tok ? base() + '/p/' + tok : '';
+    var tok = (S()._portal || {})[cid], url = tok ? plink(tok) : '';
     openModal('🔗 لينك ' + esc(c.name),
       '<p class="ax-modal-lead">صفحة للمركز يشوف فيها رصيده وأعمار الدين وآخر الحركات وكشف الحساب — قراءة بس، ومن غير ما يدخل البرنامج. اللينك سري: أي حد معاه يقدر يفتحه، فابعته للمركز بس.</p>' +
       (tok ? '<div class="ag-link"><input class="form-control" readonly value="' + esc(url) + '" onclick="this.select()"><button class="btn btn-secondary" onclick="AXAging.copy(\'' + esc(url) + '\')">نسخ</button></div>' +
@@ -181,7 +184,7 @@
   }
   function sendLink(cid) {
     var c = A('customers').find(function (x) { return x.id === cid; }); var tok = (S()._portal || {})[cid]; if (!c || !tok) return;
-    var txt = 'السلام عليكم ' + c.name + ' 🌿\nده لينك حسابكم عند *' + company() + '* — تقدروا تشوفوا منه الرصيد وكشف الحساب في أي وقت:\n' + base() + '/p/' + tok + '\nشكراً لتعاملكم معانا 🙏';
+    var txt = 'السلام عليكم ' + c.name + ' 🌿\nده لينك حسابكم عند *' + company() + '* — تقدروا تشوفوا منه الرصيد وكشف الحساب في أي وقت:\n' + plink(tok) + '\nشكراً لتعاملكم معانا 🙏';
     window.open('https://wa.me/' + phoneOf(c) + '?text=' + encodeURIComponent(txt), '_blank');
   }
 

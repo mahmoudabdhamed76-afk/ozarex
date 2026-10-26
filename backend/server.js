@@ -321,7 +321,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/api/version' && req.method === 'GET') { const vb = String(parsed.query.branch || 'main'); return sendJSON(res, 200, { version: branches.get(vb) ? verOf(vb) : verOf('main') }); }
     /* a center's own read-only page (token link) */
-    if (pathname.startsWith('/p/') && portal.handle(req, res, pathname, () => branches.allStores().map(st => st.data()))) return;   // 4.32 · a center's link works in any branch
+    if ((pathname.startsWith('/p/') || pathname.startsWith('/c/')) && portal.handle(req, res, pathname, () => branches.allStores().map(st => st.data()))) return;   // 4.32 · a center's link works in any branch
 
     /* 4.60 · الموظفين: the employee's own page (/staff) and its API — his own login, never the ERP's */
     if (pathname === '/staff/') { res.writeHead(302, { Location: APP_PATH + '/staff' }); return res.end(); }

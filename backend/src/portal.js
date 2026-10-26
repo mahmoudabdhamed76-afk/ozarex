@@ -18,7 +18,7 @@ function today() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: pro
 const dmy = ds => { if (!ds) return ''; const p = String(ds).slice(0, 10).split('-'); return (+p[2]) + '/' + (+p[1]) + '/' + p[0]; };
 
 function findCenter(d, token) {
-  if (!/^[a-f0-9]{32,64}$/.test(String(token || ''))) return null;
+  if (!/^[A-Za-z0-9]{8,64}$/.test(String(token || ''))) return null;   // 4.73 · short codes (/c/xxxxxxxx) or the old long ones
   const map = (d.settings && d.settings._portal) || {};
   const cid = Object.keys(map).find(k => map[k] === token);
   if (!cid) return null;
@@ -43,21 +43,21 @@ function periodOf(q, t) {
   const cut = v === 'year' ? t.slice(0, 4) : v === 'month' ? t.slice(0, 7) : t;
   return { v, d, t, label, prev: shift(-1), next: d < cut ? shift(1) : null, has: x => String(x || '').slice(0, d.length) === d };
 }
-function periodHtml(d, c, P, C, tok) {
+function periodHtml(d, c, P, C, tok, pre) {
   const iss = (d.issuances || []).filter(i => i.customerId === c.id && P.has(i.date)).sort((a, b) => String(b.date).localeCompare(String(a.date)) || (b.number || 0) - (a.number || 0));
   const inv = (d.invoices || []).filter(v => v.customerId === c.id && !v.archived && P.has(v.date)).sort((a, b) => String(b.date).localeCompare(String(a.date)) || (b.number || 0) - (a.number || 0));
   const pay = (d.payments || []).filter(x => x.customerId === c.id && P.has(x.date) && Number(x.amount) > 0).sort((a, b) => String(b.date).localeCompare(String(a.date)));
   const issVal = iss.reduce((t, i) => t + (Number(i.total) || 0), 0), payVal = pay.reduce((t, x) => t + (Number(x.amount) || 0), 0);
   const byP = {}; iss.forEach(i => { const k = (i.productName || 'صنف') + '|' + (i.productUnit || ''); const x = byP[k] || (byP[k] = { name: i.productName || 'صنف', unit: i.productUnit || '', qty: 0, val: 0 }); x.qty += Number(i.quantity) || 0; x.val += Number(i.total) || 0; });
   const st = (tot, paid) => { const r = (Number(tot) || 0) - (Number(paid) || 0); return r <= 0.5 ? '<span class="tg ok">مسدد</span>' : (Number(paid) || 0) > 0.5 ? '<span class="tg pt">باقي ' + num(r) + '</span>' : '<span class="tg no">آجل</span>'; };
-  const href = (v, dd) => '/p/' + tok + '?v=' + v + '&d=' + dd;
+  const href = (v, dd) => '/' + (pre || 'p') + '/' + tok + '?v=' + v + '&d=' + dd;
   const t = P.t, inP = P.has(t);
   const tabs = [['day', 'يوم', P.v === 'day' ? P.d : inP ? t : (P.v === 'month' ? P.d + '-01' : P.d + '-01-01')], ['month', 'شهر', P.v === 'year' ? (inP ? t.slice(0, 7) : P.d + '-01') : P.d.slice(0, 7)], ['year', 'سنة', P.d.slice(0, 4)]];
   const days = new Set(iss.map(i => i.date)).size;
   return `<nav class="per">
 <div class="seg">${tabs.map(x => `<a class="${P.v === x[0] ? 'on' : ''}" href="${href(x[0], x[2])}">${x[1]}</a>`).join('')}</div>
 <div class="mv"><a class="ar" href="${href(P.v, P.prev)}" aria-label="اللي قبله">‹</a><b>${esc(P.label)}</b>${P.next ? `<a class="ar" href="${href(P.v, P.next)}" aria-label="اللي بعده">›</a>` : '<span class="ar off">›</span>'}</div>
-${P.v === 'day' ? `<form class="pk" method="get" action="/p/${tok}"><input type="hidden" name="v" value="day"><input type="date" name="d" value="${P.d}" onchange="this.form.submit()"></form>` : ''}
+${P.v === 'day' ? `<form class="pk" method="get" action="/${pre || 'p'}/${tok}"><input type="hidden" name="v" value="day"><input type="date" name="d" value="${P.d}" onchange="this.form.submit()"></form>` : ''}
 </nav>
 <div class="facts f3"><div><span>الورق اللي وصلكم</span><b>${iss.length}</b><span>${iss.length ? 'عملية صرف' + (P.v !== 'day' ? ' في ' + days + ' يوم' : '') : 'مفيش صرف في الفترة دي'}</span></div>
 <div><span>قيمة المسحوب</span><b>${num(issVal)}</b><span>${esc(C)}</span></div>
@@ -70,7 +70,7 @@ ${Array.isArray(v.items) && v.items.length ? `<table><thead><tr><th>الصنف</
 ${pay.length ? `<section class="card"><h2>💵 التحصيلات</h2><table><thead><tr><th>التاريخ</th><th>الطريقة</th><th>المبلغ</th></tr></thead><tbody>${pay.map(x => `<tr><td class="n">${dmy(x.date)}</td><td>${esc(x.method || 'نقدي')}${x.reference ? ' · ' + esc(x.reference) : ''}</td><td class="n c">${num(x.amount)}</td></tr>`).join('')}</tbody></table></section>` : ''}`;
 }
 
-function page(d, c, q, tok) {
+function page(d, c, q, tok, pre) {
   const s = d.settings || {}, C = cur(s), t = today();
   const a = AX.aging(d, c.id, t), st = AX.statement(d, c.id, 60), P = periodOf(q, t);
   const due = Math.max(0, a.balance), total = a.buckets.reduce((x, v) => x + v, 0) || 1;
@@ -126,7 +126,7 @@ ${due > 0.5 ? `<div class="bar">${a.buckets.map((v, i) => v > 0 ? `<i style="wid
 </section>
 <div class="facts"><div><span>آخر دفعة</span><b>${a.lastPay ? num(a.lastPay.amount) + ' ' + esc(C) : '—'}</b><span>${a.lastPay ? dmy(a.lastPay.date) : ''}</span></div>
 <div><span>عدد الحركات</span><b>${st.count}</b><span>من أول التعامل</span></div></div>
-${periodHtml(d, c, P, C, tok)}
+${periodHtml(d, c, P, C, tok, pre)}
 <section class="card"><details class="stm"><summary>📒 كشف الحساب (آخر الحركات)</summary>${st.rows.length ? `<table><thead><tr><th>التاريخ</th><th>البيان</th><th>عليكم</th><th>دفعتم</th><th>الرصيد</th></tr></thead><tbody>
 ${st.rows.map(r => `<tr><td class="n">${dmy(r.date)}</td><td>${esc(r.label)}</td><td class="n d">${r.debit ? num(r.debit) : ''}</td><td class="n c">${r.credit ? num(r.credit) : ''}</td><td class="n">${num(r.balance)}</td></tr>`).join('')}
 </tbody></table>` : '<p style="color:var(--mut)">مفيش حركات لسه</p>'}</details></section>
@@ -142,14 +142,20 @@ function notFound() {
 }
 
 /* → true when handled */
+const MISS = new Map();
 function handle(req, res, pathname, data) {
-  const m = /^\/p\/([A-Za-z0-9]+)\/?$/.exec(pathname);
+  const m = /^\/[pc]\/([A-Za-z0-9]+)\/?$/.exec(pathname);
   if (!m || req.method !== 'GET') return false;
+  /* 4.73 · a short code is guessable only by trying a lot — too many wrong ones from one address → wait */
+  const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(), now = Date.now();
+  const miss = MISS.get(ip);
+  if (miss && miss.n >= 30 && now - miss.t < 600e3) { res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '600' }); res.end('حاولت كتير — جرّب بعد شوية'); return true; }
   /* 4.32 · data() may give one dataset or the list of every branch's: the token is looked up in each */
   const all = [].concat(data() || []);
   let d = all[0] || {}, c = null;
   for (const x of all) { const k = findCenter(x, m[1]); if (k) { d = x; c = k; break; } }
-  const html = c ? page(d, c, new URL(req.url, 'http://x').searchParams, m[1]) : notFound();
+  if (!c) { const x = MISS.get(ip); MISS.set(ip, x && now - x.t < 600e3 ? { n: x.n + 1, t: x.t } : { n: 1, t: now }); if (MISS.size > 5000) MISS.clear(); }
+  const html = c ? page(d, c, new URL(req.url, 'http://x').searchParams, m[1], pathname.charAt(1)) : notFound();
   const status = c ? 200 : 404;
   const headers = {
     'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow',
