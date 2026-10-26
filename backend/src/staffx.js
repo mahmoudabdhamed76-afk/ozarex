@@ -35,7 +35,7 @@ module.exports = function init(H) {
   CREATE INDEX IF NOT EXISTS ix_staff_reward ON staff_reward (emp_id, created_at);
   CREATE TABLE IF NOT EXISTS staff_fault_vote (fault_id INTEGER NOT NULL, who TEXT NOT NULL, at TEXT, PRIMARY KEY (fault_id, who));
   `);
-  try { const tc = db.prepare('PRAGMA table_info(staff_task)').all().map(c => c.name); if (!tc.includes('working_at')) db.exec('ALTER TABLE staff_task ADD COLUMN working_at TEXT'); if (!tc.includes('result')) db.exec('ALTER TABLE staff_task ADD COLUMN result TEXT'); } catch (e) { console.error('[staff] task cols', e.message); }
+  try { const tc = db.prepare('PRAGMA table_info(staff_task)').all().map(c => c.name); if (!tc.includes('working_at')) db.exec('ALTER TABLE staff_task ADD COLUMN working_at TEXT'); if (!tc.includes('result')) db.exec('ALTER TABLE staff_task ADD COLUMN result TEXT'); if (!tc.includes('portal_req')) db.exec('ALTER TABLE staff_task ADD COLUMN portal_req INTEGER'); } catch (e) { console.error('[staff] task cols', e.message); }
   try { if (!db.prepare('PRAGMA table_info(staff_visit)').all().some(c => c.name === 'task_id')) db.exec('ALTER TABLE staff_visit ADD COLUMN task_id INTEGER'); } catch (e) { console.error('[staff] task_id', e.message); }
 
   /* ───────── notifications ───────── */
@@ -153,6 +153,8 @@ module.exports = function init(H) {
 
   /* ───────── المهام «في الطريق» ───────── */
   const faultOfTask = id => { const f = db.prepare('SELECT f.code, f.title, f.solution FROM staff_fault f JOIN staff_visit v ON v.id = f.visit_id WHERE v.task_id = ? ORDER BY f.id DESC LIMIT 1').get(id); return f ? { code: f.code || '', title: f.title, solution: f.solution } : null; };
+  /* 4.83 · photos of the fault the center sent (portal_photo, made by portal.js) */
+  const photosOf = t => { if (!t || !t.portal_req) return 0; try { return db.prepare('SELECT COUNT(*) AS n FROM portal_photo WHERE req_id = ?').get(t.portal_req).n; } catch (e) { return 0; } };
   const taskOut = t => {
     const c = centerByKey(t.center_key), known = !!(c && c.lat != null);
     const pct = t.status === 'arrived' || t.status === 'done' ? 100 : (t.d0 && t.dist != null ? Math.max(0, Math.min(99, Math.round((1 - t.dist / Math.max(t.d0, 1)) * 100))) : 0);
@@ -164,14 +166,14 @@ module.exports = function init(H) {
       eta = Math.max(1, Math.round(t.dist / sp / 60));
     }
     return { id: t.id, emp_id: t.emp_id, center_key: t.center_key, center: t.center_name, title: t.title || '', note: t.note || '', status: t.status, created_at: t.created_at, created_by: t.created_by,
-      started_at: t.started_at, arrived_at: t.arrived_at, working_at: t.working_at || null, done_at: t.done_at, result: t.result || '', fault: faultOfTask(t.id), d0: t.d0, dist: t.dist, pct, eta, known, c_lat: known ? c.lat : null, c_lng: known ? c.lng : null, last_lat: t.last_lat, last_lng: t.last_lng, last_at: t.last_at };
+      started_at: t.started_at, arrived_at: t.arrived_at, working_at: t.working_at || null, done_at: t.done_at, photos: photosOf(t), result: t.result || '', fault: faultOfTask(t.id), d0: t.d0, dist: t.dist, pct, eta, known, c_lat: known ? c.lat : null, c_lng: known ? c.lng : null, last_lat: t.last_lat, last_lng: t.last_lng, last_at: t.last_at };
   };
   function createTask(b, who) {
     const e = db.prepare('SELECT * FROM staff_emp WHERE id = ? AND active = 1').get(str(b.emp_id, 20)); if (!e) fail(404, 'الموظف مش موجود');
     const c = centerByKey(str(b.center, 80)); if (!c) fail(404, 'المركز مش موجود');
     const title = str(b.title, 120) || 'زيارة ' + c.name;
-    const r = db.prepare('INSERT INTO staff_task (emp_id, center_key, center_name, title, note, status, created_at, created_by) VALUES (?,?,?,?,?,?,?,?)')
-      .run(e.id, c.key, c.name, title, str(b.note, 300), 'new', nowLocal().ts, who);
+    const r = db.prepare('INSERT INTO staff_task (emp_id, center_key, center_name, title, note, status, created_at, created_by, portal_req) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(e.id, c.key, c.name, title, str(b.note, 400), 'new', nowLocal().ts, who, b.portal_req ? Number(b.portal_req) : null);
     log(who, 'task.create', { emp: e.name, center: c.name });
     toEmps([e.id], { title: '📌 مهمة جديدة: ' + c.name, body: title + (b.note ? ' — ' + str(b.note, 80) : ''), tag: 'sp-task-' + r.lastInsertRowid, urgent: true });
     return { ok: true, id: Number(r.lastInsertRowid) };
@@ -375,6 +377,12 @@ module.exports = function init(H) {
     if (pathname === '/staff/api/push/key' && req.method === 'GET') return send(200, { key: webpush.publicKey(), devices: webpush.countFor('emp:' + e.id) }), true;
     if (pathname === '/staff/api/push/subscribe' && post) { const b = await body(); try { webpush.subscribe({ id: 'emp:' + e.id }, b.subscription, req.headers['user-agent']); } catch (er) { return send(400, { error: 'bad', message: 'الاشتراك ده مش صالح' }), true; } return send(200, { ok: true }), true; }
     if (pathname === '/staff/api/push/off' && post) { const b = await body(); webpush.unsubscribe(b.endpoint); return send(200, { ok: true }), true; }
+    if (pathname === '/staff/api/task/photo' && req.method === 'GET') {   // 4.83 · the fault photos, only for the employee the job belongs to
+      const t = db.prepare('SELECT * FROM staff_task WHERE id = ? AND emp_id = ?').get(Number(q.get('id')), e.id);
+      let ph = null; try { ph = t && t.portal_req ? db.prepare('SELECT * FROM portal_photo WHERE req_id = ? ORDER BY id LIMIT 1 OFFSET ?').get(t.portal_req, Math.max(0, Number(q.get('i')) || 0)) : null; } catch (er) {}
+      if (!ph) { res.writeHead(404); res.end(); return true; }
+      res.writeHead(200, { 'Content-Type': ph.mime || 'image/jpeg', 'Content-Length': ph.data.length, 'Cache-Control': 'private, max-age=86400' }); res.end(ph.data); return true;
+    }
     if (pathname === '/staff/api/faults' && req.method === 'GET') return send(200, searchFaults(q.get('q') || '', 'e:' + e.id)), true;
     if (pathname === '/staff/api/fault' && post) { const b = await body(); const id = addFault(e, b, null, null); if (!id) fail(400, 'اكتب العطل والحل'); return send(200, { ok: true, id }), true; }
     if (pathname === '/staff/api/fault/vote' && post) return send(200, vote((await body()).id, 'e:' + e.id, e.id)), true;

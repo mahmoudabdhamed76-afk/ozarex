@@ -21,6 +21,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS portal_req (
 CREATE INDEX IF NOT EXISTS ix_portal_req ON portal_req (customer_id, id);
 CREATE INDEX IF NOT EXISTS ix_portal_req_st ON portal_req (status, id);`);
 try { if (!db.prepare('PRAGMA table_info(portal_req)').all().some(c => c.name === 'kind')) db.exec("ALTER TABLE portal_req ADD COLUMN kind TEXT NOT NULL DEFAULT 'order'"); } catch (e) { console.error('[portal] kind', e.message); }
+db.exec('CREATE TABLE IF NOT EXISTS portal_photo (id INTEGER PRIMARY KEY AUTOINCREMENT, req_id INTEGER NOT NULL, mime TEXT, data BLOB NOT NULL, created_at TEXT); CREATE INDEX IF NOT EXISTS ix_portal_photo ON portal_photo (req_id, id);');
 const MSTATUS = { new: 'اتبعت — مستني فني', ok: 'اتحوّل لفني — جاي', sent: 'اتصلحت ✓', no: 'اتلغى' };
 const DEVICES = ['طابعة', 'جهاز الأشعة', 'كمبيوتر / سيستم', 'حاجة تانية'];
 const STATUS = { new: 'اتبعت — مستني التأكيد', ok: 'اتأكد — بيتجهز', sent: 'اتسلّم ✓', no: 'اتلغى' };
@@ -178,6 +179,10 @@ details.stm>summary{cursor:pointer;font-weight:700;font-size:15px;display:flex;a
 .go:disabled{opacity:.6}.omsg{margin-top:10px;font-size:14px;text-align:center}
 .or{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}.or:last-child{border-bottom:0}.or .dt{flex:1;font-size:13.5px}.or .dt small{display:block;color:var(--mut);font-size:12px}
 .dv{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}.dvb{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:9px 14px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}.dvb.on{background:#FFF7ED;border-color:#F97316;color:#C2410C}
+.phw{margin-top:10px}.phr{display:flex;gap:8px}.phb{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:1.5px dashed #F97316;background:#FFF7ED;color:#C2410C;border-radius:14px;padding:12px 8px;font-weight:800;font-size:14.5px;cursor:pointer}.phb.g{border-color:#94A3B8;background:#F8FAFC;color:#334155}
+.phs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.phs div{position:relative;width:88px;height:88px;border-radius:14px;overflow:hidden;box-shadow:var(--sh);animation:pop .4s cubic-bezier(.2,1.6,.4,1) both}.phs img{width:100%;height:100%;object-fit:cover;display:block}
+.phs button{position:absolute;top:4px;inset-inline-end:4px;width:24px;height:24px;border-radius:50%;border:0;background:rgba(15,23,42,.7);color:#fff;font-size:15px;line-height:24px;cursor:pointer;padding:0}.phs small{position:absolute;bottom:0;inset-inline:0;background:rgba(15,23,42,.6);color:#fff;font-size:10px;text-align:center;padding:1px}
+.phn{display:block;color:var(--faint);font-size:11.5px;margin-top:6px}
 .urg{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;font-weight:700;color:#B91C1C}.urg input{width:20px;height:20px;accent-color:#DC2626}
 .btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:14px;padding:11px 16px;background:var(--ink);color:#fff;font-weight:700;font-size:14px;font-family:inherit;cursor:pointer}
 .acts{display:flex;justify-content:center;margin-top:16px}.foot{margin-top:14px;font-size:12px;color:var(--faint);text-align:center}
@@ -210,10 +215,12 @@ ${orders.length ? `<div style="margin-top:14px"><h2 style="font-size:14px">طل�
 </section>
 
 <section class="card" id="maint"><h2>🛠 طلب صيانة</h2>
-<p class="mt">عندكم عطل؟ اكتبوا المشكلة والفني هيتواصل معاكم.</p>
+<p class="mt">عندكم عطل؟ اكتبوا الشكوى وصوّروا العطل، والفني هيتواصل معاكم.</p>
 <div class="oform" id="mform">
 <div class="dv">${DEVICES.map((x, i) => `<button type="button" class="dvb${i === 0 ? ' on' : ''}" onclick="pickDev(this)">${esc(x)}</button>`).join('')}</div>
-<textarea class="fld" id="m-pr" rows="3" maxlength="400" placeholder="اكتب المشكلة — مثلاً: الطابعة بتطلع الفيلم فاضي / بتسحب ورقتين"></textarea>
+<textarea class="fld" id="m-pr" rows="3" maxlength="400" placeholder="اكتب الشكوى — مثلاً: الطابعة بتطلع الفيلم فاضي / بتسحب ورقتين"></textarea>
+<div class="phw"><div class="phr"><label class="phb">📷 صوّر العطل<input type="file" accept="image/*" capture="environment" onchange="addPh(this)" hidden></label><label class="phb g">🖼 من الصور<input type="file" accept="image/*" multiple onchange="addPh(this)" hidden></label></div>
+<div class="phs" id="phs"></div><small class="phn">لحد 3 صور — الصورة بتتصغّر تلقائي قبل ما تتبعت</small></div>
 <label class="urg"><input type="checkbox" id="m-ur"> <span>🚨 مستعجل — الشغل واقف</span></label>
 <input class="fld" id="m-who" maxlength="60" placeholder="اسم اللي طالب ورقم تليفونه (اختياري)">
 <button class="go" id="m-go" type="button" onclick="sendMaint()">ابعت طلب الصيانة</button><div class="omsg" id="m-msg"></div>
@@ -251,11 +258,15 @@ try{var mo=document.querySelector('.mh a.on');if(mo)mo.parentNode.scrollLeft=mo.
 var P=${JSON.stringify(prods).replace(/</g, '\\u003c')},U=${JSON.stringify(self + '/order')};
 function opts(){return '<option value="">اختار الصنف…</option>'+P.map(function(p,i){return '<option value="'+i+'">'+p.name.replace(/[<&]/g,'')+(p.unit?' ('+p.unit.replace(/[<&]/g,'')+')':'')+'</option>'}).join('')}
 function addLine(){var d=document.createElement('div');d.className='ol';d.innerHTML='<select>'+opts()+'</select><input type="number" inputmode="numeric" min="1" placeholder="الكمية"><button class="x" type="button" aria-label="شيل" onclick="this.parentNode.remove()">×</button>';document.getElementById('olines').appendChild(d);}
+var PH=[];
+function shrink(f,cb){var u=URL.createObjectURL(f),im=new Image();im.onload=function(){var M=1024,w=im.naturalWidth,h=im.naturalHeight,k=Math.min(1,M/Math.max(w,h));var c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);var d=c.toDataURL('image/jpeg',0.5);if(d.length>1100000)d=c.toDataURL('image/jpeg',0.35);cb(d);};im.onerror=function(){URL.revokeObjectURL(u);cb(null)};im.src=u;}
+function addPh(inp){var fs=[].slice.call(inp.files||[]);inp.value='';fs.forEach(function(f){if(PH.length>=3)return;if(!/^image/.test(f.type||'image'))return;shrink(f,function(d){if(d&&PH.length<3){PH.push(d);drawPh();}});});}
+function drawPh(){document.getElementById('phs').innerHTML=PH.map(function(d,i){return '<div><img src="'+d+'" alt=""><button type="button" onclick="PH.splice('+i+',1);drawPh()">×</button><small>'+Math.round(d.length*0.75/1024)+' KB</small></div>'}).join('');}
 function pickDev(b){[].forEach.call(document.querySelectorAll('.dvb'),function(x){x.classList.toggle('on',x===b)});}
 function openMaint(){var f=document.getElementById('mform');if(!f.classList.contains('on')){f.classList.add('on');document.getElementById('m-open').style.display='none';}document.getElementById('maint').scrollIntoView({behavior:'smooth',block:'start'});setTimeout(function(){var t=document.getElementById('m-pr');if(t)t.focus()},400);}
 function sendMaint(){var pr=document.getElementById('m-pr').value.trim(),m=document.getElementById('m-msg');if(pr.length<3){m.textContent='اكتب المشكلة';m.style.color='#DC2626';return;}
 var d=document.querySelector('.dvb.on'),b=document.getElementById('m-go');b.disabled=true;b.textContent='بنبعت…';
-fetch(U.slice(0,-6)+'/maint',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device:d?d.textContent:'',problem:pr,urgent:document.getElementById('m-ur').checked,contact:document.getElementById('m-who').value})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.message||'محصلش');return j})})
+fetch(U.slice(0,-6)+'/maint',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device:d?d.textContent:'',problem:pr,urgent:document.getElementById('m-ur').checked,contact:document.getElementById('m-who').value,photos:PH})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.message||'محصلش');return j})})
 .then(function(){var o=document.createElement('div');o.className='done';o.innerHTML='<div><i>🛠</i><b>طلب الصيانة وصلنا</b><p class="mt">الفني هيتواصل معاكم في أقرب وقت</p></div>';document.body.appendChild(o);setTimeout(function(){location.reload()},1800);})
 .catch(function(e){m.textContent=e.message;m.style.color='#DC2626';b.disabled=false;b.textContent='ابعت طلب الصيانة';});}
 function openOrder(){var f=document.getElementById('oform');if(!f.classList.contains('on')){f.classList.add('on');document.getElementById('o-open').style.display='none';if(!document.querySelector('.ol'))addLine();}document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});}
@@ -315,10 +326,11 @@ function takeMaint(req, res, stores, tok) {
   const now = Date.now(), times = (ORD.get(tok) || []).filter(t => now - t < 3600e3);
   if (times.length >= 8) return send(429, { message: 'بعتّوا طلبات كتير — كلمونا لو مستعجلين' });
   let raw = '', size = 0;
-  req.on('data', ch => { size += ch.length; if (size > 20000) { req.destroy(); return; } raw += ch; });
+  req.on('data', ch => { size += ch.length; if (size > 3000000) { req.destroy(); return; } raw += ch; });   // 4.83 · up to 3 small photos
   req.on('end', () => {
     let b = {}; try { b = JSON.parse(raw || '{}'); } catch (e) { return send(400, { message: 'الطلب مش مفهوم' }); }
     const clean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
+    const photos = (Array.isArray(b.photos) ? b.photos : []).slice(0, 3).map(u => { const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(String(u || '')); if (!m) return null; const buf = Buffer.from(m[2], 'base64'); return buf.length > 200 && buf.length <= 900000 ? { mime: m[1], buf } : null; }).filter(Boolean);
     const problem = clean(b.problem, 400); if (problem.length < 3) return send(400, { message: 'اكتب المشكلة' });
     const device = DEVICES.includes(clean(b.device, 40)) ? clean(b.device, 40) : '';
     const urgent = !!b.urgent, contact = clean(b.contact, 60);
@@ -326,7 +338,8 @@ function takeMaint(req, res, stores, tok) {
     const r = db.prepare("INSERT INTO portal_req (branch, branch_name, customer_id, customer_name, items, note, contact, status, created_at, kind) VALUES (?,?,?,?,?,?,?,?,?, 'maint')")
       .run(found.st.id || 'main', found.st.name || '', found.c.id, String(found.c.name || '').slice(0, 120), JSON.stringify({ device, urgent }), problem, contact, 'new', nowTs());
     const id = Number(r.lastInsertRowid), head = (urgent ? '🚨 ' : '🛠 ') + 'طلب صيانة — ' + found.c.name;
-    try { NT.event('portal', { kind: 'maint', id, cid: found.c.id, branch: found.st.id || 'main', center: String(found.c.name || ''), device, problem, urgent, contact, text: head + ': ' + problem }); } catch (e) {}
+    photos.forEach(p => { try { db.prepare('INSERT INTO portal_photo (req_id, mime, data, created_at) VALUES (?,?,?,?)').run(id, p.mime, p.buf, nowTs()); } catch (e) {} });
+    try { NT.event('portal', { kind: 'maint', id, photos: photos.length, cid: found.c.id, branch: found.st.id || 'main', center: String(found.c.name || ''), device, problem, urgent, contact, text: head + ': ' + problem }); } catch (e) {}
     try { const ids = (NT.admins() || []).slice(0, 50); if (ids.length && NT.push) NT.push.send(ids, { title: head, body: (device ? device + ': ' : '') + problem, url: './?go=clients', tag: 'pmt-' + id, urgent: true }).catch(() => {}); } catch (e) {}
     try { if (NT.staff) { const emps = NT.staff.activeEmps().map(e => e.id); if (emps.length) NT.staff.toEmps(emps, { title: head, body: (device ? device + ': ' : '') + problem + ' — لو هتروح سجّل مهمة للمركز ده', tag: 'pmt-' + id, urgent }); } } catch (e) {}
     send(200, { ok: true });
@@ -334,13 +347,18 @@ function takeMaint(req, res, stores, tok) {
 }
 
 /* ── the admin side: /api/portal/* (server.js checks admin) ── */
-function rowOut(r) { let items = []; try { items = JSON.parse(r.items); } catch (e) {} return Object.assign({}, r, { items }); }
+function rowOut(r) { let items = []; try { items = JSON.parse(r.items); } catch (e) {} let photos = 0; try { photos = db.prepare('SELECT COUNT(*) AS n FROM portal_photo WHERE req_id = ?').get(r.id).n; } catch (e) {} return Object.assign({}, r, { items, photos }); }
 function adminApi(req, res, pathname, me, h) {
   const { sendJSON, readBody } = h, q = new URL(req.url, 'http://x').searchParams;
   if (req.method === 'GET' && pathname === '/api/portal/requests') {
     const st = q.get('status');
     const rows = (st === 'open' ? db.prepare("SELECT * FROM portal_req WHERE status IN ('new','ok') ORDER BY id DESC LIMIT 200").all() : db.prepare('SELECT * FROM portal_req ORDER BY id DESC LIMIT 200').all()).map(rowOut);
     return sendJSON(res, 200, { list: rows, newCount: db.prepare("SELECT COUNT(*) AS n FROM portal_req WHERE status = 'new'").get().n });
+  }
+  if (req.method === 'GET' && pathname === '/api/portal/photo') {
+    const ph = db.prepare('SELECT * FROM portal_photo WHERE req_id = ? ORDER BY id LIMIT 1 OFFSET ?').get(Number(q.get('req')), Math.max(0, Number(q.get('i')) || 0));
+    if (!ph) return sendJSON(res, 404, { error: 'not_found' });
+    res.writeHead(200, { 'Content-Type': ph.mime || 'image/jpeg', 'Content-Length': ph.data.length, 'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' }); res.end(ph.data); return;
   }
   if (req.method === 'GET' && pathname === '/api/portal/emps') return sendJSON(res, 200, { list: NT.staff ? NT.staff.activeEmps() : [] });
   if (req.method === 'POST' && pathname === '/api/portal/assign') {
@@ -351,7 +369,7 @@ function adminApi(req, res, pathname, me, h) {
       let it = {}; try { it = JSON.parse(r.items) || {}; } catch (e) {}
       const who = me.name || me.username || 'admin';
       try {
-        NT.staff.createTask({ emp_id: b.emp_id, center: (r.branch || 'main') + ':' + r.customer_id, title: '🛠 صيانة' + (it.device ? ' — ' + it.device : '') + (it.urgent ? ' (مستعجل)' : ''), note: r.note }, who);
+        NT.staff.createTask({ emp_id: b.emp_id, center: (r.branch || 'main') + ':' + r.customer_id, title: '🛠 صيانة' + (it.device ? ' — ' + it.device : '') + (it.urgent ? ' (مستعجل)' : ''), note: r.note, portal_req: r.id }, who);
       } catch (er) { return sendJSON(res, er.status || 400, { error: 'bad', message: er.staffMsg || er.message || 'محصلش' }); }
       const emp = (NT.staff.activeEmps() || []).find(e => e.id === String(b.emp_id));
       db.prepare("UPDATE portal_req SET status = 'ok', reply = ?, done_at = ?, done_by = ? WHERE id = ?").run('اتحوّل لـ ' + (emp ? emp.name : 'فني'), nowTs(), who, r.id);
@@ -372,7 +390,7 @@ function adminApi(req, res, pathname, me, h) {
     });
   }
   if (req.method === 'POST' && pathname === '/api/portal/request/delete') {
-    return readBody(req, 0.02).then(b => { db.prepare('DELETE FROM portal_req WHERE id = ?').run(Number((b || {}).id)); try { NT.event('portal', { kind: 'status' }); } catch (e) {} return sendJSON(res, 200, { ok: true }); });
+    return readBody(req, 0.02).then(b => { db.prepare('DELETE FROM portal_req WHERE id = ?').run(Number((b || {}).id)); db.prepare('DELETE FROM portal_photo WHERE req_id = ?').run(Number((b || {}).id)); try { NT.event('portal', { kind: 'status' }); } catch (e) {} return sendJSON(res, 200, { ok: true }); });
   }
   return sendJSON(res, 404, { error: 'not_found' });
 }

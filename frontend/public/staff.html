@@ -13,6 +13,7 @@
 <title>حضور وانصراف</title>
 <link rel="stylesheet" href="fonts/fonts.css">
 <style>
+.tph{display:flex;gap:8px;margin-top:10px}.tph img{width:86px;height:86px;object-fit:cover;border-radius:14px;display:block;border:2px solid rgba(249,115,22,.5)}
 /* 4.75 · no zoom on the phone */
 html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}@supports (-webkit-touch-callout:none){input,select,textarea{font-size:16px!important}}
 
@@ -539,6 +540,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       var nx = NEXT[t.status];
       var head = '<div class="row1"><span class="ic">📌</span><div style="flex:1;min-width:0"><div class="sub">' + (String(t.created_by || '').indexOf('emp:') === 0 ? 'مهمة سجّلتها' : 'مهمة من الإدارة') + '</div><div class="big">' + esc(t.center) + '</div></div></div>';
       var info = '<div class="sub">' + esc(t.title) + (t.note ? ' · ' + esc(t.note) : '') + (t.status === 'going' && t.dist != null ? ' · <b>باقي ' + kmText(t.dist) + '</b>' : '') + '</div>';
+      if (t.photos) { var pb = API + '/task/photo?id=' + t.id + '&i='; info += '<div class="tph">' + Array.apply(null, Array(Math.min(3, t.photos))).map(function (_, k) { return '<a href="' + pb + k + '" target="_blank"><img src="' + pb + k + '" alt="صورة العطل" loading="lazy"></a>'; }).join('') + '</div>'; }   // 4.83 · the photos the center sent
       var act = H.state !== 'in' ? '<div class="sub" style="margin-top:10px">سجّل حضورك الأول علشان تبدأ المهمة.</div>' : nx ? '<div class="acts"><button class="btn' + (nx[0] === 'done' ? ' okb' : '') + '" data-st="' + nx[0] + '" data-id="' + t.id + '">' + nx[1] + '</button></div>' : '';
       return '<div class="vc tk ' + t.status + '">' + head + info + stepsHtml(t) + act + '</div>';
     }).join('');

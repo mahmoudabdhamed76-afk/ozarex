@@ -143,7 +143,7 @@
       if (r.kind === 'maint') {
         var it = r.items && !Array.isArray(r.items) ? r.items : {}, MS = { new: 'جديد', ok: 'اتحوّل لفني', sent: 'اتصلحت', no: 'اتلغى' };
         return '<div class="cl-rq ' + r.status + '"><div class="h"><span class="cl-av" style="background:rgba(249,115,22,.15)">' + (it.urgent ? '🚨' : '🛠') + '</span><div><b>' + esc(r.customer_name) + ' — طلب صيانة</b><small>' + ago(r.created_at) + (r.branch_name ? ' · ' + esc(r.branch_name) : '') + (r.contact ? ' · ' + esc(r.contact) : '') + '</small></div><span class="cl-tg ' + r.status + '">' + MS[r.status] + '</span></div>' +
-          '<ul><li>' + (it.device ? '<span style="opacity:1;font-weight:800;color:#f59e0b">' + esc(it.device) + '</span>' : '') + '<span style="opacity:1">' + esc(r.note || '') + '</span></li></ul>' +
+          phStrip(r.id, r.photos, 'cl-ph') + '<ul><li>' + (it.device ? '<span style="opacity:1;font-weight:800;color:#f59e0b">' + esc(it.device) + '</span>' : '') + '<span style="opacity:1">' + esc(r.note || '') + '</span></li></ul>' +
           (it.urgent ? '<p class="nt" style="color:#f87171;font-weight:700">🚨 مستعجل — الشغل واقف</p>' : '') + (r.reply ? '<p class="nt" style="opacity:.7">👷 ' + esc(r.reply) + (r.done_by ? ' · بواسطة ' + esc(r.done_by) : '') + '</p>' : '') +
           '<div class="cl-a">' + (r.status === 'new' || r.status === 'ok' ? (EMPS ? empSel(r.id) + '<button class="btn btn-primary btn-sm" onclick="AXClients.assign(' + r.id + ', this.previousElementSibling)">👷 حوّل للموظف</button>' : '<span class="cl-note">بنحمّل الموظفين…</span>') +
             '<button class="btn btn-secondary btn-sm" onclick="AXClients.st(' + r.id + ',\'sent\')">✅ اتصلحت</button><button class="btn btn-ghost btn-sm" onclick="AXClients.st(' + r.id + ',\'no\')">إلغاء</button>' : '<button class="btn btn-ghost btn-sm" onclick="AXClients.del(' + r.id + ')">🗑 مسح</button>') +
@@ -256,6 +256,8 @@
       '.clp-sl .sr .q{font-weight:800;font-size:19px;color:#0F172A;font-variant-numeric:tabular-nums}.clp-sl .sr .u{font-size:12px;color:#64748B;margin-inline-start:3px}',
       '.clp-tg{font-size:11.5px;font-weight:800;border-radius:8px;padding:3px 9px;white-space:nowrap}',
       '.clp-pr{background:#FFF7ED;border:1px solid #FED7AA;color:#7C2D12;border-radius:16px;padding:14px 16px;font-size:17px;font-weight:700;line-height:1.6;margin:6px 0 4px;text-align:right;white-space:pre-wrap;animation:clpRow .45s .65s both}',
+      '.clp-ph{display:flex;gap:8px;justify-content:center;margin:8px 0 2px;animation:clpRow .45s .75s both}.clp-ph img{width:92px;height:92px;object-fit:cover;border-radius:14px;border:2px solid #FED7AA;display:block}',
+      '.cl-ph{display:flex;gap:8px;margin-top:10px}.cl-ph img{width:84px;height:84px;object-fit:cover;border-radius:12px;display:block;border:1px solid rgba(255,255,255,.15)}',
       '.clp-sel{flex:1.4;border:1px solid #CDEBD1!important;border-radius:14px!important;padding:11px 12px!important;font-family:inherit;font-size:15px!important;background:#fff!important;color:#1F2937!important;-webkit-text-fill-color:#1F2937}.clp-wait{flex:1;font-size:13px;color:#64748B;padding:10px}',
       '.clp-as{margin-top:2px}',
       '.clp-more{display:inline-block;margin-top:4px;font-size:13px;color:#fff;background:#ef4444;border-radius:999px;padding:3px 10px}'
@@ -333,10 +335,16 @@
       '<span class="late ' + dt + '">متأخر من ' + dtx + '</span>' +
       (m.last ? '<p class="mt2">آخر دفعة: ' + num(m.last.amount) + ' يوم ' + esc(String(m.last.date || '').split('-').reverse().join('/')) + '</p>' : '<p class="mt2">مفيش دفعات متسجلة</p>');
   }
+  function phStrip(id, n, cls) {
+    n = Number(n) || 0; if (!n) return '';
+    var b = base().replace(/\/$/, '') + '/api/portal/photo?req=' + id + '&i=';
+    var h = '<div class="' + cls + '">'; for (var i = 0; i < n; i++) h += '<a href="' + b + i + '" target="_blank" rel="noopener"><img src="' + b + i + '" alt="صورة العطل" loading="lazy"></a>';
+    return h + '</div>';
+  }
   function maintBody(m) {
     return '<h3>' + (m.urgent ? '🚨' : '🛠') + ' طلب صيانة</h3><p class="ctr">' + esc(m.center || '') + '</p>' +
       (m.device ? '<span class="late" style="background:#FFF7ED;color:#C2410C">' + esc(m.device) + '</span>' : '') + (m.urgent ? ' <span class="late hot">مستعجل — الشغل واقف</span>' : '') +
-      '<div class="clp-pr">' + esc(m.problem || '') + '</div>' + (m.contact ? '<p class="mt2">👤 ' + esc(m.contact) + '</p>' : '') +
+      '<div class="clp-pr">' + esc(m.problem || '') + '</div>' + phStrip(m.id, m.photos, 'clp-ph') + (m.contact ? '<p class="mt2">👤 ' + esc(m.contact) + '</p>' : '') +
       '<p class="mt2" style="margin-top:8px">وصل إشعار لكل الموظفين — حوّله لموظف معيّن يتسجّل عنده مهمة:</p>';
   }
   function dueTick(force) {
