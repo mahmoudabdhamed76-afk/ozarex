@@ -100,6 +100,7 @@
         ? '<div class="cl-l"><input readonly value="' + esc(url(r.tok)) + '" onclick="this.select()"><button class="btn btn-secondary btn-sm" onclick="AXClients.copy(\'' + c.id + '\')">نسخ</button></div>' +
           '<div class="cl-a"><a class="btn btn-secondary btn-sm" href="' + esc(url(r.tok)) + '" target="_blank" rel="noopener">👁 فتح</a>' +
           (ph ? '<button class="btn btn-secondary btn-sm cl-wa" onclick="AXClients.wa(\'' + c.id + '\')">واتساب</button>' : '') +
+          '<button class="btn btn-secondary btn-sm" onclick="AXClients.qr(\'' + c.id + '\')">▦ باركود</button>' +
           '<button class="btn btn-ghost btn-sm" onclick="AXClients.rotate(\'' + c.id + '\')">↻ لينك جديد</button>' +
           '<button class="btn btn-ghost btn-sm" onclick="AXClients.stop(\'' + c.id + '\')">⏸ إيقاف</button></div>'
         : '<div class="cl-a"><button class="btn btn-primary btn-sm" onclick="AXClients.make(\'' + c.id + '\')">🔗 اعمل لينك للمركز ده</button></div>') +
@@ -121,7 +122,7 @@
       '<button class="btn btn-secondary btn-sm" onclick="AXClients.dueTry()">جرّب</button><button class="btn ' + (dueOn() ? 'btn-ghost' : 'btn-primary') + ' btn-sm" onclick="AXClients.dueToggle()">' + (dueOn() ? 'إيقاف' : 'تشغيل') + '</button></div>' : '';
     return dueBar + '<div class="cl-st"><div><b>' + all.length + '</b><span>مركز ومستشفى</span></div><div class="ok"><b>' + allOn + '</b><span>ليهم لينك</span></div><div><b>' + (all.length - allOn) + '</b><span>من غير لينك</span></div></div>' +
       '<input class="cl-q" placeholder="🔍 دوّر على مركز بالاسم أو التليفون" value="' + esc(ui.q) + '" oninput="AXClients.search(this.value)">' +
-      group('on', '🔗 ليهم لينك', on, longN ? '<div class="cl-gx"><button class="btn btn-secondary btn-sm" onclick="AXClients.shortAll()">✂ اختصر ' + longN + ' لينك طويل</button></div>' : '') +
+      group('on', '🔗 ليهم لينك', on, (on.length || longN) ? '<div class="cl-gx">' + (on.length ? '<button class="btn btn-secondary btn-sm" onclick="AXClients.qrPrint()">🖨 اطبع باركود كل المراكز (' + allOn + ')</button>' : '') + (longN ? '<button class="btn btn-secondary btn-sm" onclick="AXClients.shortAll()">✂ اختصر ' + longN + ' لينك طويل</button>' : '') + '</div>' : '') +
       group('off', '⚪ من غير لينك', off, off.length ? '<div class="cl-gx"><button class="btn btn-primary btn-sm" onclick="AXClients.makeAll()">🔗 اعمل لينك لكل المراكز دي (' + (all.length - allOn) + ')</button></div>' : '') +
       '<p class="cl-note">دوس على أي مركز يتفتح لينكه. المركز بيشوف من اللينك: المستحق عليه، وكل شهر سحب كام واتحصّل منه كام برسم بياني، والورق اللي وصله، وفواتيره، وكشف حسابه — وكمان يقدر يطلب ورق.</p>';
   }
@@ -323,9 +324,70 @@
   });
   var tries = 0; (function boot() { if (typeof currentUser === 'undefined' || !currentUser) { if (++tries < 80) setTimeout(boot, 500); return; } refreshCount(); setInterval(refreshCount, 120000); })();
 
+
+  /* ── 4.80 · باركود (QR) لكل لينك — استيكر يتلزق على الطابعة؛ بيتعمل من اللينك الحالي، فلو اتعمل لينك جديد الباركود بيتغير معاه ── */
+  function withQR(cb) {
+    if (typeof qrcode === 'function') return cb();
+    var sc = document.createElement('script'); sc.src = base().replace(/\/$/, '') + '/vendor/qrcode.js';
+    sc.onload = function () { cb(); }; sc.onerror = function () { T('مش قادر أحمّل مولّد الباركود — اتأكد من النت', 'error'); };
+    document.head.appendChild(sc);
+  }
+  function qrSvg(text, px) {
+    var q = qrcode(0, 'M'); q.addData(text); q.make();
+    var n = q.getModuleCount(), m = 2, sz = n + m * 2, d = '';
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) d += 'M' + (c + m) + ' ' + (r + m) + 'h1v1h-1z';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + sz + ' ' + sz + '" width="' + px + '" height="' + px + '" shape-rendering="crispEdges"><rect width="' + sz + '" height="' + sz + '" fill="#fff"/><path d="' + d + '" fill="#0F172A"/></svg>';
+  }
+  function sticker(c, tok, big) {
+    var u = url(tok), logo = typeof S().companyLogo === 'string' && S().companyLogo.indexOf('data:image') === 0 ? S().companyLogo : '';
+    return '<div class="qs' + (big ? ' big' : '') + '"><div class="qs-h">' + (logo ? '<img src="' + esc(logo) + '" alt="">' : '') + '<b>' + esc(company()) + '</b></div>' +
+      '<div class="qs-c">' + esc(c.name) + '</div><div class="qs-q">' + qrSvg(u, big ? 240 : 170) + '</div>' +
+      '<div class="qs-t">📱 امسح الكود بكاميرا الموبايل</div><div class="qs-s">حسابكم · سحبكم كل شهر · اطلبوا ورق</div><div class="qs-u">' + esc(u.replace(/^https?:\/\//, '')) + '</div></div>';
+  }
+  var QS_CSS = '.qs{width:64mm;background:#fff;color:#0F172A;border:1.5px dashed #94A3B8;border-radius:5mm;padding:4mm 4mm 3.5mm;text-align:center;font-family:Tahoma,Arial,sans-serif;box-sizing:border-box;break-inside:avoid;page-break-inside:avoid}' +
+    '.qs.big{width:auto;max-width:340px;margin:auto;border-style:solid;border-color:#E2E8F0;padding:18px;border-radius:22px;box-shadow:0 12px 30px -18px rgba(15,23,42,.4)}' +
+    '.qs-h{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12px}.qs-h img{width:22px;height:22px;object-fit:contain;border-radius:5px}.qs-h b{font-size:13px}' +
+    '.qs-c{font-weight:800;font-size:15px;margin:2mm 0 1mm;line-height:1.3}.qs.big .qs-c{font-size:19px;margin:8px 0 4px}' +
+    '.qs-q svg{display:block;margin:0 auto;max-width:100%;height:auto}.qs-t{font-weight:700;font-size:12px;margin-top:1.5mm}.qs.big .qs-t{font-size:14px;margin-top:6px}' +
+    '.qs-s{font-size:10px;color:#475569;margin-top:.5mm}.qs.big .qs-s{font-size:12.5px}.qs-u{font-family:monospace;font-size:10.5px;color:#0F172A;direction:ltr;margin-top:1mm;letter-spacing:.3px}.qs.big .qs-u{font-size:13px;margin-top:6px}';
+  function qrModal(cid) {
+    var c = A('customers').filter(function (x) { return x.id === cid; })[0], tok = links()[cid]; if (!c || !tok) return;
+    withQR(function () {
+      if (!document.getElementById('qs-css')) { var st = document.createElement('style'); st.id = 'qs-css'; st.textContent = QS_CSS; document.head.appendChild(st); }
+      var body = '<div class="ax-hl-off" style="padding:6px 0">' + sticker(c, tok, true) + '<p style="font-size:12.5px;opacity:.7;text-align:center;margin:12px 0 0">اطبعه والزقه على الطابعة عند المركز. لو عملت «لينك جديد» الباركود القديم بيقف — اطبع الجديد.</p></div>';
+      var foot = '<button class="btn btn-primary" onclick="AXClients.qrPrint([\'' + cid + '\'])">🖨 اطبع الاستيكر</button><button class="btn btn-secondary" onclick="AXClients.qrPng(\'' + cid + '\')">⬇ صورة</button><button class="btn btn-ghost" onclick="closeModal()">قفل</button>';
+      if (typeof openModal === 'function') openModal('▦ باركود ' + esc(c.name), body, foot); 
+    });
+  }
+  function qrPrint(ids) {
+    var L = links(), list = (ids && ids.length ? ids : Object.keys(L)).map(function (id) { var c = A('customers').filter(function (x) { return x.id === id; })[0]; return c && L[id] ? { c: c, tok: L[id] } : null; }).filter(Boolean);
+    if (!list.length) return T('مفيش مراكز ليها لينك', 'info');
+    withQR(function () {
+      var w = window.open('', '_blank'); if (!w) return T('المتصفح منع نافذة الطباعة — اسمح بالنوافذ المنبثقة', 'error');
+      w.document.open();
+      w.document.write('<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>باركود المراكز</title><style>@page{size:A4;margin:8mm}body{margin:0;background:#fff}.g{display:flex;flex-wrap:wrap;gap:5mm;justify-content:center}' + QS_CSS + '</style></head><body><div class="g">' +
+        list.map(function (x) { return sticker(x.c, x.tok, false); }).join('') + '</div><script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>');
+      w.document.close();
+    });
+  }
+  function qrPng(cid) {
+    var c = A('customers').filter(function (x) { return x.id === cid; })[0], tok = links()[cid]; if (!c || !tok) return;
+    withQR(function () {
+      var q = qrcode(0, 'M'); q.addData(url(tok)); q.make();
+      var n = q.getModuleCount(), cell = 12, pad = 40, qs = n * cell, W = qs + pad * 2, H = qs + pad * 2 + 120;
+      var cv = document.createElement('canvas'); cv.width = W; cv.height = H; var g = cv.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.fillStyle = '#0F172A';
+      g.font = 'bold 30px Tahoma, Arial'; g.textAlign = 'center'; g.direction = 'rtl'; g.fillText(String(c.name).slice(0, 40), W / 2, 56);
+      for (var r = 0; r < n; r++) for (var k = 0; k < n; k++) if (q.isDark(r, k)) g.fillRect(pad + k * cell, 80 + r * cell, cell, cell);
+      g.font = '22px monospace'; g.direction = 'ltr'; g.fillText(url(tok).replace(/^https?:\/\//, ''), W / 2, 80 + qs + 40);
+      g.font = 'bold 20px Tahoma, Arial'; g.direction = 'rtl'; g.fillText('امسح الكود — حسابكم وطلب الورق', W / 2, 80 + qs + 76);
+      var a = document.createElement('a'); a.href = cv.toDataURL('image/png'); a.download = 'باركود-' + String(c.name).replace(/[\\/:*?"<>|]/g, '') + '.png'; document.body.appendChild(a); a.click(); a.remove();
+    });
+  }
+
   /* ── actions ── */
   function save(p) { S()._portal = p; if (typeof DB !== 'undefined' && DB.save) DB.save(); }
-  function make(cid) { var p = Object.assign({}, links()); p[cid] = newToken(); save(p); ui.open[cid] = true; T('اتعمل اللينك ✅'); render(); }
+  function make(cid) { var p = Object.assign({}, links()); p[cid] = newToken(); save(p); ui.open[cid] = true; T('اتعمل اللينك ✅ — والباركود بتاعه جاهز «▦ باركود»'); render(); }
   function makeAll() {
     var p = Object.assign({}, links()), n = 0;
     A('customers').forEach(function (c) { if (c && !c.archived && !p[c.id]) { S()._portal = p; p[c.id] = newToken(); n++; } });
@@ -338,7 +400,7 @@
       save(p); T('اتختصر ' + n + ' لينك — ابعت اللينكات الجديدة للمراكز'); render();
     });
   }
-  function rotate(cid) { ask('تعمل لينك جديد؟ اللينك القديم هيقف على طول.', function () { var p = Object.assign({}, links()); p[cid] = newToken(); save(p); T('اتعمل لينك جديد — القديم وقف'); render(); }); }
+  function rotate(cid) { ask('تعمل لينك جديد؟ اللينك القديم هيقف على طول.', function () { var p = Object.assign({}, links()); p[cid] = newToken(); save(p); T('اتعمل لينك جديد — القديم وقف، وده الباركود الجديد'); render(); setTimeout(function () { qrModal(cid); }, 450); }); }
   function stop(cid) { ask('توقف اللينك ده؟ المركز مش هيقدر يفتحه تاني.', function () { var p = Object.assign({}, links()); delete p[cid]; save(p); T('اللينك اتوقف', 'info'); render(); }); }
   function copy(cid) {
     var tok = links()[cid]; if (!tok) return; var u = url(tok);
@@ -374,7 +436,7 @@
   };
   window.AXClients = {
     render: render, make: make, makeAll: makeAll, shortAll: shortAll, rotate: rotate, stop: stop, copy: copy, wa: wa,
-    st: setSt, del: del, _pop: showPop, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
+    st: setSt, del: del, _pop: showPop, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
     tab: function (t) { ui.tab = t; if (t === 'req') ui.rq = null; render(); },
     rf: function (f) { ui.rf = f; render(); },
     grp: function (k) { ui.grp[k] = !ui.grp[k]; render(); },
