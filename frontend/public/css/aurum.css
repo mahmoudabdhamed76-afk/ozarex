@@ -6858,3 +6858,17 @@ html[dir=rtl] .rd-man { transform: translateX(50%); }
 .tk-x { font-size: 12.5px; color: var(--ax-muted); margin-top: 6px; line-height: 1.7; } .tk-x.ok { background: rgba(30,154,76,.1); color: inherit; border-radius: 10px; padding: 6px 10px; }
 .tk-x code { font: 700 11px monospace; background: rgba(128,128,128,.2); border-radius: 6px; padding: 1px 6px; direction: ltr; display: inline-block; }
 @media (prefers-reduced-motion: reduce) { .tk-st .cur i { animation: none; } }
+/* 4.65 · route button, self-registered tag, rewards */
+.tk-rt { flex: none; margin: 0 !important; padding: 4px 10px !important; font-size: 12px !important; }
+.tk-self { font-style: normal; font-size: 11px; font-weight: 700; color: #B7860B; background: rgba(247,193,45,.18); border-radius: 99px; padding: 1px 8px; margin-inline-start: 4px; }
+.stf-rwc { margin-bottom: 14px; }
+.stf-rwl { display: flex; flex-direction: column; gap: 6px; }
+.stf-rwi { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--ax-surface-2, rgba(128,128,128,.07)); }
+.stf-rwi .st { font-size: 13px; white-space: nowrap; } .stf-rwi > div { flex: 1; min-width: 0; } .stf-rwi b { display: block; font-size: 13.5px; } .stf-rwi small { color: var(--ax-muted); font-size: 12px; }
+.stf-rwi .sn { font-size: 11.5px; color: var(--ax-muted); white-space: nowrap; } .stf-rwi .sn.ok { color: #1E9A4C; font-weight: 700; }
+.stf-stars { display: flex; gap: 6px; direction: ltr; justify-content: flex-end; }
+.stf-stars button { border: 0; background: none; font-size: 32px; cursor: pointer; color: rgba(128,128,128,.4); line-height: 1; padding: 0 2px; transition: transform .15s; }
+.stf-stars button.on { color: #f7c12d; } .stf-stars button:active { transform: scale(1.25); }
+.stf-qk { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.stf-qk button { border: 1px solid var(--ax-line); background: transparent; color: inherit; border-radius: 99px; padding: 5px 11px; font-size: 12.5px; cursor: pointer; }
+@media (max-width: 768px) { .stf-rwi { flex-wrap: wrap; } }

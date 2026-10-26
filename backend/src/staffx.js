@@ -28,6 +28,11 @@ module.exports = function init(H) {
     id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT, title TEXT NOT NULL, solution TEXT NOT NULL, center_key TEXT, center_name TEXT,
     emp_id TEXT, emp_name TEXT, visit_id INTEGER, at TEXT NOT NULL, votes INTEGER NOT NULL DEFAULT 0
   );
+  CREATE TABLE IF NOT EXISTS staff_reward (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, emp_id TEXT NOT NULL, stars INTEGER NOT NULL DEFAULT 0, amount REAL NOT NULL DEFAULT 0, message TEXT,
+    created_at TEXT NOT NULL, created_by TEXT, seen_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS ix_staff_reward ON staff_reward (emp_id, created_at);
   CREATE TABLE IF NOT EXISTS staff_fault_vote (fault_id INTEGER NOT NULL, who TEXT NOT NULL, at TEXT, PRIMARY KEY (fault_id, who));
   `);
   try { const tc = db.prepare('PRAGMA table_info(staff_task)').all().map(c => c.name); if (!tc.includes('working_at')) db.exec('ALTER TABLE staff_task ADD COLUMN working_at TEXT'); if (!tc.includes('result')) db.exec('ALTER TABLE staff_task ADD COLUMN result TEXT'); } catch (e) { console.error('[staff] task cols', e.message); }
@@ -47,7 +52,7 @@ module.exports = function init(H) {
     webpush.send(list, { title: msg.title, body: msg.body || '', url: './staff', tag: msg.tag || undefined, urgent: !!msg.urgent }).catch(() => {});
   }
   const allEmpIds = except => db.prepare('SELECT id FROM staff_emp WHERE active = 1').all().map(r => r.id).filter(id => id !== except);
-  const hm = ts => String(ts || '').slice(11, 16);
+  const hm = ts => { const m = /(\d{2}):(\d{2})/.exec(String(ts || '').slice(11)); if (!m) return ''; const h = +m[1]; return '\u2066' + ((h % 12) || 12) + ':' + m[2] + (h < 12 ? ' AM' : ' PM') + '\u2069'; };
   const dur = m => { m = Math.max(0, Math.round(m)); return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
 
   /* called by staff.js after a real punch */
@@ -192,7 +197,7 @@ module.exports = function init(H) {
     return { ok: true };
   }
   function pingTask(e, b) {
-    const t = db.prepare("SELECT * FROM staff_task WHERE id = ? AND emp_id = ? AND status = 'going'").get(Number(b.id), e.id); if (!t) return { ok: false, stop: true };
+    const t = db.prepare("SELECT * FROM staff_task WHERE id = ? AND emp_id = ? AND status IN ('new','going','arrived','working')").get(Number(b.id), e.id); if (!t) return { ok: false, stop: true };
     const now = nowLocal(), open = openRecord(e.id, now); if (!open) return { ok: false, closed: true };
     const lat = num(b.lat), lng = num(b.lng); if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) fail(400, 'موقع غير صالح');
     const last = db.prepare('SELECT at FROM staff_loc WHERE emp_id = ? ORDER BY id DESC LIMIT 1').get(e.id);
@@ -208,7 +213,7 @@ module.exports = function init(H) {
     let d0 = t.d0; if (d0 == null && dist != null) d0 = dist;
     db.prepare('UPDATE staff_task SET dist = ?, d0 = ?, last_lat = ?, last_lng = ?, last_at = ?, speed = ? WHERE id = ?').run(dist, d0, lat, lng, now.ts, speed || null, t.id);
     let arrived = false;
-    if (dist !== null && dist <= Math.max(80, Math.min(centerRadius(), 250))) arrived = markArrived(e, t, now, dist);
+    if (t.status === 'going' && dist !== null && dist <= Math.max(80, Math.min(centerRadius(), 250))) arrived = markArrived(e, t, now, dist);
     return { ok: true, dist, arrived, task: taskOut(db.prepare('SELECT * FROM staff_task WHERE id = ?').get(t.id)) };
   }
   function markArrived(e, t, now, dist) {
@@ -253,6 +258,71 @@ module.exports = function init(H) {
     }
     fail(400, 'خطوة غير معروفة');
   }
+  /* 4.65 · the employee registers a job he is about to do → the manager is told */
+  function selfTask(e, b) {
+    const now = nowLocal();
+    if (!openRecord(e.id, now)) fail(409, 'سجّل حضورك الأول وبعدين سجّل المهمة');
+    const c = centerByKey(str(b.center, 80)); if (!c) fail(404, 'المركز مش موجود');
+    if (e.branch_id && c.branch !== e.branch_id) fail(403, 'المركز ده مش في فرعك');
+    const title = str(b.title, 120) || 'زيارة ' + c.name;
+    const r = db.prepare('INSERT INTO staff_task (emp_id, center_key, center_name, title, note, status, created_at, created_by) VALUES (?,?,?,?,?,?,?,?)')
+      .run(e.id, c.key, c.name, title, str(b.note, 300), 'new', now.ts, 'emp:' + e.name);
+    const id = Number(r.lastInsertRowid);
+    const lat = num(b.lat), lng = num(b.lng);
+    if (lat !== null && lng !== null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) { const open = openRecord(e.id, now); if (open) H.logLoc(e, open.id, now, lat, lng, num(b.acc), b.battery, 'route'); db.prepare('UPDATE staff_task SET last_lat = ?, last_lng = ?, last_at = ? WHERE id = ?').run(lat, lng, now.ts, id); }
+    toAdmins({ kind: 'task', title: '📌 ' + e.name + ' هيعمل مهمة في ' + c.name, body: title + (b.note ? ' — ' + str(b.note, 100) : ''), tag: 'sp-self-' + id, urgent: true });
+    return { ok: true, id };
+  }
+  /* the path of one job: every location from the moment it was given / registered until it was finished */
+  function routeOf(id) {
+    const t = db.prepare('SELECT t.*, e.name AS emp_name FROM staff_task t JOIN staff_emp e ON e.id = t.emp_id WHERE t.id = ?').get(Number(id)); if (!t) fail(404, 'المهمة مش موجودة');
+    const to = t.done_at || (t.status === 'cancel' ? t.done_at : null) || nowLocal().ts;
+    const points = db.prepare('SELECT at, lat, lng, acc, battery, kind FROM staff_loc WHERE emp_id = ? AND at >= ? AND at <= ? ORDER BY at').all(t.emp_id, t.created_at, to);
+    const c = centerByKey(t.center_key);
+    let km = 0; for (let i = 1; i < points.length; i++) km += haversine(points[i - 1].lat, points[i - 1].lng, points[i].lat, points[i].lng) / 1000;
+    return { task: Object.assign(taskOut(t), { emp: t.emp_name }), points, km: Math.round(km * 10) / 10, center: c && c.lat != null ? { name: c.name, lat: c.lat, lng: c.lng } : null };
+  }
+  /* «ريست» — wipe every job registered on one employee */
+  function resetTasks(empId, who) {
+    const e = db.prepare('SELECT * FROM staff_emp WHERE id = ?').get(str(empId, 20)); if (!e) fail(404, 'الموظف مش موجود');
+    const n = db.prepare('DELETE FROM staff_task WHERE emp_id = ?').run(e.id).changes;
+    db.prepare('UPDATE staff_visit SET task_id = NULL WHERE emp_id = ?').run(e.id);
+    log(who, 'task.reset', { emp: e.name, n: Number(n) });
+    return { ok: true, n: Number(n) };
+  }
+
+  /* ───────── 4.65 · المكافآت والتقدير ───────── */
+  const rewardOut = r => ({ id: r.id, emp_id: r.emp_id, emp: r.emp_name || '', stars: r.stars, amount: r.amount, message: r.message || '', created_at: r.created_at, created_by: r.created_by || '', seen_at: r.seen_at || null });
+  function giveReward(b, who) {
+    const e = db.prepare('SELECT * FROM staff_emp WHERE id = ? AND active = 1').get(str(b.emp_id, 20)); if (!e) fail(404, 'الموظف مش موجود');
+    const stars = Math.max(0, Math.min(5, Math.round(Number(b.stars) || 0))), amount = Math.max(0, Math.min(1e6, Math.round((Number(b.amount) || 0) * 100) / 100)), message = str(b.message, 400);
+    if (!stars && !amount && !message) fail(400, 'اكتب رسالة أو اختار نجوم أو مبلغ');
+    const r = db.prepare('INSERT INTO staff_reward (emp_id, stars, amount, message, created_at, created_by) VALUES (?,?,?,?,?,?)').run(e.id, stars, amount, message, nowLocal().ts, who);
+    log(who, 'reward', { emp: e.name, stars, amount });
+    toEmps([e.id], { title: '🏆 ' + (amount ? 'مكافأة ' + amount + ' ج' : 'تقدير من الإدارة') + (stars ? ' ' + '⭐'.repeat(stars) : ''), body: message || 'افتح التطبيق علشان تشوفها', tag: 'sp-rw-' + r.lastInsertRowid, urgent: true });
+    return { ok: true, id: Number(r.lastInsertRowid) };
+  }
+  function rewardsFor(empId) {
+    const now = nowLocal(), m = now.date.slice(0, 7);
+    const all = db.prepare('SELECT * FROM staff_reward WHERE emp_id = ? ORDER BY id DESC LIMIT 30').all(empId).map(rewardOut);
+    const month = all.filter(r => r.created_at.slice(0, 7) === m);
+    return { unseen: all.filter(r => !r.seen_at).reverse(), list: all.slice(0, 10), month: { n: month.length, amount: month.reduce((t, r) => t + r.amount, 0), stars: month.reduce((t, r) => t + r.stars, 0) } };
+  }
+  function seenReward(e, id) {
+    const r = db.prepare('SELECT * FROM staff_reward WHERE id = ? AND emp_id = ?').get(Number(id), e.id); if (!r) fail(404, 'مش موجودة');
+    if (!r.seen_at) {
+      db.prepare('UPDATE staff_reward SET seen_at = ? WHERE id = ?').run(nowLocal().ts, r.id);
+      toAdmins({ kind: 'seen', title: '👀 ' + e.name + ' شاف ' + (r.amount ? 'المكافأة (' + r.amount + ' ج)' : 'التقدير'), body: r.message ? String(r.message).slice(0, 80) : '', tag: 'sp-rws-' + r.id });
+    }
+    return { ok: true };
+  }
+  function rewardsList(month) {
+    const m = /^\d{4}-\d{2}$/.test(String(month || '')) ? month : nowLocal().date.slice(0, 7);
+    const rows = db.prepare("SELECT r.*, e.name AS emp_name FROM staff_reward r JOIN staff_emp e ON e.id = r.emp_id WHERE substr(r.created_at, 1, 7) = ? ORDER BY r.id DESC").all(m).map(rewardOut);
+    const by = {}; rows.forEach(r => { const x = by[r.emp_id] || (by[r.emp_id] = { emp_id: r.emp_id, emp: r.emp, n: 0, amount: 0, stars: 0 }); x.n++; x.amount += r.amount; x.stars += r.stars; });
+    return { month: m, list: rows, by: Object.values(by).sort((a, b) => b.stars - a.stars || b.amount - a.amount), total: rows.reduce((t, r) => t + r.amount, 0) };
+  }
+
   /* a visit started / ended on a task's center closes the loop */
   function visitStarted(e, visitId, centerKey, taskId) {
     let t = taskId ? db.prepare("SELECT * FROM staff_task WHERE id = ? AND emp_id = ? AND status IN ('new','going','arrived','working')").get(Number(taskId), e.id) : null;
@@ -287,6 +357,8 @@ module.exports = function init(H) {
     if (pathname === '/staff/api/tasks' && req.method === 'GET') return send(200, { tasks: tasksOf(e.id) }), true;
     if (pathname === '/staff/api/task/start' && post) return send(200, startTask(e, await body())), true;
     if (pathname === '/staff/api/task/ping' && post) return send(200, pingTask(e, await body())), true;
+    if (pathname === '/staff/api/task/self' && post) { selfTask(e, await body()); return send(200, { ok: true, home: H.home(e) }), true; }
+    if (pathname === '/staff/api/reward/seen' && post) { seenReward(e, (await body()).id); return send(200, { ok: true, rewards: rewardsFor(e.id) }), true; }
     if (pathname === '/staff/api/task/step' && post) { const b = await body(); stepTask(e, b); return send(200, { ok: true, tasks: tasksOf(e.id), home: H.home(e) }), true; }
     if (pathname === '/staff/api/task/arrive' && post) return send(200, arriveTask(e, await body())), true;
     return false;
@@ -295,9 +367,14 @@ module.exports = function init(H) {
     const q = new URL(req.url, 'http://x').searchParams, get = req.method === 'GET';
     if (get && p === '/faults') return send(200, Object.assign(searchFaults(q.get('q') || '', 'a:' + who), { recurring: recurring() })), true;
     if (get && p === '/tasks') return send(200, { tasks: board() }), true;
+    if (get && p === '/task/route') return send(200, routeOf(q.get('id'))), true;
+    if (get && p === '/rewards') return send(200, rewardsList(q.get('month'))), true;
     if (get && p === '/centers') return send(200, { list: centersAll().map(c => ({ key: c.key, name: c.name, branch: c.branch, known: c.lat != null })) }), true;
     if (req.method !== 'POST') return false;
     if (p === '/task') return send(200, createTask(await body(), who)), true;
+    if (p === '/task/reset') return send(200, resetTasks((await body()).emp_id, who)), true;
+    if (p === '/reward') return send(200, giveReward(await body(), who)), true;
+    if (p === '/reward/delete') { const b = await body(); db.prepare('DELETE FROM staff_reward WHERE id = ?').run(Number(b.id)); log(who, 'reward.delete', { id: b.id }); return send(200, { ok: true }), true; }
     if (p === '/task/cancel') return send(200, cancelTask((await body()).id, who)), true;
     if (p === '/fault/vote') return send(200, vote((await body()).id, 'a:' + who, null)), true;
     if (p === '/fault/delete') { const b = await body(); db.prepare('DELETE FROM staff_fault WHERE id = ?').run(Number(b.id)); db.prepare('DELETE FROM staff_fault_vote WHERE fault_id = ?').run(Number(b.id)); log(who, 'fault.delete', { id: b.id }); return send(200, { ok: true }), true; }
@@ -308,5 +385,5 @@ module.exports = function init(H) {
     }
     return false;
   }
-  return { stepTask, setNotify, onPunch, onVisit, addFault, tasksOf, board, visitStarted, visitEnded, publicRoute, adminRoute, recurring, searchFaults, toAdmins, toEmps };
+  return { rewardsFor, stepTask, setNotify, onPunch, onVisit, addFault, tasksOf, board, visitStarted, visitEnded, publicRoute, adminRoute, recurring, searchFaults, toAdmins, toEmps };
 };

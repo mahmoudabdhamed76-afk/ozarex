@@ -45,7 +45,8 @@ label{display:block;font-size:12.5px;color:var(--mut);margin:0 2px 6px;font-weig
 /* hero */
 .hero{background:var(--hero);color:var(--hero-ink);border-radius:28px;padding:22px 18px 20px;position:relative;overflow:hidden;box-shadow:0 0 0 1px var(--line)}
 .hero::before{content:"";position:absolute;inset:auto -30% -55% -30%;height:80%;background:radial-gradient(closest-side,rgba(224,27,15,.34),transparent);pointer-events:none}
-.hero .clk{font:800 44px/1.1 'Zain','IBM Plex Sans Arabic',sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.5px;text-align:center;direction:ltr}
+.wkt{font-size:15px!important}
+.hero .clk{font:800 38px/1.1 'Zain','IBM Plex Sans Arabic',sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.5px;text-align:center;direction:ltr}
 .hero .dt{text-align:center;color:var(--hero-mut);font-size:13px;margin-top:2px}
 .st{display:flex;justify-content:center;margin:14px 0 4px;position:relative}
 .stc{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:6px 13px;font-size:13px;font-weight:600;background:rgba(255,255,255,.09);color:var(--hero-ink)}
@@ -147,6 +148,21 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
 .fi .vt{margin-inline-start:auto;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer}.fi .vt.on{background:rgba(30,154,76,.14);border-color:var(--ok);color:var(--ok);font-weight:700}
 .bell{position:relative}.bell.on::after{content:"";position:absolute;top:7px;inset-inline-end:7px;width:8px;height:8px;border-radius:50%;background:var(--ok)}
 .pushb{display:flex;gap:10px;align-items:center;margin-top:12px;padding:12px 14px;border-radius:16px;border:1px dashed var(--line);background:var(--card);font-size:13px}.pushb .btn{width:auto;height:38px;padding:0 14px;font-size:13px;flex:none}
+/* 4.65 · المكافآت */
+.vc.rwd{border-color:rgba(247,193,45,.5);background:linear-gradient(180deg,rgba(247,193,45,.12),transparent 70%),var(--card)}.vc.rwd .ic{background:rgba(247,193,45,.2);font-size:18px}
+.rst{font-size:14px;color:#b7860b}
+.rwo{position:fixed;inset:0;z-index:999;background:rgba(8,6,6,.72);display:grid;place-items:center;padding:20px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);animation:rwIn .3s}
+@keyframes rwIn{from{opacity:0}}
+.rwf{position:absolute;inset:0;overflow:hidden;pointer-events:none}.rwf i{position:absolute;top:-40px;font-style:normal;animation:rwFall 3.2s ease-in forwards}
+@keyframes rwFall{to{transform:translateY(110vh) rotate(600deg)}}
+.rwb{position:relative;width:min(360px,100%);background:var(--card);border-radius:28px;padding:26px 22px 20px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.5);animation:rwPop .55s cubic-bezier(.2,1.5,.4,1)}
+@keyframes rwPop{from{transform:scale(.4);opacity:0}}
+.rwt{font-size:64px;line-height:1;animation:rwBob 1.6s ease-in-out infinite}@keyframes rwBob{50%{transform:translateY(-6px) rotate(-6deg)}}
+.rwb h2{margin:10px 0 6px;font-size:22px}.rwb p{margin:10px 0;font-size:15px;line-height:1.8}
+.rws{font-size:30px;letter-spacing:4px;color:var(--line)}.rws span{display:inline-block}.rws span.on{color:#f7c12d;animation:rwStar .5s backwards}
+@keyframes rwStar{from{transform:scale(0) rotate(-90deg)}}
+.rwa{font:800 40px/1.2 'Zain','IBM Plex Sans Arabic',sans-serif;color:var(--ok);margin-top:6px}.rwa small{font-size:16px}
+.rwby{display:block;color:var(--mut);font-size:12px;margin-bottom:14px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 </head>
@@ -154,7 +170,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
 <div class="w" id="app"></div>
 <div class="toast" id="toast"></div>
 <div class="sh" id="csh"><div class="bx">
-  <h2>إنت شغّال في أنهي مركز؟</h2>
+  <h2 id="csht">إنت شغّال في أنهي مركز؟</h2>
   <p class="hint" style="text-align:right;margin:0">الأقرب لمكانك فوق. اختار المركز وبعدين اختار إنت بتعمل إيه.</p>
   <input class="in" id="csq" placeholder="🔎 دوّر باسم المركز" style="margin-top:10px">
   <div class="cs" id="csl"><div class="empty">بنحمّل المراكز…</div></div>
@@ -238,7 +254,9 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   function srvNow() { return new Date(Date.now() + offset); }
   function syncClock(ts) { offset = Date.parse(ts.replace(' ', 'T') + 'Z') - Date.now(); }
   function p2(n) { return (n < 10 ? '0' : '') + n; }
-  function hm(ts) { return ts ? ts.slice(11, 16) : '—'; }
+  function h12(h, m, sec) { return '\u2066' + ((h % 12) || 12) + ':' + p2(m) + (sec != null ? ':' + p2(sec) : '') + (h < 12 ? ' AM' : ' PM') + '\u2069'; }
+  function t12(hhmm) { var t = String(hhmm || '').split(':'); return t.length < 2 ? '—' : h12(+t[0], +t[1]); }
+  function hm(ts) { if (!ts) return '—'; var t = String(ts).slice(11, 16).split(':'); return t.length < 2 ? '—' : h12(+t[0], +t[1]); }
   function dur(m) { m = Math.max(0, Math.round(m)); return p2(Math.floor(m / 60)) + ':' + p2(m % 60); }
   function tsMs(ts) { return Date.parse(ts.replace(' ', 'T') + 'Z'); }
 
@@ -329,9 +347,9 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       '<button class="ib bell' + (pushOn ? ' on' : '') + '" id="bbl" title="الإشعارات">🔔</button><button class="ib" id="bth" title="الوضع">' + ICON.sun + '</button><button class="ib" id="bpw" title="كلمة السر">' + ICON.key + '</button><button class="ib" id="bout" title="خروج">' + ICON.out + '</button></div>' +
       '<section class="hero"><div class="clk" id="clk">--:--:--</div><div class="dt">' + wd + ' ' + (+dd[2]) + ' ' + MONTHS[+dd[1] - 1] + ' ' + dd[0] + '</div>' +
       '<div class="st">' + stateChip() + '</div>' + bigBtn() +
-      '<div class="wk"><div><span>ميعاد الشغل</span><b>' + H.rules.start + ' - ' + H.rules.end + '</b></div><div><span>مدة الشغل النهارده</span><b id="wk">' + (H.rec ? dur(H.rec.worked) : '00:00') + '</b></div></div></section>' +
+      '<div class="wk"><div><span>ميعاد الشغل</span><b class="wkt">' + t12(H.rules.start) + ' ← ' + t12(H.rules.end) + '</b></div><div><span>مدة الشغل النهارده</span><b id="wk">' + (H.rec ? dur(H.rec.worked) : '00:00') + '</b></div></div></section>' +
       '<div class="loc" id="loc">' + ICON.pin + '<span>بنحدد موقعك…</span></div>' +
-      '<div id="tsk"></div><div id="vis"></div><button class="fbk" id="fbk"><span class="ic">🛠</span><span><b>بنك الأعطال</b><small>' + (H.faults ? H.faults + ' حل متسجّل — دوّر بالكود أو بالوصف' : 'سجّل أول حل واتشاركه مع زمايلك') + '</small></span></button><div id="pushb"></div>' +
+      '<div id="rwc"></div><div id="tsk"></div><div id="vis"></div><button class="fbk" id="fbk"><span class="ic">🛠</span><span><b>بنك الأعطال</b><small>' + (H.faults ? H.faults + ' حل متسجّل — دوّر بالكود أو بالوصف' : 'سجّل أول حل واتشاركه مع زمايلك') + '</small></span></button><div id="pushb"></div>' +
       (H.track ? '<p class="hint" style="margin:10px 6px 0;text-align:right">موقعك بيتبعت للإدارة كل ' + H.ping_min + ' دقيقة <b>وإنت في الشغل بس</b> (من تسجيل الحضور لحد الانصراف). سيب الصفحة مفتوحة، وبعد الانصراف مفيش أي تتبع.</p>' : '') +
       '<h2>الشهر ده</h2><div class="mn" id="mn"></div>' +
       '<h2>السجل <span class="sp"><button class="nv" id="mp">' + ICON.prev + '</button><b id="ml" style="font-size:13px;min-width:92px;text-align:center"></b><button class="nv" id="mnx">' + ICON.next + '</button></span></h2><div id="hl"></div>';
@@ -341,12 +359,12 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     $('pb').onclick = punch;
     $('mp').onclick = function () { shift(-1); }; $('mnx').onclick = function () { shift(1); };
     $('bbl').onclick = askPush; $('fbk').onclick = openFaults;
-    paintHist(); paintLoc(true); paintVisit(); paintTasks(); paintPushBanner();
+    paintHist(); paintLoc(true); paintVisit(); paintTasks(); paintPushBanner(); paintRewards(); showReward();
     clearInterval(clockTimer); tick(); clockTimer = setInterval(tick, 1000);
   }
   function tick() {
     var d = srvNow(), c = $('clk'); if (!c) return;
-    c.textContent = d.toISOString().slice(11, 19);
+    c.textContent = h12(d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds());
     if (H && H.state === 'in' && H.rec) { var w = $('wk'); if (w) w.textContent = dur((d.getTime() - tsMs(H.rec.in_at)) / 60000); }
     if (H && H.visit) { var vm = $('vmins'); if (vm) vm.textContent = dur((d.getTime() - tsMs(H.visit.start_at)) / 60000); }
   }
@@ -398,18 +416,19 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       el.innerHTML = '<div class="vc on"><div class="row1"><span class="ic">' + ICON.bld + '</span><div style="flex:1;min-width:0"><div class="sub">إنت شغّال دلوقتي في</div><div class="big">' + esc(v.center) + '</div></div></div>' +
         '<div class="sub">من ' + hm(v.start_at) + ' · <b id="vmins">' + dur(v.mins) + '</b>' + (v.purpose ? '<span class="pill g">' + esc(v.purpose) + '</span>' : '') + (v.far ? '<span class="pill r">بعيد ' + v.dist + ' م عن مكان المركز</span>' : '') + '</div>' +
         '<div class="acts"><button class="btn" id="vend">✓ خلّصت هنا</button><button class="btn ghost" id="vnext">مركز تاني</button></div>' + tlHtml() + '</div>';
-      $('vend').onclick = endVisit; $('vnext').onclick = openCenters;
+      $('vend').onclick = endVisit; $('vnext').onclick = function () { openCenters(); };
     } else {
       el.innerHTML = '<div class="vc ask"><h3>' + ICON.bld.replace('<svg', '<svg width="20" height="20" style="stroke:var(--red);fill:none;stroke-width:2"') + ' إنت فين دلوقتي؟</h3><div class="sub">لو رايح أو شغّال في مركز، اختاره من القايمة علشان الإدارة تعرف.</div>' +
         '<div class="acts"><button class="btn" id="vpick">اختار المركز اللي شغّال فيه</button></div>' + tlHtml() + '</div>';
-      $('vpick').onclick = openCenters;
+      $('vpick').onclick = function () { openCenters(); };
     }
   }
   function tlHtml() {
     var vs = (H.visits || []); if (!vs.length) return '';
     return '<div class="tl">' + vs.map(function (v) { return '<div class="' + (v.open ? 'o' : '') + '"><i></i><b>' + esc(v.center) + '</b>' + (v.purpose ? ' · ' + esc(v.purpose) : '') + '<span>' + hm(v.start_at) + (v.end_at ? ' - ' + hm(v.end_at) : '') + ' · ' + dur(v.mins) + '</span></div>'; }).join('') + '</div>';
   }
-  function openCenters() {
+  function openCenters(mode) {
+    CS.mode = mode === 'task' ? 'task' : 'visit'; $('csht').textContent = CS.mode === 'task' ? '📌 سجّل مهمة هتعملها' : 'إنت شغّال في أنهي مركز؟'; $('csgo').textContent = CS.mode === 'task' ? 'سجّل المهمة وبلّغ المدير' : 'أنا هنا ✓';
     CS.pick = null; CS.purpose = '';
     $('csq').value = ''; $('csx').className = 'hide'; $('csx0').className = ''; $('csh').classList.add('on');
     $('csl').innerHTML = '<div class="empty">بنحمّل المراكز…</div>';
@@ -442,8 +461,9 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     if (!CS.pick || busy) return; busy = true; var b = this; b.disabled = true;
     var fin = function () { busy = false; b.disabled = false; };
     getPos(true).catch(function (e) { if (H.need_location) throw e; return null; }).then(function (p) {
-      return battery().then(function (bt) { return api('POST', '/visit', { center: CS.pick, purpose: CS.purpose, note: $('csn').value.trim(), lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt }); });
+      return battery().then(function (bt) { return api('POST', CS.mode === 'task' ? '/task/self' : '/visit', CS.mode === 'task' ? { center: CS.pick, title: CS.purpose, note: $('csn').value.trim(), lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt } : { center: CS.pick, purpose: CS.purpose, note: $('csn').value.trim(), lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt }); });
     }).then(function (r) {
+      if (CS.mode === 'task') { fin(); $('csh').classList.remove('on'); $('csn').value = ''; H = r.home; syncClock(H.now.ts); paintTasks(); startTaskPings(); toast('📌 اتسجّلت المهمة — المدير اتبلّغ، ودوس «أنا في الطريق» لما تتحرك'); return; }
       fin(); $('csh').classList.remove('on'); $('csn').value = '';
       H = r.home; syncClock(H.now.ts); paintVisit(); paintLoc();
       toast(r.far ? 'اتسجّل — بس إنت بعيد ' + r.dist + ' م عن مكان المركز المعروف' : 'اتسجّل إنك في ' + (H.visit ? H.visit.center : 'المركز') + ' ✅', !!r.far);
@@ -477,14 +497,16 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   }
   function paintTasks() {
     var el = $('tsk'); if (!el || !H) return;
-    el.innerHTML = (H.tasks || []).map(function (t) {
+    var add = H.state === 'in' && H.has_centers ? '<button class="fbk" id="tself" style="margin-top:12px;border-style:dashed"><span class="ic">📌</span><span><b>سجّل مهمة هتعملها</b><small>اختار المركز والمطلوب — المدير بيتبلّغ وبيتابع مسارك لحد ما تخلّص</small></span></button>' : '';
+    el.innerHTML = add + (H.tasks || []).map(function (t) {
       var nx = NEXT[t.status];
-      var head = '<div class="row1"><span class="ic">📌</span><div style="flex:1;min-width:0"><div class="sub">مهمة من الإدارة</div><div class="big">' + esc(t.center) + '</div></div></div>';
+      var head = '<div class="row1"><span class="ic">📌</span><div style="flex:1;min-width:0"><div class="sub">' + (String(t.created_by || '').indexOf('emp:') === 0 ? 'مهمة سجّلتها' : 'مهمة من الإدارة') + '</div><div class="big">' + esc(t.center) + '</div></div></div>';
       var info = '<div class="sub">' + esc(t.title) + (t.note ? ' · ' + esc(t.note) : '') + (t.status === 'going' && t.dist != null ? ' · <b>باقي ' + kmText(t.dist) + '</b>' : '') + '</div>';
       var act = H.state !== 'in' ? '<div class="sub" style="margin-top:10px">سجّل حضورك الأول علشان تبدأ المهمة.</div>' : nx ? '<div class="acts"><button class="btn' + (nx[0] === 'done' ? ' okb' : '') + '" data-st="' + nx[0] + '" data-id="' + t.id + '">' + nx[1] + '</button></div>' : '';
       return '<div class="vc tk ' + t.status + '">' + head + info + stepsHtml(t) + act + '</div>';
     }).join('');
     [].forEach.call(el.querySelectorAll('[data-st]'), function (b) { b.onclick = function () { taskStep(b); }; });
+    var ts = $('tself'); if (ts) ts.onclick = function () { openCenters('task'); };
   }
   function taskById(id) { return (H.tasks || []).filter(function (t) { return String(t.id) === String(id); })[0]; }
   var ESH = { task: null };
@@ -497,22 +519,49 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       .then(function (r) { fin(); H = r.home; syncClock(H.now.ts); paintTasks(); paintVisit(); paintLoc(); startTaskPings(); toast({ going: 'ماشي — المدير عارف إنك في الطريق 🚗', arrived: 'تمام — اتسجّل إنك وصلت 📍', working: 'بالتوفيق 🔧 — لما تخلّص دوس «خلّصت»' }[b.dataset.st] || 'تمام'); })
       .catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
   }
-  function goingTask() { return (H && H.state === 'in' && (H.tasks || []).filter(function (t) { return t.status === 'going'; })[0]) || null; }
+  function goingTask() { return (H && H.state === 'in' && ((H.tasks || []).filter(function (t) { return t.status === 'going'; })[0] || (H.tasks || [])[0])) || null; }
+  var taskEvery = 0;
   function startTaskPings() {
-    clearInterval(taskTimer); taskTimer = 0;
-    if (!goingTask()) return;
+    var t0 = goingTask(), every = t0 ? (t0.status === 'going' ? 30000 : 60000) : 0;     /* on the road every 30 s, otherwise every minute — until the job is finished */
+    if (every === taskEvery && taskTimer) return;
+    clearInterval(taskTimer); taskTimer = 0; taskEvery = every;
+    if (!t0) return;
     var send = function () {
-      var t = goingTask(); if (!t) { clearInterval(taskTimer); taskTimer = 0; return; }
+      var t = goingTask(); if (!t) { clearInterval(taskTimer); taskTimer = 0; taskEvery = 0; return; }
       getPos(true).then(function (p) { return battery().then(function (bt) { return api('POST', '/task/ping', { id: t.id, lat: p.lat, lng: p.lng, acc: p.acc, battery: bt }); }); }).then(function (r) {
         if (r && r.stop) return load();
         if (r && r.task) { for (var i = 0; i < H.tasks.length; i++) if (H.tasks[i].id === r.task.id) H.tasks[i] = r.task; }
         if (r && r.arrived) { toast('📍 وصلت — دوس «بدأت الشغل» لما تبدأ'); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} }
-        paintTasks(); paintLoc();
+        paintTasks(); paintLoc(); startTaskPings();
       }).catch(function () {});
     };
-    send(); taskTimer = setInterval(send, 30000);
+    send(); taskTimer = setInterval(send, every);
   }
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && H && goingTask() && !taskTimer) startTaskPings(); });
+
+  /* ── 4.65 · المكافآت والتقدير ── */
+  function money(n) { return (Math.round(n * 100) / 100).toLocaleString('en-US'); }
+  function paintRewards() {
+    var el = $('rwc'); if (!el || !H || !H.rewards) return;
+    var R = H.rewards; if (!R.list.length) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div class="vc rwd"><div class="row1"><span class="ic">🏆</span><div style="flex:1"><div class="sub">مكافآتك الشهر ده</div><div class="big">' + (R.month.amount ? money(R.month.amount) + ' ج' : R.month.n + ' تقدير') + (R.month.stars ? ' <span class="rst">' + R.month.stars + ' ⭐</span>' : '') + '</div></div></div>' +
+      '<div class="tl">' + R.list.slice(0, 3).map(function (r) { return '<div><i style="background:#f7c12d"></i><b>' + (r.stars ? '⭐'.repeat(r.stars) + ' ' : '') + esc(r.message || 'تقدير') + '</b><span>' + (r.amount ? money(r.amount) + ' ج · ' : '') + esc(r.created_at.slice(5, 10)) + '</span></div>'; }).join('') + '</div></div>';
+  }
+  function showReward() {
+    var R = H && H.rewards; if (!R || !R.unseen.length || $('rwo')) return;
+    var r = R.unseen[0], d = document.createElement('div'); d.className = 'rwo'; d.id = 'rwo';
+    d.innerHTML = '<div class="rwf">' + Array.apply(null, Array(40)).map(function (_, i) { return '<i style="left:' + (Math.random() * 100).toFixed(1) + '%;animation-delay:' + (Math.random() * 1.2).toFixed(2) + 's;font-size:' + (14 + Math.random() * 18).toFixed(0) + 'px">' + ['🎉', '✨', '🎊', '⭐', '💛'][i % 5] + '</i>'; }).join('') + '</div>' +
+      '<div class="rwb"><div class="rwt">🏆</div><h2>برافو يا ' + esc(H.emp.name.split(' ')[0]) + '!</h2>' + (r.stars ? '<div class="rws">' + Array.apply(null, Array(5)).map(function (_, i) { return '<span class="' + (i < r.stars ? 'on' : '') + '" style="animation-delay:' + (0.3 + i * 0.15) + 's">★</span>'; }).join('') + '</div>' : '') +
+      (r.amount ? '<div class="rwa">' + money(r.amount) + ' <small>جنيه</small></div>' : '') + (r.message ? '<p>' + esc(r.message) + '</p>' : '') + '<small class="rwby">من ' + esc(r.created_by || 'الإدارة') + ' · ' + hm(r.created_at) + '</small>' +
+      '<button class="btn" id="rwok">شكرًا 🙏</button></div>';
+    document.body.appendChild(d);
+    try { navigator.vibrate && navigator.vibrate([120, 60, 120, 60, 240]); } catch (e) {}
+    try { var Ac = window.AudioContext || window.webkitAudioContext; if (Ac) { var a = new Ac(), t0 = a.currentTime; [523, 659, 784, 1047, 1319].forEach(function (f, i) { var o = a.createOscillator(), g = a.createGain(); o.type = 'triangle'; o.frequency.value = f; g.gain.setValueAtTime(.0001, t0 + i * .13); g.gain.exponentialRampToValueAtTime(.2, t0 + i * .13 + .03); g.gain.exponentialRampToValueAtTime(.0001, t0 + i * .13 + .45); o.connect(g); g.connect(a.destination); o.start(t0 + i * .13); o.stop(t0 + i * .13 + .5); }); } } catch (e) {}
+    $('rwok').onclick = function () {
+      this.disabled = true;
+      api('POST', '/reward/seen', { id: r.id }).then(function (x) { H.rewards = x.rewards; }).catch(function () { R.unseen.shift(); }).then(function () { d.remove(); paintRewards(); showReward(); });
+    };
+  }
 
   /* ── 4.63 · بنك الأعطال ── */
   var fqT = 0;

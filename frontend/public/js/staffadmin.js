@@ -23,7 +23,9 @@
   function me() { return (typeof currentUser !== 'undefined' && currentUser) || null; }
   function isPage() { try { return currentPage === 'staff'; } catch (e) { return false; } }
   function p2(n) { return (n < 10 ? '0' : '') + n; }
-  function hm(ts) { return ts ? String(ts).slice(11, 16) : '—'; }
+  function hm24(ts) { return ts ? String(ts).slice(11, 16) : ''; }
+  function hm(ts) { if (!ts) return '—'; var t = String(ts).slice(11, 16).split(':'); if (t.length < 2) return '—'; var h = +t[0]; return '\u2066' + ((h % 12) || 12) + ':' + t[1] + (h < 12 ? ' AM' : ' PM') + '\u2069'; }
+  function t12(hhmm) { return hhmm ? hm('0000-00-00 ' + hhmm) : '—'; }
   function dur(m) { m = Math.max(0, Math.round(Number(m) || 0)); return p2(Math.floor(m / 60)) + ':' + p2(m % 60); }
   function dowOf(d) { return new Date(d + 'T00:00:00Z').getUTCDay(); }
   function dmy(d) { var p = String(d).split('-'); return (+p[2]) + '/' + (+p[1]); }
@@ -234,9 +236,46 @@
       if (t.status === 'going' && t.dist != null) extra += '<div class="tk-x">🚗 باقي ' + kmT(t.dist) + (t.eta ? ' · حوالي ' + t.eta + ' دقيقة' : '') + '</div>';
       if (t.fault) extra += '<div class="tk-x ok">🛠 ' + (t.fault.code ? '<code>' + esc(t.fault.code) + '</code> ' : '') + esc(t.fault.title) + ' ← ' + esc(t.fault.solution) + '</div>';
       if (t.result) extra += '<div class="tk-x">📝 ' + esc(t.result) + '</div>';
-      return '<div class="tk-it ' + t.status + '"><div class="tk-h"><div><b>' + esc(t.emp) + '</b><span>' + esc(t.center) + (t.title && t.title.indexOf('زيارة ') !== 0 ? ' · ' + esc(t.title) : '') + '</span></div>' +
+      var self = String(t.created_by || '').indexOf('emp:') === 0;
+      return '<div class="tk-it ' + t.status + '"><div class="tk-h"><div><b>' + esc(t.emp) + (self ? ' <em class="tk-self">سجّلها بنفسه</em>' : '') + '</b><span>' + esc(t.center) + (t.title && t.title.indexOf('زيارة ') !== 0 ? ' · ' + esc(t.title) : '') + (t.note ? ' · ' + esc(t.note) : '') + '</span></div>' +
+        '<button class="btn btn-sm btn-secondary tk-rt" data-a="troute" data-id="' + t.id + '">🗺️ المسار</button>' +
         (t.status !== 'done' ? '<button class="rd-x" data-a="tcancel" data-id="' + t.id + '" title="إلغاء المهمة">✕</button>' : '') + '</div>' + steps + extra + '</div>';
     }).join('') + '</div></div>';
+  }
+  function routeModal(id) {
+    api('GET', '/task/route?id=' + encodeURIComponent(id)).then(function (r) {
+      var t = r.task, P = r.points, mins = P.length > 1 ? Math.round((Date.parse(P[P.length - 1].at.replace(' ', 'T')) - Date.parse(P[0].at.replace(' ', 'T'))) / 60000) : 0;
+      openModal('🗺️ مسار ' + esc(t.emp) + ' — ' + esc(t.center),
+        '<div class="stf-trksum"><div><b>' + r.km + '</b><span>كم تقريبًا</span></div><div><b>' + P.length + '</b><span>نقطة موقع</span></div><div><b>' + dur(mins) + '</b><span>ساعة</span></div></div>' +
+        '<p class="stf-note" style="margin:8px 2px">من ' + hm(t.created_at) + (t.done_at ? ' لحد ' + hm(t.done_at) + ' (خلّص)' : ' لحد دلوقتي') + ' · الموقع بيتسجّل كل 30 ثانية في الطريق وكل دقيقة غير كده.</p>' +
+        (P.length || r.center ? '<div class="stf-mapcard lt in-modal">' + mapBox('stf-rmap', 360) + '</div>' : '<p class="stf-note">لسه مفيش مواقع متسجّلة للمهمة دي.</p>'),
+        '<button class="btn btn-ghost" onclick="closeModal()">إغلاق</button>');
+      if (document.getElementById('stf-rmap')) drawMap('stf-rmap', { sites: sites(), centers: r.center ? [{ key: 'c', name: r.center.name, lat: r.center.lat, lng: r.center.lng, label: true }] : [], route: P });
+    }).catch(function (e) { T(e.message, 'error'); });
+  }
+  function rewardsHtml() {
+    var R = S.rewards; if (!R) return '';
+    var h = '<div class="card stf-form stf-rwc"><div class="card-header"><h3 class="card-title">🏆 المكافآت والتقدير — الشهر ده</h3><span class="stf-sub">' + (R.total ? R.total.toLocaleString('en-US') + ' ج إجمالي' : '') + '</span></div>';
+    if (!R.list.length) return h + '<p class="stf-note" style="margin:4px">لسه مفيش — دوس «🏆 مكافأة» على كارت أي موظف: رسالة + نجوم + مبلغ، وبتظهرله باحتفال وصوت وبتعرف إنه شافها.</p></div>';
+    h += '<div class="stf-rwl">' + R.list.slice(0, 12).map(function (r) {
+      return '<div class="stf-rwi ax-hl-off"><span class="st">' + (r.stars ? '⭐'.repeat(r.stars) : '🏆') + '</span><div><b>' + esc(r.emp) + (r.amount ? ' · ' + r.amount.toLocaleString('en-US') + ' ج' : '') + '</b><small>' + esc(r.message || '—') + '</small></div><span class="sn ' + (r.seen_at ? 'ok' : '') + '">' + (r.seen_at ? '👀 شافها ' + hm(r.seen_at) : 'لسه ما شافهاش') + '</span><button class="rd-x" data-a="rwdel" data-id="' + r.id + '" title="مسح">✕</button></div>'; }).join('') + '</div></div>';
+    return h;
+  }
+  function rewardModal(id) {
+    var e = empById(id); if (!e) return;
+    var st = 3;
+    openModal('🏆 مكافأة لـ ' + esc(e.name),
+      '<div class="form-group"><label>التقييم</label><div class="stf-stars" id="rw-st">' + [1, 2, 3, 4, 5].map(function (n) { return '<button type="button" data-n="' + n + '">★</button>'; }).join('') + '</div></div>' +
+      '<div class="form-group"><label>المبلغ (اختياري)</label><input class="form-control" id="rw-a" type="number" min="0" inputmode="decimal" placeholder="0"></div>' +
+      '<div class="form-group"><label>الرسالة</label><textarea class="form-control" id="rw-m" rows="2" maxlength="400" placeholder="مثلاً: شغل ممتاز في مركز النور 👏"></textarea><div class="stf-qk">' + ['شغل ممتاز 👏', 'شكرًا على مجهودك 🙏', 'أفضل موظف الأسبوع 🏆', 'التزام في المواعيد ⏰'].map(function (q) { return '<button type="button">' + q + '</button>'; }).join('') + '</div></div>',
+      '<button class="btn btn-primary" id="rw-go">🎉 ابعت المكافأة</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+    var paintSt = function () { [].forEach.call(document.querySelectorAll('#rw-st button'), function (b) { b.classList.toggle('on', +b.dataset.n <= st); }); };
+    [].forEach.call(document.querySelectorAll('#rw-st button'), function (b) { b.onclick = function () { st = +b.dataset.n === st ? 0 : +b.dataset.n; paintSt(); }; }); paintSt();
+    [].forEach.call(document.querySelectorAll('.stf-qk button'), function (b) { b.onclick = function () { var m = document.getElementById('rw-m'); m.value = (m.value ? m.value + ' ' : '') + b.textContent; }; });
+    document.getElementById('rw-go').onclick = function () {
+      api('POST', '/reward', { emp_id: id, stars: st, amount: document.getElementById('rw-a').value, message: document.getElementById('rw-m').value })
+        .then(function () { closeModal(); T('اتبعتت المكافأة 🎉 — هيوصلك إشعار لما يشوفها'); if (S.tab === 'emps') load(); }).catch(function (er) { T(er.message, 'error'); });
+    };
   }
   function celebrate(t) {
     T('🎉 ' + t.emp + ' خلّص في ' + t.center, 'success');
@@ -340,6 +379,7 @@
       S.boot = b;
       if (S.tab === 'live') return api('GET', '/live').then(function (l) { S.live = l; keepTstat(l); S.fast = (l.tasks || []).some(function (t) { return t.status !== 'done' && t.status !== 'cancel'; }); paint(); S.timer = setInterval(refreshLive, S.fast ? 10000 : 30000); });
       if (S.tab === 'report') return api('GET', '/report?month=' + (S.month || '')).then(function (r) { S.report = r; S.month = r.month; paint(); });
+      if (S.tab === 'emps') return api('GET', '/rewards').then(function (r) { S.rewards = r; paint(); });
       if (S.tab === 'cfg') return api('GET', '/log').then(function (l) { S.logs = l.rows; paint(); });
       if (S.tab === 'faults') return api('GET', '/faults?q=' + encodeURIComponent(S.fq || '')).then(function (r) { S.faults = r; paint(); });
       if (S.tab === 'centers') return api('GET', '/visits?month=' + (S.vmonth || '')).then(function (r) { S.visits = r; S.vmonth = r.month; paint(); });
@@ -476,13 +516,13 @@
   function empsHtml() {
     var list = emps();
     if (!list.length) return '<div class="card stf-empty"><div class="stf-ill">👥</div><h3>مفيش موظفين لسه</h3><p>ضيف موظف وهيطلعلك لينك واسم مستخدم وكلمة سر تبعتهم له على واتساب.</p><button class="btn btn-primary" data-a="new">＋ موظف جديد</button></div>';
-    return '<div class="stf-cards">' + list.map(function (e) {
+    return rewardsHtml() + '<div class="stf-cards">' + list.map(function (e) {
       var rest = e.rules.rest.map(function (d) { return DAYN[+d]; }).join('، ');
       return '<div class="card stf-card' + (e.active ? '' : ' off') + '"><div class="stf-av">' + esc(e.name.trim().charAt(0)) + '</div><div class="stf-ci"><div class="stf-top"><b>' + esc(e.name) + '</b>' + (e.active ? '' : '<span class="stf-chip ax-hl-off"><i></i>موقوف</span>') + '</div>' +
         '<div class="stf-meta">' + esc(e.job || '—') + ' · <code>' + esc(e.username) + '</code></div>' +
-        '<div class="stf-meta">شغل ' + e.rules.start + ' - ' + e.rules.end + ' · إجازة ' + esc(rest || 'مفيش') + (e.track ? '' : ' · من غير تتبع') + '</div>' +
+        '<div class="stf-meta">شغل من ' + t12(e.rules.start) + ' لـ ' + t12(e.rules.end) + ' · إجازة ' + esc(rest || 'مفيش') + (e.track ? '' : ' · من غير تتبع') + '</div>' +
         '<div class="stf-meta faint">' + (e.last_login_at ? 'آخر دخول ' + dmy(e.last_login_at.slice(0, 10)) + ' ' + hm(e.last_login_at) : 'لسه ما دخلش') + '</div></div>' +
-        '<div class="stf-acts"><button class="btn btn-sm btn-primary" data-a="send" data-id="' + e.id + '">🔑 ابعت البيانات</button><button class="btn btn-sm btn-secondary" data-a="edit" data-id="' + e.id + '">✏ تعديل</button></div></div>';
+        '<div class="stf-acts"><button class="btn btn-sm btn-primary" data-a="send" data-id="' + e.id + '">🔑 ابعت البيانات</button><button class="btn btn-sm btn-secondary" data-a="edit" data-id="' + e.id + '">✏ تعديل</button>' + (e.active ? '<button class="btn btn-sm btn-secondary" data-a="reward" data-id="' + e.id + '">🏆 مكافأة</button><button class="btn btn-sm btn-ghost" data-a="treset" data-id="' + e.id + '" title="يمسح كل المهام المتسجلة على الموظف">🧹 ريست المهام</button>' : '') + '</div></div>';
     }).join('') + '</div>';
   }
 
@@ -550,6 +590,10 @@
     if (a === 'link') return linkModal();
     if (a === 'focus') return focusEmp(id);
     if (a === 'newtask') return taskModal();
+    if (a === 'troute') return routeModal(id);
+    if (a === 'reward') return rewardModal(id);
+    if (a === 'rwdel') { if (!confirm('تمسح المكافأة دي؟')) return; return api('POST', '/reward/delete', { id: Number(id) }).then(function () { T('اتمسحت'); load(); }).catch(function (e) { T(e.message, 'error'); }); }
+    if (a === 'treset') { var em = empById(id); if (!confirm('تمسح كل المهام المتسجلة على ' + (em ? em.name : 'الموظف') + '؟ (مش هتقدر ترجّعها)')) return; return api('POST', '/task/reset', { emp_id: id }).then(function (r) { T('اتمسحت ' + r.n + ' مهمة ✅'); if (S.tab === 'live') refreshLive(); }).catch(function (e) { T(e.message, 'error'); }); }
     if (a === 'tcancel') { if (!confirm('تلغي المهمة دي؟')) return; return api('POST', '/task/cancel', { id: Number(id) }).then(function () { T('اتلغت المهمة'); refreshLive(); }).catch(function (e) { T(e.message, 'error'); }); }
     if (a === 'fadd') return faultModal();
     if (a === 'fvote') return api('POST', '/fault/vote', { id: Number(id) }).then(function (r) { el.textContent = '👍 ' + r.votes; el.classList.toggle('on', r.voted); }).catch(function (e) { T(e.message, 'error'); });
@@ -676,7 +720,7 @@
       var sum = P.length ? '<div class="stf-trksum"><div><b>' + (Math.round(dist * 10) / 10) + '</b><span>كم تقريبًا</span></div><div><b>' + P.length + '</b><span>نقطة موقع</span></div><div><b>' + (t.visits || []).length + '</b><span>زيارة</span></div></div>' : '';
       var tl = ev.length ? '<div class="stf-tl">' + ev.map(function (e) { return '<div class="' + e.k + '"><span>' + hm(e.at) + '</span><div>' + e.html + '</div></div>'; }).join('') + '</div>' : '<p class="stf-note">مفيش حضور مسجّل في اليوم ده.</p>';
       var edit = (t.att.length ? t.att.map(function (a) {
-          return '<div class="stf-att" data-id="' + a.id + '"><div class="stf-grid2"><div class="form-group"><label>حضور</label><input type="time" class="form-control a-in" value="' + hm(a.in_at) + '"></div><div class="form-group"><label>انصراف</label><input type="time" class="form-control a-out" value="' + (a.out_at ? hm(a.out_at) : '') + '"></div></div>' +
+          return '<div class="stf-att" data-id="' + a.id + '"><div class="stf-grid2"><div class="form-group"><label>حضور</label><input type="time" class="form-control a-in" value="' + hm24(a.in_at) + '"></div><div class="form-group"><label>انصراف</label><input type="time" class="form-control a-out" value="' + (a.out_at ? hm24(a.out_at) : '') + '"></div></div>' +
             '<div class="stf-meta">' + (a.source === 'manager' ? '✍ يدوي من الإدارة' : '📱 من الموبايل') + (a.note ? ' · ' + esc(a.note) : '') + '</div>' +
             '<div class="stf-acts"><button class="btn btn-sm btn-primary a-sv">حفظ التعديل</button><button class="btn btn-sm btn-ghost a-dl">🗑 مسح</button></div></div>'; }).join('') : '') +
         '<div class="stf-att add"><b>＋ إضافة حضور يدوي</b><div class="stf-grid2"><div class="form-group"><label>حضور</label><input type="time" class="form-control n-in"></div><div class="form-group"><label>انصراف</label><input type="time" class="form-control n-out"></div></div><button class="btn btn-sm btn-secondary n-sv">إضافة</button></div>';

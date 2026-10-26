@@ -216,7 +216,7 @@ function home(e) {
     visit: openVisit(e.id, now) ? visitOut(openVisit(e.id, now), now) : null,
     visits: db.prepare('SELECT * FROM staff_visit WHERE emp_id = ? AND date = ? ORDER BY id').all(e.id, now.date).map(v => visitOut(v, now)),
     purposes: PURPOSES, has_centers: centersFor(e).length > 0,
-    tasks: X ? X.tasksOf(e.id) : [], faults: db.prepare('SELECT COUNT(*) AS n FROM staff_fault').get().n
+    tasks: X ? X.tasksOf(e.id) : [], rewards: X ? X.rewardsFor(e.id) : null, faults: db.prepare('SELECT COUNT(*) AS n FROM staff_fault').get().n
   };
 }
 
