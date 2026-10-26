@@ -42,7 +42,8 @@ function findCenter(d, token) {
   return (d.customers || []).find(c => c.id === cid) || null;
 }
 
-/* the products this center draws (name + unit) — what the order form offers */
+/* 4.75 · what a center can order — a fixed list */
+const ORDER_ITEMS = [{ name: 'ورق A3', unit: '' }, { name: 'ورق A4', unit: '' }, { name: 'A3 plastic', unit: '' }, { name: 'A4 plastic', unit: '' }];
 function productsOf(d, cid) {
   const seen = new Map();
   (d.issuances || []).filter(i => i.customerId === cid).sort((a, b) => String(b.date).localeCompare(String(a.date))).forEach(i => {
@@ -109,19 +110,19 @@ function page(d, c, q, tok, pre, br) {
   const items = Object.values(cm.items).sort((a1, b1) => b1.qty - a1.qty), qmax = Math.max(1, ...items.map(x => x.qty));
   const inv = (d.invoices || []).filter(v => v.customerId === c.id && !v.archived && String(v.date || '').slice(0, 7) === ym).sort((a1, b1) => String(b1.date).localeCompare(String(a1.date)));
   const pays = (d.payments || []).filter(p => p.customerId === c.id && String(p.date || '').slice(0, 7) === ym && Number(p.amount) > 0).sort((a1, b1) => String(b1.date).localeCompare(String(a1.date)));
-  const prods = productsOf(d, c.id);
+  const prods = ORDER_ITEMS;
   const orders = db.prepare('SELECT * FROM portal_req WHERE customer_id = ? AND branch = ? ORDER BY id DESC LIMIT 8').all(c.id, br || 'main');
   const ty = +t.slice(0, 4), years = []; for (let k = ty; k >= ty - 3; k--) years.push(String(k));
   const st2 = (tot, paid) => { const r = (Number(tot) || 0) - (Number(paid) || 0); return r <= 0.5 ? '<span class="tg ok">مسددة</span>' : (Number(paid) || 0) > 0.5 ? '<span class="tg pt">باقي ' + n0(r) + '</span>' : '<span class="tg no">آجل</span>'; };
 
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="robots" content="noindex,nofollow">
 <meta name="color-scheme" content="light only"><meta name="theme-color" content="#F4F6FA">
 <title>${esc(c.name)} — ${esc(s.companyName || 'Ozarex')}</title>
 <link rel="stylesheet" href="/fonts/fonts.css">
 <style>
 :root{color-scheme:light;--bg:#F4F6FA;--card:#fff;--soft:#F1F4F9;--line:#E6EAF0;--ink:#0F172A;--mut:#64748B;--faint:#94A3B8;--pri:#0E9F9A;--pri2:#0B7F7B;--draw:#2563EB;--pay:#16A34A;--red:#DC2626;--sh:0 1px 2px rgba(15,23,42,.04),0 8px 24px -12px rgba(15,23,42,.12)}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html{scroll-behavior:smooth}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html{scroll-behavior:smooth}html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}@supports (-webkit-touch-callout:none){input,select,textarea{font-size:16px!important}}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans Arabic','Cairo',Tahoma,system-ui,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.5}
 .w{max-width:720px;margin:0 auto;padding:16px 16px 48px}
 .n{font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate}
@@ -189,10 +190,10 @@ ${due > 0.5 ? `<div class="bar">${a.buckets.map((v, i) => v > 0 ? `<i style="wid
 </section>
 
 <section class="card" id="order"><h2>📦 اطلب ورق</h2>
-<p class="mt" id="o-lead">اختار الصنف واكتب الكمية اللي محتاجينها، والطلب هيوصلنا على طول.</p>
+<p class="mt" id="o-lead">اختار الصنف (ورق A3 · ورق A4 · A3 plastic · A4 plastic) واكتب الكمية اللي محتاجينها، والطلب هيوصلنا على طول.</p>
 <div class="oform" id="oform">
 <div id="olines"></div>
-<button class="add" type="button" onclick="addLine()">＋ صنف تاني</button>
+<button class="add" type="button" onclick="addLine()">＋ صنف كمان</button>
 <input class="fld" id="o-who" maxlength="60" placeholder="اسم اللي طالب ورقم تليفونه (اختياري)">
 <textarea class="fld" id="o-note" rows="2" maxlength="300" placeholder="ملاحظة (اختياري) — مثلاً: محتاجينه قبل الخميس"></textarea>
 <button class="go" id="o-go" type="button" onclick="sendOrder()">ابعت الطلب</button><div class="omsg" id="o-msg"></div>
@@ -226,11 +227,11 @@ ${st.rows.map(r => `<tr><td class="n">${dmy(r.date)}</td><td>${esc(r.label)}</td
 <p class="foot">الصفحة دي لحسابكم بس، والأرقام بتتحدّث أول بأول.${s.companyPhone ? ' للاستفسار: ' + esc(s.companyPhone) : ''}</p>
 </div>
 <script>
+(function(){var p=function(e){e.preventDefault()};document.addEventListener('gesturestart',p,{passive:false});document.addEventListener('gesturechange',p,{passive:false});document.addEventListener('touchmove',function(e){if(e.touches&&e.touches.length>1)e.preventDefault()},{passive:false});document.addEventListener('dblclick',p,{passive:false})})();
 try{var mo=document.querySelector('.mh a.on');if(mo)mo.parentNode.scrollLeft=mo.offsetLeft-mo.parentNode.clientWidth/2+mo.clientWidth/2;}catch(e){}
 var P=${JSON.stringify(prods).replace(/</g, '\\u003c')},U=${JSON.stringify('/' + pre + '/' + tok + '/order')};
-function opts(){return '<option value="">اختار الصنف…</option>'+P.map(function(p,i){return '<option value="'+i+'">'+p.name.replace(/[<&]/g,'')+(p.unit?' ('+p.unit.replace(/[<&]/g,'')+')':'')+'</option>'}).join('')+'<option value="x">صنف تاني…</option>'}
-function addLine(){var d=document.createElement('div');d.className='ol';d.innerHTML='<select onchange="other(this)">'+opts()+'</select><input type="number" inputmode="numeric" min="1" placeholder="الكمية"><button class="x" type="button" aria-label="شيل" onclick="this.parentNode.remove()">×</button>';document.getElementById('olines').appendChild(d);}
-function other(s){if(s.value!=='x')return;var i=document.createElement('input');i.className='fld';i.style.marginTop='0';i.style.flex='1';i.placeholder='اسم الصنف';i.maxLength=80;s.replaceWith(i);i.focus();}
+function opts(){return '<option value="">اختار الصنف…</option>'+P.map(function(p,i){return '<option value="'+i+'">'+p.name.replace(/[<&]/g,'')+(p.unit?' ('+p.unit.replace(/[<&]/g,'')+')':'')+'</option>'}).join('')}
+function addLine(){var d=document.createElement('div');d.className='ol';d.innerHTML='<select>'+opts()+'</select><input type="number" inputmode="numeric" min="1" placeholder="الكمية"><button class="x" type="button" aria-label="شيل" onclick="this.parentNode.remove()">×</button>';document.getElementById('olines').appendChild(d);}
 function openOrder(){var f=document.getElementById('oform');if(!f.classList.contains('on')){f.classList.add('on');document.getElementById('o-open').style.display='none';if(!document.querySelector('.ol'))addLine();}document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});}
 function sendOrder(){var items=[].map.call(document.querySelectorAll('.ol'),function(l){var s=l.querySelector('select'),t=l.querySelector('.fld'),q=Number(l.querySelector('input[type=number]').value);var p=s&&s.value!==''&&s.value!=='x'?P[+s.value]:null;var name=p?p.name:(t?t.value.trim():'');return name&&q>0?{name:name,unit:p?p.unit:'',qty:q}:null}).filter(Boolean);
 var m=document.getElementById('o-msg');if(!items.length){m.textContent='اختار صنف واكتب الكمية';m.style.color='#DC2626';return;}
@@ -265,8 +266,9 @@ function takeOrder(req, res, stores, tok) {
   req.on('end', () => {
     let b = {}; try { b = JSON.parse(raw || '{}'); } catch (e) { return send(400, { message: 'الطلب مش مفهوم' }); }
     const clean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
-    const items = (Array.isArray(b.items) ? b.items : []).slice(0, 12).map(x => ({ name: clean(x && x.name, 80), unit: clean(x && x.unit, 20), qty: Math.round(Number(x && x.qty) || 0) }))
-      .filter(x => x.name && x.qty > 0 && x.qty <= 1000000);
+    const okName = new Set(ORDER_ITEMS.map(x => x.name));
+    const items = (Array.isArray(b.items) ? b.items : []).slice(0, 12).map(x => ({ name: clean(x && x.name, 80), unit: '', qty: Math.round(Number(x && x.qty) || 0) }))
+      .filter(x => okName.has(x.name) && x.qty > 0 && x.qty <= 1000000);
     if (!items.length) return send(400, { message: 'اختار صنف واكتب الكمية' });
     times.push(now); ORD.set(tok, times); if (ORD.size > 5000) ORD.clear();
     const r = db.prepare('INSERT INTO portal_req (branch, branch_name, customer_id, customer_name, items, note, contact, status, created_at) VALUES (?,?,?,?,?,?,?,?,?)')

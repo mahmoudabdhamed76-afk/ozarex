@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#0c0809">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -13,6 +13,9 @@
 <title>حضور وانصراف</title>
 <link rel="stylesheet" href="fonts/fonts.css">
 <style>
+/* 4.75 · no zoom on the phone */
+html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}@supports (-webkit-touch-callout:none){input,select,textarea{font-size:16px!important}}
+
 :root{--bg:#F3EFEF;--card:#fff;--soft:#F7F3F3;--line:#E8E0E0;--ink:#16110F;--mut:#6E6567;--faint:#A39A9B;--red:#E01B0F;--red2:#B3120A;--ok:#1E9A4C;--warn:#D98200;--hero:#16110F;--hero-ink:#F4F0F0;--hero-mut:#A39A9B}
 :root[data-t=dark]{--bg:#0c0809;--card:#171112;--soft:#1f1819;--line:#2b2223;--ink:#F4F0F0;--mut:#A39A9B;--faint:#6f6667;--hero:#1b1314;--hero-ink:#F4F0F0}
 @media (prefers-color-scheme:dark){:root:not([data-t=light]){--bg:#0c0809;--card:#171112;--soft:#1f1819;--line:#2b2223;--ink:#F4F0F0;--mut:#A39A9B;--faint:#6f6667;--hero:#1b1314}}
@@ -239,6 +242,8 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   <div style="display:flex;gap:10px"><button class="btn" id="pwgo">حفظ</button><button class="btn ghost" id="pwno" style="width:38%">إلغاء</button></div>
 </div></div>
 <script>
+(function(){var p=function(e){e.preventDefault()};document.addEventListener('gesturestart',p,{passive:false});document.addEventListener('gesturechange',p,{passive:false});document.addEventListener('touchmove',function(e){if(e.touches&&e.touches.length>1)e.preventDefault()},{passive:false});document.addEventListener('dblclick',p,{passive:false})})();
+
 (function () {
   'use strict';
   var BASE = location.pathname.replace(/\/staff\/?$/, '');
