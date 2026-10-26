@@ -6966,23 +6966,3 @@ html[dir=rtl] .rd-man { transform: translateX(50%); }
   .stf-road .tkc-a { margin-top: 8px; }
   .stf-road .tkc-b { padding: 5px 12px; font-size: 12px; }
 }
-
-/* ════ 4.82 · الوضع الليلي أفتح شوية — نفس الأحمر بس أرضية ماروني بدل الأسود ════ */
-html.aurum[data-theme="dark"] {
-  --ax-bg: #1A0B0E; --ax-side: #1D0D10; --ax-surface: #26131A; --ax-surface-2: #2D171C; --ax-surface-3: #361C22;
-  --ax-line: #3E2026; --ax-line-2: #5A2A32;
-  --ax-muted: #CDB2B6; --ax-faint: #9A7C80;
-  --ax-deep: #2A1117; --ax-input: #211014;
-  --rd-card: linear-gradient(160deg, #2C151A 0%, #200F13 100%);
-  --rd-edge: rgba(229, 35, 47, .30);
-  --ax-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 28px -16px rgba(229, 35, 47, .30);
-}
-html.aurum[data-theme="dark"] body {
-  background:
-    radial-gradient(900px 520px at 100% -10%, rgba(229, 35, 47, .22), transparent 60%),
-    radial-gradient(700px 600px at -10% 110%, rgba(229, 35, 47, .16), transparent 60%),
-    #1A0B0E !important; background-attachment: fixed !important;
-}
-html.aurum[data-theme="dark"] .sidebar { background: linear-gradient(180deg, #24111A, #1A0B0F) !important; border-color: #3E2026 !important; }
-html.aurum[data-theme="dark"] .card, html.aurum[data-theme="dark"] .stat-card { border-color: rgba(229, 35, 47, .28); }
-html.aurum[data-theme="dark"] .pxs { --bg: #2A1218 !important; }
