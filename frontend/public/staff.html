@@ -90,12 +90,49 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
 @keyframes up{from{transform:translateY(40px);opacity:0}}
 .toast{position:fixed;inset-inline:16px;bottom:max(20px,env(safe-area-inset-bottom));max-width:488px;margin:0 auto;background:#16110F;color:#fff;border-radius:14px;padding:13px 15px;font-size:14px;z-index:60;box-shadow:0 12px 30px -10px rgba(0,0,0,.6);display:none;line-height:1.6}.toast.on{display:block;animation:up .2s ease}.toast.bad{background:var(--red2)}
 .hide{display:none!important}
+/* 4.61 · the center he is working at */
+.vc{margin-top:12px;border-radius:20px;padding:15px;background:var(--card);border:1px solid var(--line)}
+.vc.on{border-color:rgba(30,154,76,.45);background:linear-gradient(180deg,rgba(30,154,76,.09),transparent 70%),var(--card)}
+.vc.ask{border-style:dashed;text-align:center}
+.vc h3{margin:0 0 4px;font-size:15px;display:flex;align-items:center;gap:8px}.vc.ask h3{justify-content:center}
+.vc .sub{font-size:12.5px;color:var(--mut);line-height:1.7}
+.vc .big{font:800 20px/1.35 'Zain','IBM Plex Sans Arabic',sans-serif;margin:2px 0}
+.vc .acts{display:flex;gap:8px;margin-top:12px}.vc .acts .btn{height:46px;font-size:14.5px}
+.vc .ic{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:rgba(30,154,76,.14);flex:none}
+.vc .ic svg{width:19px;height:19px;stroke:var(--ok);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.vc .row1{display:flex;gap:10px;align-items:center}
+.pill{display:inline-block;font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px;background:var(--soft);color:var(--mut);margin-inline-start:4px}
+.pill.g{background:rgba(30,154,76,.13);color:var(--ok)}.pill.r{background:rgba(224,27,15,.12);color:var(--red)}
+.tl{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px}
+.tl div{display:flex;gap:8px;align-items:center;font-size:12.5px;padding:4px 0;color:var(--mut)}.tl b{color:var(--ink);font-weight:700}.tl i{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}.tl div.o i{background:var(--ok)}
+.tl span:last-child{margin-inline-start:auto;font-variant-numeric:tabular-nums;direction:ltr;white-space:nowrap}.tl b{min-width:0}
+.cs{max-height:min(62vh,520px);overflow:auto;margin:10px -4px 0;padding:0 4px}
+.ci{display:flex;align-items:center;gap:10px;padding:12px;border-radius:15px;border:1px solid var(--line);background:var(--card);margin-bottom:8px;cursor:pointer;width:100%;text-align:right}
+.ci:active{transform:scale(.99)}.ci.sel{border-color:var(--red);box-shadow:0 0 0 2px rgba(224,27,15,.18)}
+.ci .t{flex:1;min-width:0}.ci b{display:block;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ci small{display:block;font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci .d{font-size:11.5px;font-weight:700;color:var(--ok);white-space:nowrap}.ci .d.f{color:var(--faint)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 13px;font-size:13px;cursor:pointer}
+.chips button.on{background:var(--red);border-color:var(--red);color:#fff}
+.sh .bx h2{margin:0 0 4px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 </head>
 <body>
 <div class="w" id="app"></div>
 <div class="toast" id="toast"></div>
+<div class="sh" id="csh"><div class="bx">
+  <h2>إنت شغّال في أنهي مركز؟</h2>
+  <p class="hint" style="text-align:right;margin:0">الأقرب لمكانك فوق. اختار المركز وبعدين اختار إنت بتعمل إيه.</p>
+  <input class="in" id="csq" placeholder="🔎 دوّر باسم المركز" style="margin-top:10px">
+  <div class="cs" id="csl"><div class="empty">بنحمّل المراكز…</div></div>
+  <div id="csx" class="hide">
+    <div class="chips" id="csp"></div>
+    <input class="in" id="csn" maxlength="200" placeholder="ملاحظة (اختياري) — مثلاً: سلّمت 5 كرتونة A4">
+    <div style="display:flex;gap:10px;margin-top:12px"><button class="btn" id="csgo">أنا هنا ✓</button><button class="btn ghost" id="csno" style="width:38%">إلغاء</button></div>
+  </div>
+  <div id="csx0" style="margin-top:10px"><button class="btn ghost" id="csno0">إلغاء</button></div>
+</div></div>
 <div class="sh" id="pwsh"><div class="bx">
   <h2 style="margin-top:0">تغيير كلمة السر</h2>
   <div class="err" id="pwerr"></div>
@@ -120,6 +157,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     key: '<svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L21 2M16 7l3 3"/></svg>',
     sun: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
     pin: '<svg viewBox="0 0 24 24"><path d="M12 22s7-6.1 7-12a7 7 0 0 0-14 0c0 5.9 7 12 7 12z"/><circle cx="12" cy="10" r="2.6"/></svg>',
+    bld: '<svg viewBox="0 0 24 24"><path d="M4 21V7l8-4 8 4v14"/><path d="M9 21v-5h6v5M10 9h4M12 7v4"/></svg>',
     prev: '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>', next: '<svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>'
   };
 
@@ -239,6 +277,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       '<div class="st">' + stateChip() + '</div>' + bigBtn() +
       '<div class="wk"><div><span>ميعاد الشغل</span><b>' + H.rules.start + ' - ' + H.rules.end + '</b></div><div><span>مدة الشغل النهارده</span><b id="wk">' + (H.rec ? dur(H.rec.worked) : '00:00') + '</b></div></div></section>' +
       '<div class="loc" id="loc">' + ICON.pin + '<span>بنحدد موقعك…</span></div>' +
+      '<div id="vis"></div>' +
       (H.track ? '<p class="hint" style="margin:10px 6px 0;text-align:right">موقعك بيتبعت للإدارة كل ' + H.ping_min + ' دقيقة <b>وإنت في الشغل بس</b> (من تسجيل الحضور لحد الانصراف). سيب الصفحة مفتوحة، وبعد الانصراف مفيش أي تتبع.</p>' : '') +
       '<h2>الشهر ده</h2><div class="mn" id="mn"></div>' +
       '<h2>السجل <span class="sp"><button class="nv" id="mp">' + ICON.prev + '</button><b id="ml" style="font-size:13px;min-width:92px;text-align:center"></b><button class="nv" id="mnx">' + ICON.next + '</button></span></h2><div id="hl"></div>';
@@ -247,13 +286,14 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     $('bth').onclick = function () { theme(dark() ? 'light' : 'dark'); };
     $('pb').onclick = punch;
     $('mp').onclick = function () { shift(-1); }; $('mnx').onclick = function () { shift(1); };
-    paintHist(); paintLoc(true);
+    paintHist(); paintLoc(true); paintVisit();
     clearInterval(clockTimer); tick(); clockTimer = setInterval(tick, 1000);
   }
   function tick() {
     var d = srvNow(), c = $('clk'); if (!c) return;
     c.textContent = d.toISOString().slice(11, 19);
     if (H && H.state === 'in' && H.rec) { var w = $('wk'); if (w) w.textContent = dur((d.getTime() - tsMs(H.rec.in_at)) / 60000); }
+    if (H && H.visit) { var vm = $('vmins'); if (vm) vm.textContent = dur((d.getTime() - tsMs(H.visit.start_at)) / 60000); }
   }
 
   function paintLoc(fetchNow) {
@@ -263,7 +303,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       var best = null;
       (H.sites || []).forEach(function (s) { var dd = Math.round(dist(p.lat, p.lng, s.lat, s.lng)); if (!best || dd < best.d) best = { d: dd, s: s }; });
       var acc = p.acc ? ' · دقة ' + Math.round(p.acc) + ' م' : '';
-      if (!best) return set('good', '<b>الموقع شغال</b>' + acc, true);
+      if (!best || (H.visit && H.state === 'in')) return set('good', '<b>الموقع شغال</b>' + (H.visit && H.state === 'in' ? ' · إنت مسجّل في ' + esc(H.visit.center) : '') + acc, true);
       if (best.d <= best.s.radius) set('good', '<b>إنت في ' + esc(best.s.name) + '</b> (على بعد ' + best.d + ' م)' + acc, true);
       else set(H.geofence === 'block' && H.state === 'out' ? 'bad' : 'warn', '<b>إنت بعيد ' + best.d + ' م عن ' + esc(best.s.name) + '</b>' + (H.geofence === 'block' ? ' — لازم تقرّب علشان تسجّل الحضور' : ' — التسجيل هيتحسب بس هيبان للإدارة إنك برّه المكان') + acc, true);
     };
@@ -285,6 +325,79 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       ls.set('ozs_lp', String(Date.now()));
       setTimeout(function () { renderHome(); startPings(); toast(type === 'in' ? (r.resumed ? 'تمام — كمّلت شغلك' : 'اتسجّل حضورك ' + hm(H.rec.in_at) + ' ✅') : 'اتسجّل انصرافك ' + hm(H.rec.out_at) + ' — تعيش 👋'); fin(); }, 900);
     }).catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
+  }
+
+
+  /* ── 4.61 · «أنا شغّال في مركز…» ── */
+  var CS = { list: [], pick: null, purpose: '' };
+  function paintVisit() {
+    var el = $('vis'); if (!el || !H) return;
+    if (!H.has_centers) { el.innerHTML = ''; return; }
+    if (H.state !== 'in') {
+      el.innerHTML = H.visits && H.visits.length ? '<div class="vc">' + tlHtml() + '</div>' : '';
+      return;
+    }
+    var v = H.visit;
+    if (v) {
+      el.innerHTML = '<div class="vc on"><div class="row1"><span class="ic">' + ICON.bld + '</span><div style="flex:1;min-width:0"><div class="sub">إنت شغّال دلوقتي في</div><div class="big">' + esc(v.center) + '</div></div></div>' +
+        '<div class="sub">من ' + hm(v.start_at) + ' · <b id="vmins">' + dur(v.mins) + '</b>' + (v.purpose ? '<span class="pill g">' + esc(v.purpose) + '</span>' : '') + (v.far ? '<span class="pill r">بعيد ' + v.dist + ' م عن مكان المركز</span>' : '') + '</div>' +
+        '<div class="acts"><button class="btn" id="vend">✓ خلّصت هنا</button><button class="btn ghost" id="vnext">مركز تاني</button></div>' + tlHtml() + '</div>';
+      $('vend').onclick = endVisit; $('vnext').onclick = openCenters;
+    } else {
+      el.innerHTML = '<div class="vc ask"><h3>' + ICON.bld.replace('<svg', '<svg width="20" height="20" style="stroke:var(--red);fill:none;stroke-width:2"') + ' إنت فين دلوقتي؟</h3><div class="sub">لو رايح أو شغّال في مركز، اختاره من القايمة علشان الإدارة تعرف.</div>' +
+        '<div class="acts"><button class="btn" id="vpick">اختار المركز اللي شغّال فيه</button></div>' + tlHtml() + '</div>';
+      $('vpick').onclick = openCenters;
+    }
+  }
+  function tlHtml() {
+    var vs = (H.visits || []); if (!vs.length) return '';
+    return '<div class="tl">' + vs.map(function (v) { return '<div class="' + (v.open ? 'o' : '') + '"><i></i><b>' + esc(v.center) + '</b>' + (v.purpose ? ' · ' + esc(v.purpose) : '') + '<span>' + hm(v.start_at) + (v.end_at ? ' - ' + hm(v.end_at) : '') + ' · ' + dur(v.mins) + '</span></div>'; }).join('') + '</div>';
+  }
+  function openCenters() {
+    CS.pick = null; CS.purpose = '';
+    $('csq').value = ''; $('csx').className = 'hide'; $('csx0').className = ''; $('csh').classList.add('on');
+    $('csl').innerHTML = '<div class="empty">بنحمّل المراكز…</div>';
+    var go = function (p) {
+      api('GET', '/centers' + (p ? '?lat=' + p.lat + '&lng=' + p.lng : '')).then(function (r) { CS.list = r.list; paintCenters(); }).catch(function (e) { $('csl').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+    };
+    getPos(false).then(go, function () { go(null); });
+  }
+  function paintCenters() {
+    var q = $('csq').value.trim(), list = CS.list;
+    if (q) list = list.filter(function (c) { return (c.name + ' ' + c.address).indexOf(q) >= 0; });
+    $('csl').innerHTML = list.length ? list.slice(0, 120).map(function (c) {
+      var d = c.dist != null ? (c.dist < 1000 ? c.dist + ' م' : (c.dist / 1000).toFixed(1) + ' كم') : '';
+      return '<button class="ci' + (CS.pick === c.key ? ' sel' : '') + '" data-k="' + esc(c.key) + '"><div class="t"><b>' + esc(c.name) + '</b><small>' + esc([c.address, c.branch].filter(Boolean).join(' · ') || (c.mine ? 'زرته ' + c.mine + ' مرة' : '')) + '</small></div>' +
+        (d ? '<span class="d' + (c.dist > 1500 ? ' f' : '') + '">' + (c.dist <= 1500 ? 'قريب · ' : '') + d + '</span>' : (c.mine ? '<span class="d f">زرته ' + c.mine + '</span>' : '')) + '</button>';
+    }).join('') : '<div class="empty">مفيش مركز بالاسم ده</div>';
+    [].forEach.call($('csl').querySelectorAll('.ci'), function (b) { b.onclick = function () { choose(b.dataset.k); }; });
+  }
+  function choose(k) {
+    CS.pick = k; paintCenters();
+    $('csp').innerHTML = (H.purposes || []).map(function (p) { return '<button data-p="' + esc(p) + '" class="' + (CS.purpose === p ? 'on' : '') + '">' + esc(p) + '</button>'; }).join('');
+    [].forEach.call($('csp').querySelectorAll('button'), function (b) { b.onclick = function () { CS.purpose = CS.purpose === b.dataset.p ? '' : b.dataset.p; [].forEach.call($('csp').children, function (x) { x.classList.toggle('on', x.dataset.p === CS.purpose); }); }; });
+    $('csx').className = ''; $('csx0').className = 'hide';
+    var sel = $('csl').querySelector('.ci.sel'); if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+  }
+  $('csq').oninput = paintCenters;
+  $('csno').onclick = $('csno0').onclick = function () { $('csh').classList.remove('on'); };
+  $('csh').onclick = function (e) { if (e.target === this) this.classList.remove('on'); };
+  $('csgo').onclick = function () {
+    if (!CS.pick || busy) return; busy = true; var b = this; b.disabled = true;
+    var fin = function () { busy = false; b.disabled = false; };
+    getPos(true).catch(function (e) { if (H.need_location) throw e; return null; }).then(function (p) {
+      return battery().then(function (bt) { return api('POST', '/visit', { center: CS.pick, purpose: CS.purpose, note: $('csn').value.trim(), lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt }); });
+    }).then(function (r) {
+      fin(); $('csh').classList.remove('on'); $('csn').value = '';
+      H = r.home; syncClock(H.now.ts); paintVisit(); paintLoc();
+      toast(r.far ? 'اتسجّل — بس إنت بعيد ' + r.dist + ' م عن مكان المركز المعروف' : 'اتسجّل إنك في ' + (H.visit ? H.visit.center : 'المركز') + ' ✅', !!r.far);
+    }).catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
+  };
+  function endVisit() {
+    if (busy) return; busy = true;
+    var fin = function () { busy = false; };
+    getPos(true).catch(function () { return null; }).then(function (p) { return api('POST', '/visit/end', { lat: p && p.lat, lng: p && p.lng }); })
+      .then(function (r) { fin(); H = r.home; paintVisit(); paintLoc(); toast('تمام — خلّصت في المركز'); }).catch(function (e) { fin(); if (e.message) toast(e.message, true); });
   }
 
   /* ── month ── */

@@ -40,12 +40,40 @@ CREATE TABLE IF NOT EXISTS staff_loc (
 CREATE INDEX IF NOT EXISTS ix_staff_loc ON staff_loc (emp_id, at);
 CREATE TABLE IF NOT EXISTS staff_cfg (key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS staff_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT, who TEXT, action TEXT, detail TEXT);
+CREATE TABLE IF NOT EXISTS staff_visit (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, emp_id TEXT NOT NULL, att_id INTEGER, date TEXT NOT NULL,
+  center_key TEXT NOT NULL, center_name TEXT, branch_id TEXT,
+  start_at TEXT NOT NULL, end_at TEXT, lat REAL, lng REAL, acc REAL, dist INTEGER,
+  end_lat REAL, end_lng REAL, purpose TEXT, note TEXT, ended_by TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_staff_visit ON staff_visit (emp_id, date);
+CREATE INDEX IF NOT EXISTS ix_staff_visit_c ON staff_visit (center_key, date);
+CREATE TABLE IF NOT EXISTS staff_center (key TEXT PRIMARY KEY, name TEXT, lat REAL, lng REAL, n INTEGER NOT NULL DEFAULT 0, pinned INTEGER NOT NULL DEFAULT 0, updated_at TEXT);
 `);
+/* 4.61 · an employee may belong to one branch (he then sees that branch's centers only) */
+try { if (!db.prepare('PRAGMA table_info(staff_emp)').all().some(c => c.name === 'branch_id')) db.exec('ALTER TABLE staff_emp ADD COLUMN branch_id TEXT'); } catch (e) { console.error('[staff] branch_id', e.message); }
+
+/* ── the ERP's own data, handed in by server.js: the centers (customers of every branch) + the branches ── */
+let SRC = { centers: () => [], branches: () => [] };
+let _cc = null, _ccAt = 0;
+function setSource(s) { SRC = Object.assign(SRC, s || {}); _cc = null; }
+function centersAll() {
+  if (_cc && Date.now() - _ccAt < 20000) return _cc;
+  let list = [];
+  try { list = SRC.centers() || []; } catch (e) { list = []; }
+  const learned = new Map(db.prepare('SELECT * FROM staff_center').all().map(r => [r.key, r]));
+  _cc = list.map(c => { const l = learned.get(c.key); return Object.assign({}, c, l && l.lat != null ? { lat: l.lat, lng: l.lng, pinned: !!l.pinned, samples: l.n } : { lat: null, lng: null }); });
+  _ccAt = Date.now();
+  return _cc;
+}
+const centerByKey = k => centersAll().find(c => c.key === k) || null;
+function centersFor(e) { const all = centersAll(); return e && e.branch_id ? all.filter(c => c.branch === e.branch_id) : all; }
+const PURPOSES = ['توصيل ورق', 'تحصيل', 'متابعة / زيارة', 'صيانة / تجربة', 'استلام مرتجع', 'تاني'];
 
 /* ── settings ── */
 const DEFAULTS = {
   tz: 'Africa/Cairo', require_location: '1', geofence: 'warn', ping_min: '15', grace_min: '10',
-  shift_start: '09:00', shift_end: '17:00', rest_days: '5', track: '1', open_hours: '16'
+  shift_start: '09:00', shift_end: '17:00', rest_days: '5', track: '1', open_hours: '16', center_radius: '300'
 };
 function cfgAll() {
   const out = Object.assign({}, DEFAULTS);
@@ -182,8 +210,88 @@ function home(e) {
     track: c.track === '1' && e.track === 1, ping_min: Math.max(1, Number(c.ping_min) || 15),
     need_location: c.require_location === '1', geofence: c.geofence,
     sites: sites.map(s => ({ id: s.id, name: s.name, lat: s.lat, lng: s.lng, radius: s.radius })),
-    month: monthSummary(e, now.date.slice(0, 7), now)
+    month: monthSummary(e, now.date.slice(0, 7), now),
+    visit: openVisit(e.id, now) ? visitOut(openVisit(e.id, now), now) : null,
+    visits: db.prepare('SELECT * FROM staff_visit WHERE emp_id = ? AND date = ? ORDER BY id').all(e.id, now.date).map(v => visitOut(v, now)),
+    purposes: PURPOSES, has_centers: centersFor(e).length > 0
   };
+}
+
+/* ── 4.61 · «أنا شغّال في مركز…» — a visit to one of the ERP's centers ── */
+function openVisit(empId, now) {
+  const v = db.prepare('SELECT * FROM staff_visit WHERE emp_id = ? AND end_at IS NULL ORDER BY id DESC LIMIT 1').get(empId);
+  if (!v) return null;
+  if (!openRecord(empId, now)) { closeVisit(v, now, null, null, 'auto'); return null; }        // the day ended without closing it
+  return v;
+}
+function closeVisit(v, now, lat, lng, by) {
+  db.prepare('UPDATE staff_visit SET end_at = ?, end_lat = ?, end_lng = ?, ended_by = ? WHERE id = ? AND end_at IS NULL').run(now.ts, lat, lng, by || 'emp', v.id);
+}
+const centerRadius = () => Math.max(80, Number(cfg('center_radius')) || 300);
+function visitOut(v, now) {
+  const end = v.end_at || (now ? now.ts : null);
+  return {
+    id: v.id, center_key: v.center_key, center: v.center_name, branch: v.branch_id, start_at: v.start_at, end_at: v.end_at,
+    mins: end ? Math.max(0, Math.round(tsMin(end) - tsMin(v.start_at))) : 0, open: !v.end_at,
+    dist: v.dist, far: v.dist != null && v.dist > centerRadius(), purpose: v.purpose || '', note: v.note || '', lat: v.lat, lng: v.lng
+  };
+}
+/* the center's place is learned from the visits themselves (good GPS fixes only), unless the manager pinned it */
+function learnCenter(c, lat, lng, acc) {
+  if (lat == null || lng == null || (acc != null && acc > 120)) return;
+  const r = db.prepare('SELECT * FROM staff_center WHERE key = ?').get(c.key);
+  const now = nowLocal().ts;
+  if (!r) { db.prepare('INSERT INTO staff_center (key, name, lat, lng, n, pinned, updated_at) VALUES (?,?,?,?,1,0,?)').run(c.key, c.name, lat, lng, now); _cc = null; return; }
+  if (r.pinned || r.lat == null) { if (r.lat == null) { db.prepare('UPDATE staff_center SET lat = ?, lng = ?, n = 1, updated_at = ? WHERE key = ?').run(lat, lng, now, c.key); _cc = null; } return; }
+  if (r.n >= 8 || haversine(lat, lng, r.lat, r.lng) > centerRadius()) return;      // far fixes never pull the point away
+  const n = r.n + 1;
+  db.prepare('UPDATE staff_center SET lat = ?, lng = ?, n = ?, updated_at = ? WHERE key = ?').run((r.lat * r.n + lat) / n, (r.lng * r.n + lng) / n, n, now, c.key);
+  _cc = null;
+}
+function startVisit(e, b) {
+  const now = nowLocal();
+  const att = openRecord(e.id, now);
+  if (!att) fail(409, 'سجّل حضورك الأول وبعدين اختار المركز');
+  const c = centersFor(e).find(x => x.key === String(b.center || ''));
+  if (!c) fail(404, 'المركز ده مش موجود في القايمة');
+  const lat = num(b.lat), lng = num(b.lng), acc = num(b.acc);
+  const has = lat !== null && lng !== null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  if (cfg('require_location') === '1' && !has) fail(400, 'لازم تفعّل الموقع علشان تسجّل إنك في المركز');
+  const cur = openVisit(e.id, now);
+  if (cur && cur.center_key === c.key) return { ok: true, same: true, home: home(e) };
+  if (cur) closeVisit(cur, now, has ? lat : null, has ? lng : null, 'next');
+  const dist = has && c.lat != null ? Math.round(haversine(lat, lng, c.lat, c.lng)) : null;
+  const purpose = PURPOSES.includes(b.purpose) ? b.purpose : (b.purpose ? str(b.purpose, 40) : '');
+  db.prepare('INSERT INTO staff_visit (emp_id, att_id, date, center_key, center_name, branch_id, start_at, lat, lng, acc, dist, purpose, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(e.id, att.id, now.date, c.key, c.name, c.branch || null, now.ts, has ? lat : null, has ? lng : null, acc, dist, purpose, str(b.note, 200));
+  if (has) { logLoc(e, att.id, now, lat, lng, acc, b.battery, 'visit'); if (dist === null || dist <= centerRadius()) learnCenter(c, lat, lng, acc); }
+  return { ok: true, home: home(e), dist, far: dist != null && dist > centerRadius() };
+}
+function endVisit(e, b) {
+  const now = nowLocal(), v = openVisit(e.id, now);
+  if (!v) fail(409, 'إنت مش مسجّل في أي مركز دلوقتي');
+  const lat = num(b.lat), lng = num(b.lng);
+  closeVisit(v, now, lat, lng, 'emp');
+  return { ok: true, home: home(e) };
+}
+function centersList(e, q) {
+  const lat = num(q.get('lat')), lng = num(q.get('lng'));
+  const mine = new Map(db.prepare('SELECT center_key, MAX(start_at) AS last, COUNT(*) AS n FROM staff_visit WHERE emp_id = ? GROUP BY center_key').all(e.id).map(r => [r.center_key, r]));
+  const brs = new Map((SRC.branches() || []).map(b => [b.id, b.name]));
+  const many = brs.size > 1 && !e.branch_id;
+  const list = centersFor(e).map(c => {
+    const d = lat !== null && c.lat != null ? Math.round(haversine(lat, lng, c.lat, c.lng)) : null;
+    const m = mine.get(c.key);
+    return { key: c.key, name: c.name, address: c.address || '', branch: many ? (brs.get(c.branch) || '') : '', dist: d, known: c.lat != null, mine: m ? m.n : 0, last: m ? m.last : null };
+  });
+  list.sort((a, b) => {
+    const an = a.dist != null && a.dist <= 1500, bn = b.dist != null && b.dist <= 1500;
+    if (an !== bn) return an ? -1 : 1;
+    if (an && bn) return a.dist - b.dist;
+    if (!!a.mine !== !!b.mine) return a.mine ? -1 : 1;
+    return a.name.localeCompare(b.name, 'ar');
+  });
+  return { list, radius: centerRadius() };
 }
 
 /* ── punch / ping ── */
@@ -215,6 +323,8 @@ function punch(e, b) {
   } else {
     const open = openRecord(e.id, now);
     if (!open) fail(409, 'مفيش حضور مسجّل — سجّل الحضور الأول');
+    const ov = db.prepare('SELECT * FROM staff_visit WHERE emp_id = ? AND end_at IS NULL ORDER BY id DESC LIMIT 1').get(e.id);
+    if (ov) closeVisit(ov, now, has ? lat : null, has ? lng : null, 'out');
     db.prepare('UPDATE staff_att SET out_at = ?, out_lat = ?, out_lng = ?, out_acc = ?, out_dist = ? WHERE id = ?')
       .run(now.ts, has ? lat : null, has ? lng : null, acc, near ? near.dist : null, open.id);
     if (has) logLoc(e, open.id, now, lat, lng, acc, b.battery, 'out');
@@ -247,7 +357,7 @@ const adminEmp = (e, now) => {
   return {
     id: e.id, name: e.name, job: e.job || '', phone: e.phone || '', username: e.username, active: !!e.active, track: !!e.track,
     shift_start: e.shift_start || '', shift_end: e.shift_end || '', rest_days: e.rest_days == null ? '' : e.rest_days, site_id: e.site_id || '', note: e.note || '',
-    created_at: e.created_at, last_login_at: e.last_login_at,
+    created_at: e.created_at, last_login_at: e.last_login_at, branch_id: e.branch_id || '',
     rules: { start: R.start, end: R.end, rest: R.rest },
     state: open ? 'in' : (today ? 'done' : 'out'),
     in_at: today ? today.in_at : null, out_at: today ? today.out_at : null
@@ -255,7 +365,8 @@ const adminEmp = (e, now) => {
 };
 function bootstrap() {
   const now = nowLocal();
-  return { now, cfg: cfgAll(), sites: sitesAll(), emps: db.prepare('SELECT * FROM staff_emp ORDER BY active DESC, name').all().map(e => adminEmp(e, now)) };
+  let brs = []; try { brs = (SRC.branches() || []).map(b => ({ id: b.id, name: b.name })); } catch (e) {}
+  return { now, cfg: cfgAll(), sites: sitesAll(), branches: brs, centers: centersAll().length, purposes: PURPOSES, emps: db.prepare('SELECT * FROM staff_emp ORDER BY active DESC, name').all().map(e => adminEmp(e, now)) };
 }
 function saveEmp(b, who) {
   const name = str(b.name, 100); if (!name) fail(400, 'اكتب اسم الموظف');
@@ -276,6 +387,7 @@ function saveEmp(b, who) {
   const rest = b.rest_days === '' || b.rest_days == null ? null : [...new Set(String(b.rest_days).split(',').map(x => x.trim()).filter(x => /^[0-6]$/.test(x)))].join(',');
   const site = b.site_id && db.prepare('SELECT 1 FROM staff_site WHERE id = ?').get(String(b.site_id)) ? String(b.site_id) : null;
   const row = { name, job: str(b.job, 80), phone: str(b.phone, 30), active: b.active === false || b.active === 0 ? 0 : 1, track: b.track === false || b.track === 0 ? 0 : 1, note: str(b.note, 300) };
+  let branch = null; try { branch = b.branch_id && (SRC.branches() || []).some(x => x.id === String(b.branch_id)) ? String(b.branch_id) : null; } catch (e) {}
   let pw = null, eid = id;
   if (id) {
     db.prepare('UPDATE staff_emp SET name=?, job=?, phone=?, username=?, active=?, track=?, shift_start=?, shift_end=?, rest_days=?, site_id=?, note=? WHERE id=?')
@@ -289,6 +401,7 @@ function saveEmp(b, who) {
     db.prepare('INSERT INTO staff_emp (id, name, job, phone, username, pass, active, track, shift_start, shift_end, rest_days, site_id, note, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(eid, row.name, row.job, row.phone, username, auth.hashPassword(pw), row.active, row.track, ss, se, rest, site, row.note, nowLocal().ts);
   }
+  db.prepare('UPDATE staff_emp SET branch_id = ? WHERE id = ?').run(branch, eid);
   log(who, id ? 'emp.update' : 'emp.create', { id: eid, name });
   return { ok: true, id: eid, username, password: pw };                    // the password is shown once, here
 }
@@ -304,7 +417,7 @@ function deleteEmp(id, who) {
   const e = db.prepare('SELECT * FROM staff_emp WHERE id = ?').get(str(id, 20)); if (!e) fail(404, 'الموظف مش موجود');
   db.exec('BEGIN');
   try {
-    for (const t of ['staff_att', 'staff_loc', 'staff_sess']) db.prepare('DELETE FROM ' + t + ' WHERE emp_id = ?').run(e.id);
+    for (const t of ['staff_att', 'staff_loc', 'staff_sess', 'staff_visit']) db.prepare('DELETE FROM ' + t + ' WHERE emp_id = ?').run(e.id);
     db.prepare('DELETE FROM staff_emp WHERE id = ?').run(e.id);
     db.exec('COMMIT');
   } catch (er) { db.exec('ROLLBACK'); throw er; }
@@ -320,6 +433,7 @@ function saveCfg(b, who) {
   if (b.grace_min !== undefined) c.grace_min = String(Math.max(0, Math.min(120, Math.round(Number(b.grace_min) || 0))));
   if (b.shift_start !== undefined) { if (!isHM(b.shift_start)) fail(400, 'ميعاد البداية غلط'); c.shift_start = b.shift_start; }
   if (b.shift_end !== undefined) { if (!isHM(b.shift_end)) fail(400, 'ميعاد النهاية غلط'); c.shift_end = b.shift_end; }
+  if (b.center_radius !== undefined) c.center_radius = String(Math.max(80, Math.min(3000, Math.round(Number(b.center_radius) || 300))));
   if (b.rest_days !== undefined) c.rest_days = [...new Set(String(b.rest_days).split(',').map(x => x.trim()).filter(x => /^[0-6]$/.test(x)))].join(',');
   for (const k of Object.keys(c)) cfgSet(k, c[k]);
   if (Array.isArray(b.sites)) {
@@ -350,7 +464,7 @@ function live() {
     const today = db.prepare('SELECT * FROM staff_att WHERE emp_id = ? AND date = ? ORDER BY id DESC LIMIT 1').get(e.id, now.date);
     const l = db.prepare('SELECT * FROM staff_loc WHERE emp_id = ? AND at >= ? ORDER BY id DESC LIMIT 1').get(e.id, now.date + ' 00:00:00');
     const item = { id: e.id, name: e.name, job: e.job || '', phone: e.phone || '', state: open ? 'in' : (today ? 'done' : 'out'), in_at: today ? today.in_at : null, out_at: today ? today.out_at : null, tracking: !!e.track };
-    if (today) { const c = calc(today, e, now.ts); item.late = c.late; item.worked = c.worked; item.over = c.over; item.early = c.early; item.in_dist = today.in_dist; }
+    if (today) { const c = calc(today, e, now.ts); item.late = c.late; item.worked = c.worked; item.over = c.over; item.early = c.early; item.in_dist = today.in_dist; const ss = today.in_site && sites.get(today.in_site); item.in_far = today.in_dist != null && !!ss && today.in_dist > (ss.radius || 250); }
     if (l) {
       item.last = { lat: l.lat, lng: l.lng, acc: l.acc, at: l.at, battery: l.battery, kind: l.kind };
       item.age_min = Math.max(0, Math.round(nowM - tsMin(l.at)));
@@ -358,18 +472,29 @@ function live() {
       if (near) { item.site = near.name; item.dist = near.dist; item.at_site = near.dist <= near.radius; }
     }
     item.pings = db.prepare("SELECT COUNT(*) AS n FROM staff_loc WHERE emp_id = ? AND at >= ? AND kind = 'ping'").get(e.id, now.date + ' 00:00:00').n;
+    const ov = openVisit(e.id, now);
+    if (ov) item.visit = visitOut(ov, now);
+    item.visits = db.prepare('SELECT COUNT(*) AS n FROM staff_visit WHERE emp_id = ? AND date = ?').get(e.id, now.date).n;
     out.push(item);
   }
   const rank = { in: 0, out: 1, done: 2 };
   out.sort((a, b) => (rank[a.state] - rank[b.state]) || a.name.localeCompare(b.name, 'ar'));
-  return { now, ping_min: Number(cfg('ping_min')) || 15, list: out, sites: sitesAll().filter(s => s.lat !== null).map(s => ({ id: s.id, name: s.name, lat: s.lat, lng: s.lng, radius: s.radius })) };
+  /* the centers on the map: every center whose place is known, and who is in it right now */
+  const here = {}; out.forEach(x => { if (x.visit) (here[x.visit.center_key] = here[x.visit.center_key] || []).push(x.name); });
+  const todayN = new Map(db.prepare('SELECT center_key, COUNT(*) AS n FROM staff_visit WHERE date = ? GROUP BY center_key').all(now.date).map(r => [r.center_key, r.n]));
+  const centers = centersAll().filter(c => c.lat != null).map(c => ({ key: c.key, name: c.name, lat: c.lat, lng: c.lng, here: here[c.key] || [], today: todayN.get(c.key) || 0 }));
+  return { now, ping_min: Number(cfg('ping_min')) || 15, radius: centerRadius(), list: out, centers, sites: sitesAll().filter(s => s.lat !== null).map(s => ({ id: s.id, name: s.name, lat: s.lat, lng: s.lng, radius: s.radius })) };
 }
 function track(empId, date) {
   const e = db.prepare('SELECT * FROM staff_emp WHERE id = ?').get(str(empId, 20)); if (!e) fail(404, 'الموظف مش موجود');
   const d = isDate(date) ? date : nowLocal().date;
   const att = db.prepare('SELECT * FROM staff_att WHERE emp_id = ? AND date = ? ORDER BY id').all(e.id, d);
   const points = db.prepare('SELECT at, lat, lng, acc, battery, kind FROM staff_loc WHERE emp_id = ? AND at >= ? AND at < ? ORDER BY at').all(e.id, d + ' 00:00:00', addDays(d, 1) + ' 12:00:00');
-  return { date: d, emp: { id: e.id, name: e.name }, att, points };
+  const now = nowLocal();
+  const visits = db.prepare('SELECT * FROM staff_visit WHERE emp_id = ? AND date = ? ORDER BY start_at').all(e.id, d).map(v => visitOut(v, now));
+  const keys = new Set(visits.map(v => v.center_key));
+  const centers = centersAll().filter(c => keys.has(c.key) && c.lat != null).map(c => ({ key: c.key, name: c.name, lat: c.lat, lng: c.lng }));
+  return { date: d, emp: { id: e.id, name: e.name }, att, points, visits, centers, radius: centerRadius() };
 }
 function report(month) {
   const now = nowLocal();
@@ -393,7 +518,11 @@ function report(month) {
     const from = e.created_at && e.created_at.slice(0, 10) > a ? e.created_at.slice(0, 10) : a;
     let absent = 0, expected = 0;
     for (let d = from; d <= last; d = addDays(d, 1)) { if (R.rest.includes(String(dow(d)))) continue; expected++; if (!days[d] && d < now.date) absent++; }
-    rows.push({ id: e.id, name: e.name, job: e.job || '', active: !!e.active, present: Object.keys(days).length, absent, expected, mins, late, lateMin, over, early, noOut: openN, outside, days: Object.values(days) });
+    const vs = db.prepare('SELECT * FROM staff_visit WHERE emp_id = ? AND date >= ? AND date <= ?').all(e.id, a, b).map(v => visitOut(v, now));
+    const byDay = {}; db.prepare('SELECT date, COUNT(*) AS n FROM staff_visit WHERE emp_id = ? AND date >= ? AND date <= ? GROUP BY date').all(e.id, a, b).forEach(r => { byDay[r.date] = r.n; });
+    Object.values(days).forEach(d => { d.visits = byDay[d.date] || 0; });
+    rows.push({ id: e.id, name: e.name, job: e.job || '', active: !!e.active, present: Object.keys(days).length, absent, expected, mins, late, lateMin, over, early, noOut: openN, outside,
+      visits: vs.length, visitMins: vs.reduce((t, v) => t + v.mins, 0), centersN: new Set(vs.map(v => v.center_key)).size, farVisits: vs.filter(v => v.far).length, days: Object.values(days) });
   }
   return { month: m, from: a, to: b, now, rows };
 }
@@ -420,8 +549,42 @@ function saveAtt(b, who) {
 }
 function delAtt(id, who) {
   const r = db.prepare('SELECT a.*, e.name FROM staff_att a JOIN staff_emp e ON e.id = a.emp_id WHERE a.id = ?').get(Number(id)); if (!r) fail(404, 'السجل مش موجود');
-  db.prepare('DELETE FROM staff_att WHERE id = ?').run(r.id); db.prepare('DELETE FROM staff_loc WHERE att_id = ?').run(r.id);
+  db.prepare('DELETE FROM staff_att WHERE id = ?').run(r.id); db.prepare('DELETE FROM staff_loc WHERE att_id = ?').run(r.id); db.prepare('DELETE FROM staff_visit WHERE att_id = ?').run(r.id);
   log(who, 'att.delete', { emp: r.name, date: r.date });
+  return { ok: true };
+}
+
+/* 4.61 · «زيارات المراكز» — every center in a month: how many visits, how long, by whom, and where it is */
+function visitsReport(month) {
+  const now = nowLocal();
+  const m = /^\d{4}-\d{2}$/.test(String(month || '')) ? month : now.date.slice(0, 7);
+  const [a, b] = monthRange(m);
+  const names = new Map(db.prepare('SELECT id, name FROM staff_emp').all().map(r => [r.id, r.name]));
+  const rows = db.prepare('SELECT * FROM staff_visit WHERE date >= ? AND date <= ? ORDER BY start_at DESC').all(a, b);
+  const by = new Map();
+  for (const r of rows) {
+    const v = visitOut(r, now);
+    const g = by.get(r.center_key) || { key: r.center_key, name: r.center_name, n: 0, mins: 0, far: 0, last: null, emps: {}, purposes: {}, list: [] };
+    g.n++; g.mins += v.mins; if (v.far) g.far++; if (!g.last || r.start_at > g.last) g.last = r.start_at;
+    const en = names.get(r.emp_id) || '—'; g.emps[en] = (g.emps[en] || 0) + 1;
+    if (v.purpose) g.purposes[v.purpose] = (g.purposes[v.purpose] || 0) + 1;
+    if (g.list.length < 40) g.list.push(Object.assign(v, { emp: en, date: r.date }));
+    by.set(r.center_key, g);
+  }
+  const all = centersAll();
+  const known = new Map(all.map(c => [c.key, c]));
+  const out = [...by.values()].map(g => { const c = known.get(g.key); return Object.assign(g, { lat: c ? c.lat : null, lng: c ? c.lng : null, pinned: !!(c && c.pinned), samples: c ? c.samples || 0 : 0, gone: !c }); }).sort((x, y) => y.n - x.n);
+  const visited = new Set(out.map(g => g.key));
+  const never = all.filter(c => !visited.has(c.key)).map(c => ({ key: c.key, name: c.name, lat: c.lat, lng: c.lng }));
+  return { month: m, now, total: rows.length, centers: out, never: never.slice(0, 300), neverN: never.length, radius: centerRadius() };
+}
+function pinCenter(b, who) {
+  const c = centerByKey(String(b.key || '')); if (!c) fail(404, 'المركز مش موجود');
+  if (b.clear) { db.prepare('DELETE FROM staff_center WHERE key = ?').run(c.key); _cc = null; log(who, 'center.clear', { name: c.name }); return { ok: true }; }
+  const lat = num(b.lat), lng = num(b.lng);
+  if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) fail(400, 'الإحداثيات غلط');
+  db.prepare('INSERT INTO staff_center (key, name, lat, lng, n, pinned, updated_at) VALUES (?,?,?,?,1,1,?) ON CONFLICT(key) DO UPDATE SET lat = excluded.lat, lng = excluded.lng, pinned = 1, name = excluded.name, updated_at = excluded.updated_at').run(c.key, c.name, lat, lng, nowLocal().ts);
+  _cc = null; log(who, 'center.pin', { name: c.name });
   return { ok: true };
 }
 
@@ -475,6 +638,9 @@ async function handlePublic(req, res, pathname, h) {
     if (pathname === '/staff/api/home' && req.method === 'GET') return send(200, home(e));
     if (pathname === '/staff/api/punch' && req.method === 'POST') return send(200, punch(e, (await readBody(req, 0.02)) || {}));
     if (pathname === '/staff/api/ping' && req.method === 'POST') return send(200, ping(e, (await readBody(req, 0.02)) || {}));
+    if (pathname === '/staff/api/centers' && req.method === 'GET') return send(200, centersList(e, new URL(req.url, 'http://x').searchParams));
+    if (pathname === '/staff/api/visit' && req.method === 'POST') return send(200, startVisit(e, (await readBody(req, 0.02)) || {}));
+    if (pathname === '/staff/api/visit/end' && req.method === 'POST') return send(200, endVisit(e, (await readBody(req, 0.02)) || {}));
     if (pathname === '/staff/api/history' && req.method === 'GET') {
       const m = String(new URL(req.url, 'http://x').searchParams.get('month') || '');
       const month = /^\d{4}-\d{2}$/.test(m) ? m : nowLocal().date.slice(0, 7);
@@ -510,6 +676,7 @@ async function handleAdmin(req, res, pathname, me, h) {
     if (get && p === '/live') return sendJSON(res, 200, live());
     if (get && p === '/track') return sendJSON(res, 200, track(q.get('emp'), q.get('date')));
     if (get && p === '/report') return sendJSON(res, 200, report(q.get('month')));
+    if (get && p === '/visits') return sendJSON(res, 200, visitsReport(q.get('month')));
     if (get && p === '/log') return sendJSON(res, 200, { rows: db.prepare('SELECT * FROM staff_log ORDER BY id DESC LIMIT 80').all() });
     if (req.method === 'POST') {
       if (p === '/emp') return sendJSON(res, 200, saveEmp(await body(), who));
@@ -517,6 +684,7 @@ async function handleAdmin(req, res, pathname, me, h) {
       if (p === '/emp/delete') return sendJSON(res, 200, deleteEmp((await body()).id, who));
       if (p === '/cfg') return sendJSON(res, 200, saveCfg(await body(), who));
       if (p === '/att') return sendJSON(res, 200, saveAtt(await body(), who));
+      if (p === '/center') return sendJSON(res, 200, pinCenter(await body(), who));
       if (p === '/att/delete') return sendJSON(res, 200, delAtt((await body()).id, who));
     }
     return sendJSON(res, 404, { error: 'not_found' });
@@ -526,4 +694,4 @@ async function handleAdmin(req, res, pathname, me, h) {
   }
 }
 
-module.exports = { handlePublic, handleAdmin, _test: { nowLocal, calc, rulesOf, tsMin } };
+module.exports = { handlePublic, handleAdmin, setSource, _test: { nowLocal, calc, rulesOf, tsMin } };

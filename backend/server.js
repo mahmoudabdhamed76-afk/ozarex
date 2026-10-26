@@ -27,6 +27,18 @@ try { transfers.recover(); } catch (e) { console.error('[transfers] recover:', e
 const portal = require('./src/portal');
 const webpush = require('./src/webpush');
 const staff = require('./src/staff');
+/* 4.61 · the employees pick the center they're working at from the ERP's own customers (every branch) */
+staff.setSource({
+  centers: () => {
+    const out = [];
+    for (const st of branches.allStores()) {
+      const d = st.data() || {};
+      for (const c of (d.customers || [])) { if (!c || !c.id || !c.name || c.archived || c.disabled) continue; out.push({ key: st.id + ':' + c.id, id: c.id, branch: st.id, name: String(c.name).slice(0, 120), address: String(c.address || '').slice(0, 160) }); }
+    }
+    return out;
+  },
+  branches: () => branches.list().filter(b => b.active || b.main).map(b => ({ id: b.id, name: b.name }))
+});
 const digest = require('./src/digest');
 /* 4.39 · the daily summary + instant alerts read every active branch */
 const digestCtx = () => ({
