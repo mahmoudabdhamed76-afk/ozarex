@@ -612,7 +612,7 @@ function sweep() {
 sweep(); setInterval(sweep, 6 * 3600e3).unref();
 
 /* 4.63 · notifications + بنك الأعطال + المهام */
-X = require('./staffx')({ db, nowLocal, tsMin, haversine, num, str, fail, centerByKey, centersAll, centerRadius, cfg, openRecord, log, logLoc });
+X = require('./staffx')({ db, nowLocal, tsMin, haversine, num, str, fail, centerByKey, centersAll, centerRadius, cfg, openRecord, log, logLoc, startVisit, endVisit, home });
 
 /* ═════════════ HTTP ═════════════ */
 /* /staff/api/* — the employee's own endpoints (no ERP session; his own) */

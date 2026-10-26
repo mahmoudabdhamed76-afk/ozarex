@@ -6838,3 +6838,23 @@ html[dir=rtl] .rd-man { transform: translateX(50%); }
 .stf-cpick { max-height: 340px; }
 .stf-cph { font-size: 12px; color: var(--ax-muted); padding: 2px 6px 4px; font-weight: 700; }
 .stf-cpb { position: sticky; top: -6px; z-index: 1; background: var(--ax-surface, #1a1112); font-size: 12px; font-weight: 800; color: var(--ax-primary, #E5232F); padding: 6px 8px 4px; }
+/* 4.64 · task stages — اتبعتت ← في الطريق ← وصل ← بيشتغل ← خلّص */
+.tk-list { display: flex; flex-direction: column; gap: 10px; }
+.tk-it { border: 1px solid var(--ax-line); border-radius: 16px; padding: 12px 14px 10px; background: var(--ax-surface-2, rgba(128,128,128,.05)); }
+.tk-it.done { border-color: rgba(30,154,76,.4); }
+.tk-h { display: flex; align-items: flex-start; gap: 8px; } .tk-h > div { flex: 1; min-width: 0; }
+.tk-h b { display: block; font-size: 15px; } .tk-h span { display: block; color: var(--ax-muted); font-size: 12.5px; line-height: 1.6; }
+.tk-st { display: flex; margin: 12px 0 4px; }
+.tk-st > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative; font-size: 11.5px; color: var(--ax-muted); text-align: center; min-width: 0; }
+.tk-st > div::before { content: ""; position: absolute; top: 15px; inset-inline-end: 50%; width: 100%; height: 3px; background: rgba(128,128,128,.3); }
+.tk-st > div:first-child::before { display: none; }
+.tk-st > div.ok::before, .tk-st > div.cur::before { background: #1E9A4C; }
+.tk-st i { position: relative; z-index: 1; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 14px; background: rgba(128,128,128,.2); filter: grayscale(1); opacity: .5; }
+.tk-st .ok i { background: rgba(30,154,76,.2); filter: none; opacity: 1; }
+.tk-st .cur i { background: #1E9A4C; filter: none; opacity: 1; box-shadow: 0 0 0 5px rgba(30,154,76,.2); animation: tkP 1.8s infinite; }
+@keyframes tkP { 50% { box-shadow: 0 0 0 9px rgba(30,154,76,.04); } }
+.tk-st .ok span, .tk-st .cur span { color: var(--ax-text); font-weight: 700; }
+.tk-st em { font-style: normal; font-variant-numeric: tabular-nums; min-height: 15px; direction: ltr; font-size: 11px; }
+.tk-x { font-size: 12.5px; color: var(--ax-muted); margin-top: 6px; line-height: 1.7; } .tk-x.ok { background: rgba(30,154,76,.1); color: inherit; border-radius: 10px; padding: 6px 10px; }
+.tk-x code { font: 700 11px monospace; background: rgba(128,128,128,.2); border-radius: 6px; padding: 1px 6px; direction: ltr; display: inline-block; }
+@media (prefers-reduced-motion: reduce) { .tk-st .cur i { animation: none; } }

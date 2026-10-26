@@ -119,6 +119,17 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
 .vc.tk{border-color:rgba(224,27,15,.35);background:linear-gradient(180deg,rgba(224,27,15,.07),transparent 70%),var(--card)}
 .vc.tk.going{border-color:rgba(30,154,76,.45);background:linear-gradient(180deg,rgba(30,154,76,.09),transparent 70%),var(--card)}
 .vc.tk .ic{background:rgba(224,27,15,.12);font-size:18px}.vc.tk.going .ic,.vc.tk.arrived .ic{background:rgba(30,154,76,.14)}
+.stp{display:flex;margin:14px 0 2px;position:relative}
+.stp>div{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;font-size:11px;color:var(--faint);text-align:center}
+.stp>div::before{content:"";position:absolute;top:16px;inset-inline-end:50%;width:100%;height:3px;background:var(--line);z-index:0}
+.stp>div:first-child::before{display:none}
+.stp>div.ok::before,.stp>div.cur::before{background:var(--ok)}
+.stp i{position:relative;z-index:1;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:15px;background:var(--soft);filter:grayscale(1);opacity:.55}
+.stp .ok i{background:rgba(30,154,76,.16);filter:none;opacity:1}
+.stp .cur i{background:var(--ok);filter:none;opacity:1;box-shadow:0 0 0 5px rgba(30,154,76,.18);animation:stpP 1.8s infinite}
+@keyframes stpP{50%{box-shadow:0 0 0 9px rgba(30,154,76,.05)}}
+.stp .ok span,.stp .cur span{color:var(--ink);font-weight:700}.stp em{font-style:normal;font-variant-numeric:tabular-nums;min-height:14px;direction:ltr}
+.btn.okb{background:var(--ok)}
 .trk{position:relative;height:10px;border-radius:99px;background:rgba(128,128,128,.3);margin:22px 8px 8px}
 .trk i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:99px;background:linear-gradient(90deg,var(--ok),#7ad39a);transition:width 1s}
 .trk em{position:absolute;top:-17px;font-style:normal;font-size:20px;transform:translateX(50%);transition:inset-inline-start 1s;line-height:1}
@@ -173,6 +184,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   <input class="in" id="ecd" placeholder="كود العطل (اختياري)" maxlength="30" dir="ltr" style="margin-top:10px">
   <input class="in" id="etl" placeholder="وصف العطل" maxlength="160" style="margin-top:8px">
   <textarea class="in" id="esl" placeholder="الحل اللي اشتغل" maxlength="800" rows="3" style="height:auto;padding:10px 14px;margin-top:8px"></textarea>
+  <div id="enw" class="hide"><input class="in" id="enote" placeholder="ملاحظة للمدير (اختياري) — مثلاً: محتاج قطعة غيار" maxlength="300" style="margin-top:8px"></div>
   <div style="display:flex;gap:10px;margin-top:12px"><button class="btn" id="ego">✓ خلّصت</button><button class="btn ghost" id="eno" style="width:34%">إلغاء</button></div>
 </div></div>
 <div class="sh" id="pwsh"><div class="bx">
@@ -381,6 +393,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       return;
     }
     var v = H.visit;
+    if (v && (H.tasks || []).some(function (t) { return t.status === 'working' && t.center_key === v.center_key; })) { el.innerHTML = ''; return; }
     if (v) {
       el.innerHTML = '<div class="vc on"><div class="row1"><span class="ic">' + ICON.bld + '</span><div style="flex:1;min-width:0"><div class="sub">إنت شغّال دلوقتي في</div><div class="big">' + esc(v.center) + '</div></div></div>' +
         '<div class="sub">من ' + hm(v.start_at) + ' · <b id="vmins">' + dur(v.mins) + '</b>' + (v.purpose ? '<span class="pill g">' + esc(v.purpose) + '</span>' : '') + (v.far ? '<span class="pill r">بعيد ' + v.dist + ' م عن مكان المركز</span>' : '') + '</div>' +
@@ -437,6 +450,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     }).catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
   };
   function endVisit() {
+    ESH.task = null; $('enw').className = 'hide';
     $('ec').textContent = H.visit ? H.visit.center : 'المركز'; $('ecd').value = $('etl').value = $('esl').value = ''; $('esh').classList.add('on');
   }
   $('eno').onclick = function () { $('esh').classList.remove('on'); };
@@ -447,46 +461,41 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     if ((t || c) && !(t && s)) return toast('اكتب وصف العطل والحل مع بعض — أو سيبهم فاضيين', true);
     busy = true; var b = this; b.disabled = true;
     var fin = function () { busy = false; b.disabled = false; };
-    getPos(true).catch(function () { return null; }).then(function (p) { return api('POST', '/visit/end', { lat: p && p.lat, lng: p && p.lng, fault: t && s ? { code: c, title: t, solution: s } : null }); })
-      .then(function (r) { fin(); $('esh').classList.remove('on'); H = r.home; paintVisit(); paintTasks(); paintLoc(); toast(r.fault ? 'خلّصت — والحل اتسجّل في بنك الأعطال 🛠' : 'تمام — خلّصت في المركز'); startTaskPings(); }).catch(function (e) { fin(); if (e.message) toast(e.message, true); });
+    var tk = ESH.task, fault = t && s ? { code: c, title: t, solution: s } : null;
+    getPos(true).catch(function () { return null; }).then(function (p) { return tk ? api('POST', '/task/step', { id: tk.id, step: 'done', fault: fault, note: $('enote').value.trim(), lat: p && p.lat, lng: p && p.lng }) : api('POST', '/visit/end', { lat: p && p.lat, lng: p && p.lng, fault: fault }); })
+      .then(function (r) { fin(); $('esh').classList.remove('on'); if (tk) { r.fault = !!fault; toast(fault ? '✅ خلّصت — والحل اتسجّل في بنك الأعطال 🛠' : '✅ خلّصت — المدير اتبلّغ'); } H = r.home; paintVisit(); paintTasks(); paintLoc(); if (!tk) toast(r.fault ? 'خلّصت — والحل اتسجّل في بنك الأعطال 🛠' : 'تمام — خلّصت في المركز'); startTaskPings(); }).catch(function (e) { fin(); if (e.message) toast(e.message, true); });
   };
 
   /* ── 4.63 · المهام: «ابدأ الطريق» → الموقع كل 30 ثانية → وصلت ── */
   function kmText(m) { return m == null ? '' : (m < 1000 ? m + ' م' : (m / 1000).toFixed(1) + ' كم'); }
+  var STEPS = [['new', '📌', 'اتبعتت'], ['going', '🚗', 'في الطريق'], ['arrived', '📍', 'وصلت'], ['working', '🔧', 'بشتغل'], ['done', '✅', 'خلّصت']];
+  var NEXT = { new: ['going', '🚗 أنا في الطريق'], going: ['arrived', '📍 وصلت'], arrived: ['working', '🔧 بدأت الشغل'], working: ['done', '✅ خلّصت'] };
+  function stepsHtml(t) {
+    var cur = STEPS.map(function (x) { return x[0]; }).indexOf(t.status);
+    var at = [t.created_at, t.started_at, t.arrived_at, t.working_at, t.done_at];
+    return '<div class="stp">' + STEPS.map(function (x, i) { return '<div class="' + (i < cur || t.status === 'done' ? 'ok' : i === cur ? 'cur' : '') + '"><i>' + x[1] + '</i><span>' + x[2] + '</span><em>' + (i <= cur && at[i] ? hm(at[i]) : '') + '</em></div>'; }).join('') + '</div>';
+  }
   function paintTasks() {
     var el = $('tsk'); if (!el || !H) return;
-    var list = (H.tasks || []).filter(function (t) { return !(t.status === 'arrived' && H.visit && H.visit.center_key === t.center_key); });
-    el.innerHTML = list.map(function (t) {
-      var going = t.status === 'going', arr = t.status === 'arrived';
-      var head = '<div class="row1"><span class="ic">' + (arr ? '📍' : '🚗') + '</span><div style="flex:1;min-width:0"><div class="sub">' + (arr ? 'وصلت — ابدأ الزيارة' : going ? 'في الطريق إلى' : 'مهمة جديدة من الإدارة') + '</div><div class="big">' + esc(t.center) + '</div></div></div>';
-      var info = '<div class="sub">' + esc(t.title) + (t.note ? ' · ' + esc(t.note) : '') + '</div>';
-      var bar = going ? '<div class="trk"><i style="width:' + t.pct + '%"></i><em style="inset-inline-start:' + t.pct + '%">🚶</em><b>🏥</b></div><div class="nums"><span>باقي <b>' + (t.dist != null ? kmText(t.dist) : '—') + '</b></span><span>' + (t.eta ? 'حوالي <b>' + t.eta + '</b> دقيقة' : '') + '</span><span><b>' + t.pct + '%</b></span></div>' : '';
-      var acts = !H.state || H.state !== 'in' ? '<div class="sub" style="margin-top:8px">سجّل حضورك الأول علشان تبدأ المهمة.</div>' :
-        t.status === 'new' ? '<div class="acts"><button class="btn" data-ts="' + t.id + '">🚗 ابدأ الطريق</button></div>' :
-        going ? '<div class="acts"><button class="btn" data-ta="' + t.id + '">وصلت ✓</button></div>' :
-        '<div class="acts"><button class="btn" data-tv="' + t.id + '">ابدأ الزيارة هنا</button></div>';
-      return '<div class="vc tk ' + t.status + '">' + head + info + bar + acts + '</div>';
+    el.innerHTML = (H.tasks || []).map(function (t) {
+      var nx = NEXT[t.status];
+      var head = '<div class="row1"><span class="ic">📌</span><div style="flex:1;min-width:0"><div class="sub">مهمة من الإدارة</div><div class="big">' + esc(t.center) + '</div></div></div>';
+      var info = '<div class="sub">' + esc(t.title) + (t.note ? ' · ' + esc(t.note) : '') + (t.status === 'going' && t.dist != null ? ' · <b>باقي ' + kmText(t.dist) + '</b>' : '') + '</div>';
+      var act = H.state !== 'in' ? '<div class="sub" style="margin-top:10px">سجّل حضورك الأول علشان تبدأ المهمة.</div>' : nx ? '<div class="acts"><button class="btn' + (nx[0] === 'done' ? ' okb' : '') + '" data-st="' + nx[0] + '" data-id="' + t.id + '">' + nx[1] + '</button></div>' : '';
+      return '<div class="vc tk ' + t.status + '">' + head + info + stepsHtml(t) + act + '</div>';
     }).join('');
-    [].forEach.call(el.querySelectorAll('[data-ts]'), function (b) { b.onclick = function () { taskStart(b); }; });
-    [].forEach.call(el.querySelectorAll('[data-ta]'), function (b) { b.onclick = function () { taskArrive(b); }; });
-    [].forEach.call(el.querySelectorAll('[data-tv]'), function (b) { b.onclick = function () { taskVisit(b); }; });
+    [].forEach.call(el.querySelectorAll('[data-st]'), function (b) { b.onclick = function () { taskStep(b); }; });
   }
   function taskById(id) { return (H.tasks || []).filter(function (t) { return String(t.id) === String(id); })[0]; }
-  function taskStart(b) {
-    if (busy) return; busy = true; b.disabled = true;
+  var ESH = { task: null };
+  function taskStep(b) {
+    var t = taskById(b.dataset.id); if (!t || busy) return;
+    if (b.dataset.st === 'done') { ESH.task = t; $('ec').textContent = t.center; $('ecd').value = $('etl').value = $('esl').value = $('enote').value = ''; $('enw').className = ''; $('esh').classList.add('on'); return; }
+    busy = true; b.disabled = true;
     var fin = function () { busy = false; b.disabled = false; };
-    getPos(true).catch(function (e) { if (H.need_location) throw e; return null; }).then(function (p) { return battery().then(function (bt) { return api('POST', '/task/start', { id: b.dataset.ts, lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt }); }); })
-      .then(function () { fin(); return load(); }).then(function () { toast('ماشي — الإدارة شايفاك في الطريق 🚗'); }).catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
-  }
-  function taskArrive(b) {
-    if (busy) return; busy = true; b.disabled = true;
-    api('POST', '/task/arrive', { id: b.dataset.ta }).then(function () { busy = false; return load(); }).catch(function (e) { busy = false; b.disabled = false; if (e.message) toast(e.message, true); });
-  }
-  function taskVisit(b) {
-    var t = taskById(b.dataset.tv); if (!t || busy) return; busy = true; b.disabled = true;
-    var fin = function () { busy = false; b.disabled = false; };
-    getPos(true).catch(function (e) { if (H.need_location) throw e; return null; }).then(function (p) { return battery().then(function (bt) { return api('POST', '/visit', { center: t.center_key, task: t.id, purpose: 'متابعة / زيارة', lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt }); }); })
-      .then(function (r) { fin(); H = r.home; paintVisit(); paintTasks(); paintLoc(); toast('اتسجّل إنك في ' + t.center + ' ✅'); }).catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
+    getPos(true).catch(function (e) { if (H.need_location) throw e; return null; }).then(function (p) { return battery().then(function (bt) { return api('POST', '/task/step', { id: t.id, step: b.dataset.st, lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt }); }); })
+      .then(function (r) { fin(); H = r.home; syncClock(H.now.ts); paintTasks(); paintVisit(); paintLoc(); startTaskPings(); toast({ going: 'ماشي — المدير عارف إنك في الطريق 🚗', arrived: 'تمام — اتسجّل إنك وصلت 📍', working: 'بالتوفيق 🔧 — لما تخلّص دوس «خلّصت»' }[b.dataset.st] || 'تمام'); })
+      .catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
   }
   function goingTask() { return (H && H.state === 'in' && (H.tasks || []).filter(function (t) { return t.status === 'going'; })[0]) || null; }
   function startTaskPings() {
@@ -497,7 +506,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       getPos(true).then(function (p) { return battery().then(function (bt) { return api('POST', '/task/ping', { id: t.id, lat: p.lat, lng: p.lng, acc: p.acc, battery: bt }); }); }).then(function (r) {
         if (r && r.stop) return load();
         if (r && r.task) { for (var i = 0; i < H.tasks.length; i++) if (H.tasks[i].id === r.task.id) H.tasks[i] = r.task; }
-        if (r && r.arrived) { toast('🎉 وصلت! دوس «ابدأ الزيارة هنا»'); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} }
+        if (r && r.arrived) { toast('📍 وصلت — دوس «بدأت الشغل» لما تبدأ'); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} }
         paintTasks(); paintLoc();
       }).catch(function () {});
     };

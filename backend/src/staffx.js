@@ -30,6 +30,7 @@ module.exports = function init(H) {
   );
   CREATE TABLE IF NOT EXISTS staff_fault_vote (fault_id INTEGER NOT NULL, who TEXT NOT NULL, at TEXT, PRIMARY KEY (fault_id, who));
   `);
+  try { const tc = db.prepare('PRAGMA table_info(staff_task)').all().map(c => c.name); if (!tc.includes('working_at')) db.exec('ALTER TABLE staff_task ADD COLUMN working_at TEXT'); if (!tc.includes('result')) db.exec('ALTER TABLE staff_task ADD COLUMN result TEXT'); } catch (e) { console.error('[staff] task cols', e.message); }
   try { if (!db.prepare('PRAGMA table_info(staff_visit)').all().some(c => c.name === 'task_id')) db.exec('ALTER TABLE staff_visit ADD COLUMN task_id INTEGER'); } catch (e) { console.error('[staff] task_id', e.message); }
 
   /* ───────── notifications ───────── */
@@ -142,6 +143,7 @@ module.exports = function init(H) {
   }
 
   /* ───────── المهام «في الطريق» ───────── */
+  const faultOfTask = id => { const f = db.prepare('SELECT f.code, f.title, f.solution FROM staff_fault f JOIN staff_visit v ON v.id = f.visit_id WHERE v.task_id = ? ORDER BY f.id DESC LIMIT 1').get(id); return f ? { code: f.code || '', title: f.title, solution: f.solution } : null; };
   const taskOut = t => {
     const c = centerByKey(t.center_key), known = !!(c && c.lat != null);
     const pct = t.status === 'arrived' || t.status === 'done' ? 100 : (t.d0 && t.dist != null ? Math.max(0, Math.min(99, Math.round((1 - t.dist / Math.max(t.d0, 1)) * 100))) : 0);
@@ -153,7 +155,7 @@ module.exports = function init(H) {
       eta = Math.max(1, Math.round(t.dist / sp / 60));
     }
     return { id: t.id, emp_id: t.emp_id, center_key: t.center_key, center: t.center_name, title: t.title || '', note: t.note || '', status: t.status, created_at: t.created_at, created_by: t.created_by,
-      started_at: t.started_at, arrived_at: t.arrived_at, done_at: t.done_at, d0: t.d0, dist: t.dist, pct, eta, known, c_lat: known ? c.lat : null, c_lng: known ? c.lng : null, last_lat: t.last_lat, last_lng: t.last_lng, last_at: t.last_at };
+      started_at: t.started_at, arrived_at: t.arrived_at, working_at: t.working_at || null, done_at: t.done_at, result: t.result || '', fault: faultOfTask(t.id), d0: t.d0, dist: t.dist, pct, eta, known, c_lat: known ? c.lat : null, c_lng: known ? c.lng : null, last_lat: t.last_lat, last_lng: t.last_lng, last_at: t.last_at };
   };
   function createTask(b, who) {
     const e = db.prepare('SELECT * FROM staff_emp WHERE id = ? AND active = 1').get(str(b.emp_id, 20)); if (!e) fail(404, 'الموظف مش موجود');
@@ -173,7 +175,7 @@ module.exports = function init(H) {
     toEmps([t.emp_id], { title: '🚫 اتلغت مهمة: ' + t.center_name, body: '', tag: 'sp-task-' + t.id });
     return { ok: true };
   }
-  const tasksOf = empId => db.prepare("SELECT * FROM staff_task WHERE emp_id = ? AND status IN ('new','going','arrived') ORDER BY id").all(empId).map(taskOut);
+  const tasksOf = empId => db.prepare("SELECT * FROM staff_task WHERE emp_id = ? AND status IN ('new','going','arrived','working') ORDER BY id").all(empId).map(taskOut);
   function startTask(e, b) {
     const t = db.prepare('SELECT * FROM staff_task WHERE id = ? AND emp_id = ?').get(Number(b.id), e.id); if (!t || !['new', 'going'].includes(t.status)) fail(404, 'المهمة دي مش متاحة');
     const now = nowLocal();
@@ -223,25 +225,53 @@ module.exports = function init(H) {
     markArrived(e, db.prepare('SELECT * FROM staff_task WHERE id = ?').get(t.id), now, t.dist);
     return { ok: true };
   }
+  /* 4.64 · one button, the next stage: في الطريق → وصلت → بدأت الشغل → خلّصت */
+  function stepTask(e, b) {
+    const step = String(b.step || '');
+    if (step === 'going') return startTask(e, b);
+    if (step === 'arrived') return arriveTask(e, b);
+    const t = db.prepare("SELECT * FROM staff_task WHERE id = ? AND emp_id = ? AND status IN ('new','going','arrived','working')").get(Number(b.id), e.id); if (!t) fail(404, 'المهمة دي مش متاحة');
+    const now = nowLocal();
+    if (!openRecord(e.id, now)) fail(409, 'سجّل حضورك الأول');
+    const pos = { lat: b.lat, lng: b.lng, acc: b.acc, battery: b.battery };
+    if (step === 'working') {
+      if (t.status === 'working') return { ok: true };
+      const ov = db.prepare('SELECT * FROM staff_visit WHERE emp_id = ? AND end_at IS NULL ORDER BY id DESC LIMIT 1').get(e.id);
+      if (!ov || ov.center_key !== t.center_key) { try { H.startVisit(e, Object.assign({ center: t.center_key, task: t.id, purpose: 'صيانة / تجربة' }, pos)); } catch (er) { if (er.status === 400) throw er; } }
+      else if (!ov.task_id) db.prepare('UPDATE staff_visit SET task_id = ? WHERE id = ?').run(t.id, ov.id);
+      db.prepare("UPDATE staff_task SET status = 'working', started_at = COALESCE(started_at, ?), arrived_at = COALESCE(arrived_at, ?), working_at = ? WHERE id = ?").run(now.ts, now.ts, now.ts, t.id);
+      toAdmins({ kind: 'work', title: '🔧 ' + e.name + ' بدأ الشغل في ' + t.center_name, body: t.title || '', tag: 'sp-work-' + t.id });
+      return { ok: true };
+    }
+    if (step === 'done') {
+      const f = b.fault && b.fault.title && b.fault.solution ? b.fault : null;
+      const ov = db.prepare('SELECT * FROM staff_visit WHERE emp_id = ? AND end_at IS NULL AND task_id = ? ORDER BY id DESC LIMIT 1').get(e.id, t.id);
+      if (ov) H.endVisit(e, Object.assign({ fault: f }, pos)); else if (f) addFault(e, f, null, t.center_key);
+      db.prepare("UPDATE staff_task SET status = 'done', done_at = ?, result = ?, working_at = COALESCE(working_at, ?), arrived_at = COALESCE(arrived_at, ?) WHERE id = ?").run(now.ts, str(b.note, 300), now.ts, now.ts, t.id);
+      toAdmins({ kind: 'done', title: '✅ ' + e.name + ' خلّص ' + (t.title && t.title.indexOf('زيارة ') !== 0 ? t.title + ' في ' : '') + t.center_name, body: f ? '🛠 ' + f.title + ' ← ' + String(f.solution).slice(0, 80) : (b.note ? str(b.note, 120) : ''), tag: 'sp-done-' + t.id, urgent: true });
+      return { ok: true };
+    }
+    fail(400, 'خطوة غير معروفة');
+  }
   /* a visit started / ended on a task's center closes the loop */
   function visitStarted(e, visitId, centerKey, taskId) {
-    let t = taskId ? db.prepare("SELECT * FROM staff_task WHERE id = ? AND emp_id = ? AND status IN ('new','going','arrived')").get(Number(taskId), e.id) : null;
+    let t = taskId ? db.prepare("SELECT * FROM staff_task WHERE id = ? AND emp_id = ? AND status IN ('new','going','arrived','working')").get(Number(taskId), e.id) : null;
     if (!t) t = db.prepare("SELECT * FROM staff_task WHERE emp_id = ? AND center_key = ? AND status IN ('going','arrived') ORDER BY id DESC LIMIT 1").get(e.id, centerKey);
     if (!t) return;
     db.prepare('UPDATE staff_visit SET task_id = ? WHERE id = ?').run(t.id, visitId);
-    db.prepare("UPDATE staff_task SET status = 'arrived', arrived_at = COALESCE(arrived_at, ?) WHERE id = ?").run(nowLocal().ts, t.id);
+    db.prepare("UPDATE staff_task SET status = CASE WHEN status IN ('new','going') THEN 'arrived' ELSE status END, arrived_at = COALESCE(arrived_at, ?) WHERE id = ?").run(nowLocal().ts, t.id);
   }
   function visitEnded(e, v) {
     if (!v.task_id) return;
-    db.prepare("UPDATE staff_task SET status = 'done', done_at = ? WHERE id = ? AND status IN ('arrived','going','new')").run(nowLocal().ts, v.task_id);
+    db.prepare("UPDATE staff_task SET status = 'done', done_at = ? WHERE id = ? AND status IN ('arrived','going','new','working')").run(nowLocal().ts, v.task_id);
   }
   /* the board on the manager's «النهارده» */
   function board() {
     const now = nowLocal();
-    const rows = db.prepare("SELECT t.*, e.name AS emp_name FROM staff_task t JOIN staff_emp e ON e.id = t.emp_id WHERE t.status IN ('new','going','arrived') OR (t.status = 'done' AND t.done_at >= ?) OR (t.status = 'cancel' AND t.done_at >= ?) ORDER BY t.id DESC LIMIT 60").all(now.date + ' 00:00:00', now.date + ' 00:00:00');
+    const rows = db.prepare("SELECT t.*, e.name AS emp_name FROM staff_task t JOIN staff_emp e ON e.id = t.emp_id WHERE t.status IN ('new','going','arrived','working') OR (t.status = 'done' AND t.done_at >= ?) OR (t.status = 'cancel' AND t.done_at >= ?) ORDER BY t.id DESC LIMIT 60").all(now.date + ' 00:00:00', now.date + ' 00:00:00');
     return rows.map(r => Object.assign(taskOut(r), { emp: r.emp_name }));
   }
-  function sweep() { try { db.prepare("UPDATE staff_task SET status = 'cancel', done_at = ? WHERE status IN ('new','going','arrived') AND created_at < ?").run(nowLocal().ts, new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10)); } catch (e) {} }
+  function sweep() { try { db.prepare("UPDATE staff_task SET status = 'cancel', done_at = ? WHERE status IN ('new','going','arrived','working') AND created_at < ?").run(nowLocal().ts, new Date(Date.now() - 3 * 864e5).toISOString().slice(0, 10)); } catch (e) {} }
   sweep(); setInterval(sweep, 6 * 3600e3).unref();
 
   /* ───────── routes ───────── */
@@ -257,6 +287,7 @@ module.exports = function init(H) {
     if (pathname === '/staff/api/tasks' && req.method === 'GET') return send(200, { tasks: tasksOf(e.id) }), true;
     if (pathname === '/staff/api/task/start' && post) return send(200, startTask(e, await body())), true;
     if (pathname === '/staff/api/task/ping' && post) return send(200, pingTask(e, await body())), true;
+    if (pathname === '/staff/api/task/step' && post) { const b = await body(); stepTask(e, b); return send(200, { ok: true, tasks: tasksOf(e.id), home: H.home(e) }), true; }
     if (pathname === '/staff/api/task/arrive' && post) return send(200, arriveTask(e, await body())), true;
     return false;
   }
@@ -277,5 +308,5 @@ module.exports = function init(H) {
     }
     return false;
   }
-  return { setNotify, onPunch, onVisit, addFault, tasksOf, board, visitStarted, visitEnded, publicRoute, adminRoute, recurring, searchFaults, toAdmins, toEmps };
+  return { stepTask, setNotify, onPunch, onVisit, addFault, tasksOf, board, visitStarted, visitEnded, publicRoute, adminRoute, recurring, searchFaults, toAdmins, toEmps };
 };

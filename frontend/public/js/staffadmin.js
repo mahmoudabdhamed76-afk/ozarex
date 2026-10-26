@@ -222,26 +222,27 @@
   /* ════════ 4.63 · الفنيين في الطريق ════════ */
   function keepTstat(l) { S.tstat = {}; (l.tasks || []).forEach(function (t) { S.tstat[t.id] = t.status; }); }
   function kmT(m) { return m == null ? '—' : (m < 1000 ? m + ' م' : (m / 1000).toFixed(1) + ' كم'); }
+  var TSTEPS = [['new', '📌', 'اتبعتت'], ['going', '🚗', 'في الطريق'], ['arrived', '📍', 'وصل'], ['working', '🔧', 'بيشتغل'], ['done', '✅', 'خلّص']];
   function roadHtml(tasks) {
     var list = (tasks || []).filter(function (t) { return t.status !== 'cancel'; });
-    var h = '<div class="card stf-road ax-hl-off" id="stf-road"><div class="card-header"><h3 class="card-title">🚗 الفنيين في الطريق</h3><button class="btn btn-sm btn-primary" data-a="newtask">＋ مهمة لموظف</button></div>';
-    if (!list.length) return h + '<p class="stf-note" style="margin:6px 4px 2px">مفيش مهام النهارده — اضغط «＋ مهمة لموظف» وحدد المركز، والموظف هيوصله إشعار ويبدأ الطريق وانت تتابعه هنا.</p></div>';
-    h += '<div class="rd-list">' + list.map(function (t) {
-      var cls = t.status, pct = t.pct;
-      var head = '<div class="rd-h"><b>' + esc(t.emp) + '</b><span>← ' + esc(t.center) + (t.title && t.title.indexOf('زيارة ') !== 0 ? ' · ' + esc(t.title) : '') + '</span>';
-      var st = t.status === 'going' ? '<em class="rd-st g">في الطريق</em>' : t.status === 'arrived' ? '<em class="rd-st a">🎉 وصل ' + hm(t.arrived_at) + '</em>' : t.status === 'done' ? '<em class="rd-st d">✅ خلّص ' + hm(t.done_at) + '</em>' : '<em class="rd-st n">⏳ لسه ما بدأش</em>';
-      var x = (t.status === 'new' || t.status === 'going' || t.status === 'arrived') ? '<button class="rd-x" data-a="tcancel" data-id="' + t.id + '" title="إلغاء المهمة">✕</button>' : '';
-      var road = '<div class="rd-road"><i style="width:' + pct + '%"></i><span class="rd-man' + (t.status === 'going' ? ' walk' : '') + '" style="inset-inline-start:' + pct + '%">' + (t.status === 'arrived' || t.status === 'done' ? '🎉' : '🚶') + '</span><span class="rd-end">🏥</span></div>';
-      var nums = t.status === 'going' ? '<div class="rd-n"><span>باقي <b>' + kmT(t.dist) + '</b></span><span>' + (t.eta ? 'حوالي <b>' + t.eta + '</b> دقيقة' : '') + '</span><span><b>' + pct + '%</b></span>' + (t.known ? '' : '<span class="rd-warn">مكان المركز لسه مش معروف</span>') + '</div>' : t.status === 'new' ? '' : '<div class="rd-n"><span>بدأ ' + hm(t.started_at) + '</span><span>' + (t.arrived_at ? 'وصل ' + hm(t.arrived_at) : '') + '</span></div>';
-      return '<div class="rd-it ' + cls + '">' + head + st + x + '</div>' + road + nums + '</div>';
+    var h = '<div class="card stf-road ax-hl-off" id="stf-road"><div class="card-header"><h3 class="card-title">📌 المهام النهارده</h3><button class="btn btn-sm btn-primary" data-a="newtask">＋ مهمة لموظف</button></div>';
+    if (!list.length) return h + '<p class="stf-note" style="margin:6px 4px 2px">مفيش مهام النهارده — اضغط «＋ مهمة لموظف» واختار المركز. الموظف بيدوس على كل مرحلة (في الطريق ← وصل ← بيشتغل ← خلّص) وانت بتشوفها هنا وبيوصلك إشعار.</p></div>';
+    return h + '<div class="tk-list">' + list.map(function (t) {
+      var cur = TSTEPS.map(function (x) { return x[0]; }).indexOf(t.status), at = [t.created_at, t.started_at, t.arrived_at, t.working_at, t.done_at];
+      var steps = '<div class="tk-st">' + TSTEPS.map(function (x, i) { return '<div class="' + (i < cur || t.status === 'done' ? 'ok' : i === cur ? 'cur' : '') + '"><i>' + x[1] + '</i><span>' + x[2] + '</span><em>' + (i <= cur && at[i] ? hm(at[i]) : '') + '</em></div>'; }).join('') + '</div>';
+      var extra = '';
+      if (t.status === 'going' && t.dist != null) extra += '<div class="tk-x">🚗 باقي ' + kmT(t.dist) + (t.eta ? ' · حوالي ' + t.eta + ' دقيقة' : '') + '</div>';
+      if (t.fault) extra += '<div class="tk-x ok">🛠 ' + (t.fault.code ? '<code>' + esc(t.fault.code) + '</code> ' : '') + esc(t.fault.title) + ' ← ' + esc(t.fault.solution) + '</div>';
+      if (t.result) extra += '<div class="tk-x">📝 ' + esc(t.result) + '</div>';
+      return '<div class="tk-it ' + t.status + '"><div class="tk-h"><div><b>' + esc(t.emp) + '</b><span>' + esc(t.center) + (t.title && t.title.indexOf('زيارة ') !== 0 ? ' · ' + esc(t.title) : '') + '</span></div>' +
+        (t.status !== 'done' ? '<button class="rd-x" data-a="tcancel" data-id="' + t.id + '" title="إلغاء المهمة">✕</button>' : '') + '</div>' + steps + extra + '</div>';
     }).join('') + '</div></div>';
-    return h;
   }
   function celebrate(t) {
-    T('🎉 ' + t.emp + ' وصل ' + t.center, 'success');
+    T('🎉 ' + t.emp + ' خلّص في ' + t.center, 'success');
     try {
       var d = document.createElement('div'); d.className = 'stf-party';
-      d.innerHTML = '<div class="pt-msg">🎉 ' + esc(t.emp) + ' وصل<br><small>' + esc(t.center) + '</small></div>' + Array.apply(null, Array(36)).map(function (_, i) { return '<i style="left:' + (Math.random() * 100).toFixed(1) + '%;animation-delay:' + (Math.random() * .8).toFixed(2) + 's;font-size:' + (14 + Math.random() * 16).toFixed(0) + 'px">' + ['🎉', '✨', '🎊', '⭐', '🟢'][i % 5] + '</i>'; }).join('');
+      d.innerHTML = '<div class="pt-msg">✅ ' + esc(t.emp) + ' خلّص<br><small>' + esc(t.center) + '</small></div>' + Array.apply(null, Array(36)).map(function (_, i) { return '<i style="left:' + (Math.random() * 100).toFixed(1) + '%;animation-delay:' + (Math.random() * .8).toFixed(2) + 's;font-size:' + (14 + Math.random() * 16).toFixed(0) + 'px">' + ['🎉', '✨', '🎊', '⭐', '🟢'][i % 5] + '</i>'; }).join('');
       document.body.appendChild(d); setTimeout(function () { d.remove(); }, 3800);
       var Ac = window.AudioContext || window.webkitAudioContext;
       if (Ac) { var a = new Ac(), t0 = a.currentTime; [523, 659, 784, 1047].forEach(function (f, i) { var o = a.createOscillator(), g = a.createGain(); o.frequency.value = f; o.type = 'sine'; g.gain.setValueAtTime(.0001, t0 + i * .12); g.gain.exponentialRampToValueAtTime(.18, t0 + i * .12 + .03); g.gain.exponentialRampToValueAtTime(.0001, t0 + i * .12 + .35); o.connect(g); g.connect(a.destination); o.start(t0 + i * .12); o.stop(t0 + i * .12 + .4); }); }
@@ -337,7 +338,7 @@
     var body = document.getElementById('stf-body'); if (!body) return;
     api('GET', '/bootstrap').then(function (b) {
       S.boot = b;
-      if (S.tab === 'live') return api('GET', '/live').then(function (l) { S.live = l; keepTstat(l); S.fast = (l.tasks || []).some(function (t) { return t.status === 'going'; }); paint(); S.timer = setInterval(refreshLive, S.fast ? 10000 : 30000); });
+      if (S.tab === 'live') return api('GET', '/live').then(function (l) { S.live = l; keepTstat(l); S.fast = (l.tasks || []).some(function (t) { return t.status !== 'done' && t.status !== 'cancel'; }); paint(); S.timer = setInterval(refreshLive, S.fast ? 10000 : 30000); });
       if (S.tab === 'report') return api('GET', '/report?month=' + (S.month || '')).then(function (r) { S.report = r; S.month = r.month; paint(); });
       if (S.tab === 'cfg') return api('GET', '/log').then(function (l) { S.logs = l.rows; paint(); });
       if (S.tab === 'faults') return api('GET', '/faults?q=' + encodeURIComponent(S.fq || '')).then(function (r) { S.faults = r; paint(); });
@@ -352,9 +353,9 @@
       S.live = l; if (!isPage() || S.tab !== 'live') return;
       var st = document.getElementById('stf-lstats'), cd = document.getElementById('stf-lcards');
       if (st && cd && l.list.length) {
-        var prev = S.tstat || {}; (l.tasks || []).forEach(function (t) { if (t.status === 'arrived' && prev[t.id] === 'going') celebrate(t); });
+        var prev = S.tstat || {}; (l.tasks || []).forEach(function (t) { if (t.status === 'done' && prev[t.id] && prev[t.id] !== 'done') celebrate(t); });
         st.outerHTML = liveStats(l.list); cd.innerHTML = liveList(l); var rd = document.getElementById('stf-road'); if (rd) rd.outerHTML = roadHtml(l.tasks || []); drawLive(true); keepTstat(l);
-        var fast = (l.tasks || []).some(function (t) { return t.status === 'going'; }); if (fast !== S.fast) { S.fast = fast; clearInterval(S.timer); S.timer = setInterval(refreshLive, fast ? 10000 : 30000); }
+        var fast = (l.tasks || []).some(function (t) { return t.status !== 'done' && t.status !== 'cancel'; }); if (fast !== S.fast) { S.fast = fast; clearInterval(S.timer); S.timer = setInterval(refreshLive, fast ? 10000 : 30000); }
       } else paint();
     }).catch(function () {});
   }
