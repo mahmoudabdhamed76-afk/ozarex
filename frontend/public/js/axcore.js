@@ -50,7 +50,7 @@
   var FLOW_FIELDS = { _custody: { status: 1, closedAt: 1, moves: 1 }, _cheques: { status: 1, statusAt: 1, history: 1, paymentId: 1, spId: 1, revId: 1 },
     _po: { status: 1, sentAt: 1, receivedAt: 1, purchaseId: 1, received: 1 },
     _requests: { status: 1, decidedAt: 1 } };
-  var ADMIN_ONLY_PAGES = ['users', 'audit', 'settings', 'security', 'staff'];
+  var ADMIN_ONLY_PAGES = ['users', 'audit', 'settings', 'security', 'staff', 'clients'];
 
   function blank(v) { return v === undefined || v === null || v === ''; }
   function isNum(v) { return typeof v === 'number' && isFinite(v); }

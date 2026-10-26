@@ -23,7 +23,7 @@
   function users() { var d = D(); if (!Array.isArray(d.users)) d.users = []; return d.users; }
   function esc(s) { return (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s); }
   function T(m, t, ms) { if (typeof toast === 'function') toast(m, t || 'success', ms); }
-  function adminOnly() { try { return ADMIN_ONLY_PAGES; } catch (e) { return ['users', 'staff', 'audit', 'security', 'settings']; } }
+  function adminOnly() { try { return ADMIN_ONLY_PAGES; } catch (e) { return ['users', 'staff', 'clients', 'audit', 'security', 'settings']; } }
   function navs() { try { return NAV_ITEMS.filter(function (n) { return adminOnly().indexOf(n.key) < 0; }); } catch (e) { return []; } }
   function roleDefault(role) { try { return (PERMISSIONS[role] || []).filter(function (k) { return adminOnly().indexOf(k) < 0; }); } catch (e) { return []; } }
   function pagesOf(u) { return typeof userPages === 'function' ? userPages(u) : roleDefault(u.role); }

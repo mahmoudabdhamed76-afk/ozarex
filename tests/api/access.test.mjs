@@ -60,7 +60,7 @@ test('matrix: every page in the menu has a policy, every policy names real colle
   /* 4.27: «المبيعات» is a view of the issuance records — the browser maps it to «صرف الورق» (same right, same data),
      so the server policy that covers it is the issuances one */
   const VIEWS = { sales: 'issuances' };
-  assert.equal(nav.length, 27);
+  assert.equal(nav.length, 28);
   assert.match(html, /if \(page === 'sales'\) page = 'issuances';/, 'the browser maps «المبيعات» to «صرف الورق»');
   for (const k of nav) { const real = VIEWS[k] || k; assert.ok(P.POLICY[real] || P.ADMIN_ONLY_PAGES.includes(real), 'no policy for page ' + k); }
   for (const [k, pol] of Object.entries(P.POLICY)) {
@@ -71,7 +71,7 @@ test('matrix: every page in the menu has a policy, every policy names real colle
 test('matrix: pages of a user follow the browser rule (always dashboard/approvals/requests, never admin pages)', () => {
   assert.deepEqual(P.pagesOf({ role: 'sales', pages: ['issuances', 'users', 'settings'] }).sort(), ['approvals', 'dashboard', 'issuances', 'requests']);
   assert.deepEqual(P.pagesOf({ role: 'sales' }).sort(), P.ROLE_PAGES.sales.slice().sort());
-  assert.equal(P.pagesOf({ role: 'admin' }).length, 26);
+  assert.equal(P.pagesOf({ role: 'admin' }).length, 27);
   assert.deepEqual(P.pagesOf({ role: 'nobody' }).sort(), ['approvals', 'dashboard', 'requests']);
 });
 

@@ -9767,7 +9767,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 4.71</div>
+      <div class="version">الإصدار 4.72</div>
     </footer>
   </div>
 </div>
@@ -10574,6 +10574,7 @@ const SyncEngine = (() => {
       purchases: typeof renderPurchaseInvoices === 'function' ? renderPurchaseInvoices : null,
       security:  typeof renderSecurity  === 'function' ? renderSecurity  : null,
       aging:     typeof renderAging     === 'function' ? renderAging     : null,
+      clients:   typeof renderClients   === 'function' ? renderClients   : null,
       cheques:   typeof renderCheques   === 'function' ? renderCheques   : null,
       profit:    typeof renderProfit    === 'function' ? renderProfit    : null,
       suppliers: typeof renderSuppliers === 'function' ? renderSuppliers : null,
@@ -10897,13 +10898,13 @@ function normalizeArabic(s) {
 let currentUser = null;
 const ROLE_LABELS = { admin: 'مدير النظام', accountant: 'محاسب', sales: 'موظف مبيعات' };
 const PERMISSIONS = {
-  admin: ['dashboard','customers','issuances','forecast','invoices','payments','aging','transfers','cheques','debts','suppliers','purchases','inventory','stock','expenses','reports','monthly','profit','aiassistant','approvals','requests','users','staff','audit','security','settings'],
+  admin: ['dashboard','customers','issuances','forecast','invoices','payments','aging','transfers','cheques','debts','suppliers','purchases','inventory','stock','expenses','reports','monthly','profit','aiassistant','approvals','requests','users','staff','clients','audit','security','settings'],
   accountant: ['dashboard','customers','issuances','forecast','invoices','payments','aging','transfers','cheques','debts','suppliers','purchases','expenses','reports','monthly','profit','aiassistant','approvals','requests'],
   sales: ['dashboard','customers','issuances','forecast','invoices','payments','aging','cheques','inventory','stock','aiassistant','approvals','requests']
 };
 /* 4.8 · each user has his own sections (set by the admin in «المستخدمين»);
    a user who was never customised gets his role's list above */
-const ADMIN_ONLY_PAGES = ['users', 'staff', 'audit', 'security', 'settings'];
+const ADMIN_ONLY_PAGES = ['users', 'staff', 'clients', 'audit', 'security', 'settings'];
 function userPages(u) {
   if (!u) return [];
   if (u.role === 'admin') return PERMISSIONS.admin.slice();
@@ -11451,6 +11452,7 @@ const NAV_ITEMS = [
   { key: 'requests', label: 'الطلبات والمقترحات', color: '#D79613', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8V16h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3z"/></svg>', section: 'ops' },
   { key: 'users', label: 'المستخدمين', color: '#14b8a6', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>', section: 'admin' },
   { key: 'staff', label: 'الموظفين', color: '#E01B0F', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3.5"/><path d="M2.5 20v-1.5A4.5 4.5 0 0 1 7 14h4a4.5 4.5 0 0 1 4.5 4.5V20"/><path d="M17 4.5a3.5 3.5 0 0 1 0 6.6M21.5 20v-1.4a4.4 4.4 0 0 0-3-4.1"/><path d="M12.5 21.5s2-1.6 2-3.3"/></svg>', section: 'admin' },
+  { key: 'clients', label: 'متابعة العملاء', color: '#0EA5A4', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>', section: 'admin' },
   { key: 'audit', label: 'سجل التعديلات', color: '#dc2626', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>', section: 'admin' },
   { key: 'security', label: 'الأمان والنسخ', color: '#0EA5E9', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><rect x="9" y="10" width="6" height="5" rx="1"/><path d="M10.5 10V8.5a1.5 1.5 0 0 1 3 0V10"/></svg>', section: 'admin' },
   { key: 'settings', label: 'الإعدادات', color: '#64748b', icon: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>', section: 'admin' }
@@ -11570,7 +11572,7 @@ function navigate(page, isBack) {
   }
 
   const doRender = () => {
-    const renderers = { sales: (typeof renderSales === 'function' ? renderSales : renderDashboard), dashboard: renderDashboard, customers: renderCustomers, issuances: renderIssuances, invoices: renderInvoices, payments: renderPayments, transfers: renderTransfersPage, debts: (typeof renderDebts === 'function' ? renderDebts : renderDashboard), suppliers: renderSuppliers, inventory: renderInventory, stock: (typeof renderStockHub === 'function' ? renderStockHub : renderDashboard), expenses: renderExpenses, reports: renderReports, aiassistant: renderAIAssistant, approvals: (typeof renderApprovals === 'function' ? renderApprovals : renderDashboard), requests: (typeof renderRequests === 'function' ? renderRequests : renderDashboard), forecast: (typeof renderForecast === 'function' ? renderForecast : renderDashboard), monthly: (typeof renderMonthly === 'function' ? renderMonthly : renderDashboard), purchases: (typeof renderPurchaseInvoices === 'function' ? renderPurchaseInvoices : renderDashboard), aging: (typeof renderAging === 'function' ? renderAging : renderDashboard), cheques: (typeof renderCheques === 'function' ? renderCheques : renderDashboard), profit: (typeof renderProfit === 'function' ? renderProfit : renderDashboard), users: renderUsers, staff: (typeof renderStaff === 'function' ? renderStaff : renderDashboard), security: (typeof renderSecurity === 'function' ? renderSecurity : renderDashboard), audit: renderAuditLog, settings: renderSettings };
+    const renderers = { sales: (typeof renderSales === 'function' ? renderSales : renderDashboard), dashboard: renderDashboard, customers: renderCustomers, issuances: renderIssuances, invoices: renderInvoices, payments: renderPayments, transfers: renderTransfersPage, debts: (typeof renderDebts === 'function' ? renderDebts : renderDashboard), suppliers: renderSuppliers, inventory: renderInventory, stock: (typeof renderStockHub === 'function' ? renderStockHub : renderDashboard), expenses: renderExpenses, reports: renderReports, aiassistant: renderAIAssistant, approvals: (typeof renderApprovals === 'function' ? renderApprovals : renderDashboard), requests: (typeof renderRequests === 'function' ? renderRequests : renderDashboard), forecast: (typeof renderForecast === 'function' ? renderForecast : renderDashboard), monthly: (typeof renderMonthly === 'function' ? renderMonthly : renderDashboard), purchases: (typeof renderPurchaseInvoices === 'function' ? renderPurchaseInvoices : renderDashboard), aging: (typeof renderAging === 'function' ? renderAging : renderDashboard), cheques: (typeof renderCheques === 'function' ? renderCheques : renderDashboard), profit: (typeof renderProfit === 'function' ? renderProfit : renderDashboard), users: renderUsers, staff: (typeof renderStaff === 'function' ? renderStaff : renderDashboard), clients: (typeof renderClients === 'function' ? renderClients : renderDashboard), security: (typeof renderSecurity === 'function' ? renderSecurity : renderDashboard), audit: renderAuditLog, settings: renderSettings };
     (renderers[page] || renderDashboard)();
     updateBackButton();
     updateHomeFab();
@@ -26808,5 +26810,6 @@ function exportSuppliersCSV() {
 <script src="js/pushx.js"></script>
 <script src="js/consumables.js"></script>
 <script src="js/staffadmin.js"></script>
+<script src="js/clients.js"></script>
 </body>
 </html>
