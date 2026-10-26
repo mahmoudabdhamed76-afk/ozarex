@@ -66,6 +66,7 @@ function centersAll() {
   _ccAt = Date.now();
   return _cc;
 }
+let X = null;
 const centerByKey = k => centersAll().find(c => c.key === k) || null;
 function centersFor(e) { const all = centersAll(); return e && e.branch_id ? all.filter(c => c.branch === e.branch_id) : all; }
 const PURPOSES = ['توصيل ورق', 'تحصيل', 'متابعة / زيارة', 'صيانة / تجربة', 'استلام مرتجع', 'تاني'];
@@ -73,7 +74,8 @@ const PURPOSES = ['توصيل ورق', 'تحصيل', 'متابعة / زيارة'
 /* ── settings ── */
 const DEFAULTS = {
   tz: 'Africa/Cairo', require_location: '1', geofence: 'warn', ping_min: '15', grace_min: '10',
-  shift_start: '09:00', shift_end: '17:00', rest_days: '5', track: '1', open_hours: '16', center_radius: '300'
+  shift_start: '09:00', shift_end: '17:00', rest_days: '5', track: '1', open_hours: '16', center_radius: '300',
+  notify_in: '1', notify_out: '1', notify_arrive: '1', notify_visit: '0'
 };
 function cfgAll() {
   const out = Object.assign({}, DEFAULTS);
@@ -213,7 +215,8 @@ function home(e) {
     month: monthSummary(e, now.date.slice(0, 7), now),
     visit: openVisit(e.id, now) ? visitOut(openVisit(e.id, now), now) : null,
     visits: db.prepare('SELECT * FROM staff_visit WHERE emp_id = ? AND date = ? ORDER BY id').all(e.id, now.date).map(v => visitOut(v, now)),
-    purposes: PURPOSES, has_centers: centersFor(e).length > 0
+    purposes: PURPOSES, has_centers: centersFor(e).length > 0,
+    tasks: X ? X.tasksOf(e.id) : [], faults: db.prepare('SELECT COUNT(*) AS n FROM staff_fault').get().n
   };
 }
 
@@ -226,6 +229,7 @@ function openVisit(empId, now) {
 }
 function closeVisit(v, now, lat, lng, by) {
   db.prepare('UPDATE staff_visit SET end_at = ?, end_lat = ?, end_lng = ?, ended_by = ? WHERE id = ? AND end_at IS NULL').run(now.ts, lat, lng, by || 'emp', v.id);
+  if (X) X.visitEnded(null, v);
 }
 const centerRadius = () => Math.max(80, Number(cfg('center_radius')) || 300);
 function visitOut(v, now) {
@@ -262,8 +266,9 @@ function startVisit(e, b) {
   if (cur) closeVisit(cur, now, has ? lat : null, has ? lng : null, 'next');
   const dist = has && c.lat != null ? Math.round(haversine(lat, lng, c.lat, c.lng)) : null;
   const purpose = PURPOSES.includes(b.purpose) ? b.purpose : (b.purpose ? str(b.purpose, 40) : '');
-  db.prepare('INSERT INTO staff_visit (emp_id, att_id, date, center_key, center_name, branch_id, start_at, lat, lng, acc, dist, purpose, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+  const vr = db.prepare('INSERT INTO staff_visit (emp_id, att_id, date, center_key, center_name, branch_id, start_at, lat, lng, acc, dist, purpose, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .run(e.id, att.id, now.date, c.key, c.name, c.branch || null, now.ts, has ? lat : null, has ? lng : null, acc, dist, purpose, str(b.note, 200));
+  try { X.visitStarted(e, Number(vr.lastInsertRowid), c.key, b.task); X.onVisit(e, { center_name: c.name, purpose }, 'start'); } catch (er) { console.error('[staff] visit hook', er.message); }
   if (has) { logLoc(e, att.id, now, lat, lng, acc, b.battery, 'visit'); if (dist === null || dist <= centerRadius()) learnCenter(c, lat, lng, acc); }
   return { ok: true, home: home(e), dist, far: dist != null && dist > centerRadius() };
 }
@@ -272,7 +277,9 @@ function endVisit(e, b) {
   if (!v) fail(409, 'إنت مش مسجّل في أي مركز دلوقتي');
   const lat = num(b.lat), lng = num(b.lng);
   closeVisit(v, now, lat, lng, 'emp');
-  return { ok: true, home: home(e) };
+  let fault = null;
+  try { if (b.fault && (b.fault.title || b.fault.solution)) fault = X.addFault(e, b.fault, v.id, v.center_key); } catch (er) { console.error('[staff] fault', er.message); }
+  return { ok: true, home: home(e), fault };
 }
 function centersList(e, q) {
   const lat = num(q.get('lat')), lng = num(q.get('lng'));
@@ -320,6 +327,10 @@ function punch(e, b) {
     const r = db.prepare('INSERT INTO staff_att (emp_id, date, in_at, in_lat, in_lng, in_acc, in_dist, in_site, source) VALUES (?,?,?,?,?,?,?,?,?)')
       .run(e.id, now.date, now.ts, has ? lat : null, has ? lng : null, acc, near ? near.dist : null, near ? near.id : null, 'phone');
     if (has) logLoc(e, Number(r.lastInsertRowid), now, lat, lng, acc, b.battery, 'in');
+    try {
+      const rec = db.prepare('SELECT * FROM staff_att WHERE id = ?').get(Number(r.lastInsertRowid));
+      X.onPunch(e, 'in', now, { late: calc(rec, e, now.ts).late, dist: near ? near.dist : null, far: !!(near && near.dist > near.radius), site: near ? near.name : '' });
+    } catch (er) { console.error('[staff] notify', er.message); }
   } else {
     const open = openRecord(e.id, now);
     if (!open) fail(409, 'مفيش حضور مسجّل — سجّل الحضور الأول');
@@ -328,6 +339,7 @@ function punch(e, b) {
     db.prepare('UPDATE staff_att SET out_at = ?, out_lat = ?, out_lng = ?, out_acc = ?, out_dist = ? WHERE id = ?')
       .run(now.ts, has ? lat : null, has ? lng : null, acc, near ? near.dist : null, open.id);
     if (has) logLoc(e, open.id, now, lat, lng, acc, b.battery, 'out');
+    try { X.onPunch(e, 'out', now, { worked: calc(Object.assign({}, open, { out_at: now.ts }), e, now.ts).worked, visits: db.prepare('SELECT COUNT(*) AS n FROM staff_visit WHERE emp_id = ? AND date = ?').get(e.id, now.date).n }); } catch (er) { console.error('[staff] notify', er.message); }
   }
   return { ok: true, type, home: home(e) };
 }
@@ -435,6 +447,7 @@ function saveCfg(b, who) {
   if (b.shift_end !== undefined) { if (!isHM(b.shift_end)) fail(400, 'ميعاد النهاية غلط'); c.shift_end = b.shift_end; }
   if (b.center_radius !== undefined) c.center_radius = String(Math.max(80, Math.min(3000, Math.round(Number(b.center_radius) || 300))));
   if (b.rest_days !== undefined) c.rest_days = [...new Set(String(b.rest_days).split(',').map(x => x.trim()).filter(x => /^[0-6]$/.test(x)))].join(',');
+  for (const k of ['notify_in', 'notify_out', 'notify_arrive', 'notify_visit']) if (b[k] !== undefined) c[k] = b[k] ? '1' : '0';
   for (const k of Object.keys(c)) cfgSet(k, c[k]);
   if (Array.isArray(b.sites)) {
     const keep = new Set();
@@ -483,7 +496,7 @@ function live() {
   const here = {}; out.forEach(x => { if (x.visit) (here[x.visit.center_key] = here[x.visit.center_key] || []).push(x.name); });
   const todayN = new Map(db.prepare('SELECT center_key, COUNT(*) AS n FROM staff_visit WHERE date = ? GROUP BY center_key').all(now.date).map(r => [r.center_key, r.n]));
   const centers = centersAll().filter(c => c.lat != null).map(c => ({ key: c.key, name: c.name, lat: c.lat, lng: c.lng, here: here[c.key] || [], today: todayN.get(c.key) || 0 }));
-  return { now, ping_min: Number(cfg('ping_min')) || 15, radius: centerRadius(), list: out, centers, sites: sitesAll().filter(s => s.lat !== null).map(s => ({ id: s.id, name: s.name, lat: s.lat, lng: s.lng, radius: s.radius })) };
+  return { now, ping_min: Number(cfg('ping_min')) || 15, radius: centerRadius(), list: out, centers, tasks: X.board(), sites: sitesAll().filter(s => s.lat !== null).map(s => ({ id: s.id, name: s.name, lat: s.lat, lng: s.lng, radius: s.radius })) };
 }
 function track(empId, date) {
   const e = db.prepare('SELECT * FROM staff_emp WHERE id = ?').get(str(empId, 20)); if (!e) fail(404, 'الموظف مش موجود');
@@ -598,6 +611,9 @@ function sweep() {
 }
 sweep(); setInterval(sweep, 6 * 3600e3).unref();
 
+/* 4.63 · notifications + بنك الأعطال + المهام */
+X = require('./staffx')({ db, nowLocal, tsMin, haversine, num, str, fail, centerByKey, centersAll, centerRadius, cfg, openRecord, log, logLoc });
+
 /* ═════════════ HTTP ═════════════ */
 /* /staff/api/* — the employee's own endpoints (no ERP session; his own) */
 async function handlePublic(req, res, pathname, h) {
@@ -656,6 +672,7 @@ async function handlePublic(req, res, pathname, h) {
       db.prepare('DELETE FROM staff_sess WHERE emp_id = ? AND id != ?').run(e.id, auth.sha(me.token));
       return send(200, { ok: true });
     }
+    if (await X.publicRoute(req, res, pathname, e, send, readBody)) return;
     return send(404, { error: 'not_found' });
   } catch (er) {
     if (er && er.staffMsg) return send(er.status || 400, { error: 'staff', message: er.staffMsg });
@@ -687,6 +704,7 @@ async function handleAdmin(req, res, pathname, me, h) {
       if (p === '/center') return sendJSON(res, 200, pinCenter(await body(), who));
       if (p === '/att/delete') return sendJSON(res, 200, delAtt((await body()).id, who));
     }
+    if (await X.adminRoute(req, res, p, who, body, (st, o) => sendJSON(res, st, o))) return;
     return sendJSON(res, 404, { error: 'not_found' });
   } catch (er) {
     if (er && er.staffMsg) return sendJSON(res, er.status || 400, { error: 'staff', message: er.staffMsg });
@@ -694,4 +712,4 @@ async function handleAdmin(req, res, pathname, me, h) {
   }
 }
 
-module.exports = { handlePublic, handleAdmin, setSource, _test: { nowLocal, calc, rulesOf, tsMin } };
+module.exports = { handlePublic, handleAdmin, setSource, setNotify: n => X.setNotify(n), _test: { nowLocal, calc, rulesOf, tsMin } };

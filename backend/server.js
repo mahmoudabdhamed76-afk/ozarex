@@ -39,6 +39,11 @@ staff.setSource({
   },
   branches: () => branches.list().filter(b => b.active || b.main).map(b => ({ id: b.id, name: b.name }))
 });
+/* 4.63 · who hears about a punch (the admins) + the live event the open screens turn into a toast */
+staff.setNotify({
+  admins: () => ((store.data() || {}).users || []).filter(u => u && u.role === 'admin' && !u.disabled).map(u => u.id),
+  event: (name, payload) => { try { broadcast(name, payload); } catch (e) {} }
+});
 const digest = require('./src/digest');
 /* 4.39 · the daily summary + instant alerts read every active branch */
 const digestCtx = () => ({
@@ -321,6 +326,9 @@ const server = http.createServer(async (req, res) => {
     /* 4.60 · الموظفين: the employee's own page (/staff) and its API — his own login, never the ERP's */
     if (pathname === '/staff/') { res.writeHead(302, { Location: APP_PATH + '/staff' }); return res.end(); }
     if (pathname === '/staff') return serveStatic(req, res, path.join(PUBLIC, 'staff.html'));
+    if (pathname === '/staff-sw.js') {
+      try { const data = await fs.promises.readFile(path.join(PUBLIC, 'staff-sw.js')); return endBody(req, res, 200, data, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Service-Worker-Allowed': '/staff' }, true); } catch (_) {}
+    }
     if (pathname === '/staff/manifest.json') return sendJSON(res, 200, { name: 'حضور وانصراف', short_name: 'حضوري', start_url: '../staff', scope: '../', display: 'standalone', background_color: '#0c0809', theme_color: '#0c0809', lang: 'ar', dir: 'rtl', icons: [{ src: '../icons/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '../icons/icon-512.png', sizes: '512x512', type: 'image/png' }] }, { 'Cache-Control': 'public, max-age=3600' });
     if (pathname.startsWith('/staff/api/')) return await staff.handlePublic(req, res, pathname, { sendJSON, readBody, settings: () => (store.data() || {}).settings || {} });
 

@@ -219,6 +219,83 @@
     var el = document.getElementById('stf-map'); if (el && el.scrollIntoView && window.innerWidth < 900) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
+  /* ════════ 4.63 · الفنيين في الطريق ════════ */
+  function keepTstat(l) { S.tstat = {}; (l.tasks || []).forEach(function (t) { S.tstat[t.id] = t.status; }); }
+  function kmT(m) { return m == null ? '—' : (m < 1000 ? m + ' م' : (m / 1000).toFixed(1) + ' كم'); }
+  function roadHtml(tasks) {
+    var list = (tasks || []).filter(function (t) { return t.status !== 'cancel'; });
+    var h = '<div class="card stf-road ax-hl-off" id="stf-road"><div class="card-header"><h3 class="card-title">🚗 الفنيين في الطريق</h3><button class="btn btn-sm btn-primary" data-a="newtask">＋ مهمة لموظف</button></div>';
+    if (!list.length) return h + '<p class="stf-note" style="margin:6px 4px 2px">مفيش مهام النهارده — اضغط «＋ مهمة لموظف» وحدد المركز، والموظف هيوصله إشعار ويبدأ الطريق وانت تتابعه هنا.</p></div>';
+    h += '<div class="rd-list">' + list.map(function (t) {
+      var cls = t.status, pct = t.pct;
+      var head = '<div class="rd-h"><b>' + esc(t.emp) + '</b><span>← ' + esc(t.center) + (t.title && t.title.indexOf('زيارة ') !== 0 ? ' · ' + esc(t.title) : '') + '</span>';
+      var st = t.status === 'going' ? '<em class="rd-st g">في الطريق</em>' : t.status === 'arrived' ? '<em class="rd-st a">🎉 وصل ' + hm(t.arrived_at) + '</em>' : t.status === 'done' ? '<em class="rd-st d">✅ خلّص ' + hm(t.done_at) + '</em>' : '<em class="rd-st n">⏳ لسه ما بدأش</em>';
+      var x = (t.status === 'new' || t.status === 'going' || t.status === 'arrived') ? '<button class="rd-x" data-a="tcancel" data-id="' + t.id + '" title="إلغاء المهمة">✕</button>' : '';
+      var road = '<div class="rd-road"><i style="width:' + pct + '%"></i><span class="rd-man' + (t.status === 'going' ? ' walk' : '') + '" style="inset-inline-start:' + pct + '%">' + (t.status === 'arrived' || t.status === 'done' ? '🎉' : '🚶') + '</span><span class="rd-end">🏥</span></div>';
+      var nums = t.status === 'going' ? '<div class="rd-n"><span>باقي <b>' + kmT(t.dist) + '</b></span><span>' + (t.eta ? 'حوالي <b>' + t.eta + '</b> دقيقة' : '') + '</span><span><b>' + pct + '%</b></span>' + (t.known ? '' : '<span class="rd-warn">مكان المركز لسه مش معروف</span>') + '</div>' : t.status === 'new' ? '' : '<div class="rd-n"><span>بدأ ' + hm(t.started_at) + '</span><span>' + (t.arrived_at ? 'وصل ' + hm(t.arrived_at) : '') + '</span></div>';
+      return '<div class="rd-it ' + cls + '">' + head + st + x + '</div>' + road + nums + '</div>';
+    }).join('') + '</div></div>';
+    return h;
+  }
+  function celebrate(t) {
+    T('🎉 ' + t.emp + ' وصل ' + t.center, 'success');
+    try {
+      var d = document.createElement('div'); d.className = 'stf-party';
+      d.innerHTML = '<div class="pt-msg">🎉 ' + esc(t.emp) + ' وصل<br><small>' + esc(t.center) + '</small></div>' + Array.apply(null, Array(36)).map(function (_, i) { return '<i style="left:' + (Math.random() * 100).toFixed(1) + '%;animation-delay:' + (Math.random() * .8).toFixed(2) + 's;font-size:' + (14 + Math.random() * 16).toFixed(0) + 'px">' + ['🎉', '✨', '🎊', '⭐', '🟢'][i % 5] + '</i>'; }).join('');
+      document.body.appendChild(d); setTimeout(function () { d.remove(); }, 3800);
+      var Ac = window.AudioContext || window.webkitAudioContext;
+      if (Ac) { var a = new Ac(), t0 = a.currentTime; [523, 659, 784, 1047].forEach(function (f, i) { var o = a.createOscillator(), g = a.createGain(); o.frequency.value = f; o.type = 'sine'; g.gain.setValueAtTime(.0001, t0 + i * .12); g.gain.exponentialRampToValueAtTime(.18, t0 + i * .12 + .03); g.gain.exponentialRampToValueAtTime(.0001, t0 + i * .12 + .35); o.connect(g); g.connect(a.destination); o.start(t0 + i * .12); o.stop(t0 + i * .12 + .4); }); }
+    } catch (e) {}
+  }
+  function taskModal(empId) {
+    api('GET', '/centers').then(function (r) {
+      var es = emps().filter(function (e) { return e.active; });
+      if (!es.length) { T('ضيف موظف الأول', 'error'); return; }
+      openModal('📌 مهمة جديدة لموظف',
+        '<div class="form-group"><label>الموظف</label><select class="form-control" id="tk-e">' + es.map(function (e) { return '<option value="' + esc(e.id) + '"' + (e.id === empId ? ' selected' : '') + '>' + esc(e.name) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="form-group"><label>المركز</label><input class="form-control" id="tk-c" list="tk-cl" placeholder="ابدأ اكتب اسم المركز…" autocomplete="off"><datalist id="tk-cl">' + r.list.map(function (c) { return '<option value="' + esc(c.name) + '"></option>'; }).join('') + '</datalist><small class="stf-note">لو المركز مكانه لسه مش معروف هتتحسب المسافة بعد أول زيارة ليه أو ثبّت مكانه من تبويب «المراكز».</small></div>' +
+        '<div class="form-group"><label>المطلوب (اختياري)</label><input class="form-control" id="tk-t" placeholder="مثلاً: توصيل ورق / تحصيل / صيانة الطابعة" maxlength="120"></div>' +
+        '<div class="form-group"><label>ملاحظة (اختياري)</label><input class="form-control" id="tk-n" maxlength="300"></div>',
+        '<button class="btn btn-primary" id="tk-go">إرسال المهمة</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+      document.getElementById('tk-go').onclick = function () {
+        var nm = document.getElementById('tk-c').value.trim(), c = r.list.filter(function (x) { return x.name === nm; })[0];
+        if (!c) { T('اختار المركز من القايمة', 'error'); return; }
+        api('POST', '/task', { emp_id: document.getElementById('tk-e').value, center: c.key, title: document.getElementById('tk-t').value, note: document.getElementById('tk-n').value })
+          .then(function () { closeModal(); T('اتبعتت المهمة والموظف اتبلّغ ✅'); if (S.tab === 'live') refreshLive(); }).catch(function (e) { T(e.message, 'error'); });
+      };
+    }).catch(function (e) { T(e.message, 'error'); });
+  }
+
+  /* ════════ 4.63 · بنك الأعطال ════════ */
+  function faultsHtml() {
+    var F = S.faults || { list: [], recurring: [], total: 0 };
+    var h = '<div class="card stf-form"><div class="stf-fbar"><input class="form-control" id="stf-fq" placeholder="🔎 كود العطل أو وصفه" value="' + esc(S.fq || '') + '"><button class="btn btn-secondary" data-a="fsearch">بحث</button><button class="btn btn-primary" data-a="fadd">＋ حل</button></div><p class="stf-note" style="margin:8px 2px 0">' + F.total + ' حل في البنك — الفنيين بيسجّلوه وهما بيخلّصوا زيارة، وبيوصل لكل زميل إشعار لحظي.</p></div>';
+    if (F.recurring && F.recurring.length && !S.fq) {
+      h += '<div class="card stf-form"><div class="card-header"><h3 class="card-title">🔁 أعطال متكررة (آخر 90 يوم)</h3></div><div class="stf-rec">' + F.recurring.map(function (r) {
+        return '<div class="stf-recit ax-hl-off"><span class="rn">' + r.n + '×</span><div><b>' + (r.code ? '<code>' + esc(r.code) + '</code> ' : '') + esc(r.title) + '</b><small>' + esc(r.centers.join('، ') || '—') + '</small>' + (r.best ? '<small class="ok">الحل: ' + esc(r.best.solution.slice(0, 110)) + ' — ' + esc(r.best.emp || '') + '</small>' : '') + '</div></div>'; }).join('') + '</div></div>';
+    }
+    h += F.list.length ? '<div class="stf-flist">' + F.list.map(function (f) {
+      return '<div class="card stf-fi ax-hl-off"><div class="stf-fh"><b>' + esc(f.title) + '</b>' + (f.code ? '<code>' + esc(f.code) + '</code>' : '') + '</div><div class="stf-sol">' + esc(f.solution) + '</div><div class="stf-fm"><span>👷 ' + esc(f.emp) + '</span>' + (f.center ? '<span>🏥 ' + esc(f.center) + '</span>' : '') + '<span>' + esc(String(f.at).slice(0, 16)) + '</span>' + (f.repeats > 1 ? '<span class="rep">اتكرر ' + f.repeats + '×</span>' : '') +
+        '<button class="stf-vt' + (f.voted ? ' on' : '') + '" data-a="fvote" data-id="' + f.id + '">👍 ' + f.votes + '</button><button class="stf-vt" data-a="fdel" data-id="' + f.id + '" title="مسح">🗑</button></div></div>'; }).join('') + '</div>' : '<div class="card stf-empty"><div class="stf-ill">🛠</div><h3>' + (S.fq ? 'مفيش نتايج' : 'البنك لسه فاضي') + '</h3><p>' + (S.fq ? 'جرّب كلمة تانية أو الكود بس.' : 'أول ما فني يخلّص زيارة وفيها عطل ويسجّل حلّه هيظهر هنا.') + '</p></div>';
+    return h;
+  }
+  function faultModal() {
+    openModal('🛠 حل جديد في البنك',
+      '<div class="form-group"><label>كود العطل (اختياري)</label><input class="form-control" id="fl-c" dir="ltr" maxlength="30" placeholder="E45"></div><div class="form-group"><label>وصف العطل</label><input class="form-control" id="fl-t" maxlength="160"></div><div class="form-group"><label>الحل</label><textarea class="form-control" id="fl-s" rows="3" maxlength="800"></textarea></div>',
+      '<button class="btn btn-primary" id="fl-go">حفظ</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+    document.getElementById('fl-go').onclick = function () {
+      api('POST', '/fault', { code: document.getElementById('fl-c').value, title: document.getElementById('fl-t').value, solution: document.getElementById('fl-s').value })
+        .then(function () { closeModal(); T('اتسجّل والفريق اتبلّغ ✅'); load(); }).catch(function (e) { T(e.message, 'error'); });
+    };
+  }
+  /* a punch / a fault / an arrival happened somewhere → a toast, and the live screen refreshes itself */
+  document.addEventListener('ax:sse', function (ev) {
+    var m = ev.detail || {}; if (m.event !== 'staff') return;
+    var u = me(); if (!u || u.role !== 'admin') return;
+    T(m.text || 'تحديث في الموظفين', m.kind === 'out' ? 'info' : 'success');
+    if (isPage() && S.tab === 'live') refreshLive();
+  });
+
   /* ════════ page ════════ */
   function render() {
     var root = document.getElementById('page-content'); if (!root) return;
@@ -226,7 +303,7 @@
     root.innerHTML =
       '<div class="page-header stf-head"><div><h2 class="page-title">الموظفين</h2><p class="page-subtitle">حضور وانصراف بالموقع من لينك خاص بكل موظف</p></div>' +
       '<div class="page-actions"><button class="btn btn-secondary" data-a="link">🔗 اللينك</button><button class="btn btn-primary" data-a="new">＋ موظف</button></div></div>' +
-      '<div class="stf-tabs" id="stf-tabs">' + [['live', 'النهارده'], ['centers', 'المراكز'], ['emps', 'الموظفين'], ['report', 'التقرير'], ['cfg', 'الإعدادات']].map(function (t) {
+      '<div class="stf-tabs" id="stf-tabs">' + [['live', 'النهارده'], ['centers', 'المراكز'], ['faults', 'الأعطال'], ['emps', 'الموظفين'], ['report', 'التقرير'], ['cfg', 'الإعدادات']].map(function (t) {
         return '<button data-t="' + t[0] + '" class="' + (S.tab === t[0] ? 'on' : '') + '">' + t[1] + '</button>'; }).join('') + '</div>' +
       '<div id="stf-body"><div class="stf-load">بنحمّل…</div></div>';
     root.onclick = onClick;
@@ -243,9 +320,10 @@
     var body = document.getElementById('stf-body'); if (!body) return;
     api('GET', '/bootstrap').then(function (b) {
       S.boot = b;
-      if (S.tab === 'live') return api('GET', '/live').then(function (l) { S.live = l; paint(); S.timer = setInterval(refreshLive, 30000); });
+      if (S.tab === 'live') return api('GET', '/live').then(function (l) { S.live = l; keepTstat(l); S.fast = (l.tasks || []).some(function (t) { return t.status === 'going'; }); paint(); S.timer = setInterval(refreshLive, S.fast ? 10000 : 30000); });
       if (S.tab === 'report') return api('GET', '/report?month=' + (S.month || '')).then(function (r) { S.report = r; S.month = r.month; paint(); });
       if (S.tab === 'cfg') return api('GET', '/log').then(function (l) { S.logs = l.rows; paint(); });
+      if (S.tab === 'faults') return api('GET', '/faults?q=' + encodeURIComponent(S.fq || '')).then(function (r) { S.faults = r; paint(); });
       if (S.tab === 'centers') return api('GET', '/visits?month=' + (S.vmonth || '')).then(function (r) { S.visits = r; S.vmonth = r.month; paint(); });
       paint();
     }).catch(function (e) { var bd = document.getElementById('stf-body'); if (bd) bd.innerHTML = '<div class="stf-load bad">' + esc(e.message) + '</div>'; });
@@ -256,12 +334,16 @@
     api('GET', '/live').then(function (l) {
       S.live = l; if (!isPage() || S.tab !== 'live') return;
       var st = document.getElementById('stf-lstats'), cd = document.getElementById('stf-lcards');
-      if (st && cd && l.list.length) { st.outerHTML = liveStats(l.list); cd.innerHTML = liveList(l); drawLive(true); } else paint();
+      if (st && cd && l.list.length) {
+        var prev = S.tstat || {}; (l.tasks || []).forEach(function (t) { if (t.status === 'arrived' && prev[t.id] === 'going') celebrate(t); });
+        st.outerHTML = liveStats(l.list); cd.innerHTML = liveList(l); var rd = document.getElementById('stf-road'); if (rd) rd.outerHTML = roadHtml(l.tasks || []); drawLive(true); keepTstat(l);
+        var fast = (l.tasks || []).some(function (t) { return t.status === 'going'; }); if (fast !== S.fast) { S.fast = fast; clearInterval(S.timer); S.timer = setInterval(refreshLive, fast ? 10000 : 30000); }
+      } else paint();
     }).catch(function () {});
   }
   function paint() {
     var body = document.getElementById('stf-body'); if (!body) return;
-    body.innerHTML = S.tab === 'live' ? liveHtml() : S.tab === 'centers' ? centersHtml() : S.tab === 'emps' ? empsHtml() : S.tab === 'report' ? reportHtml() : cfgHtml();
+    body.innerHTML = S.tab === 'live' ? liveHtml() : S.tab === 'centers' ? centersHtml() : S.tab === 'faults' ? faultsHtml() : S.tab === 'emps' ? empsHtml() : S.tab === 'report' ? reportHtml() : cfgHtml();
     if (S.tab === 'live' && S.live && S.live.list.length) drawLive(false);
     if (S.tab === 'centers' && S.visits) drawCenters();
   }
@@ -291,7 +373,7 @@
   function liveHtml() {
     var L = S.live, list = L.list;
     if (!list.length) return '<div class="card stf-empty"><div class="stf-ill">👥</div><h3>مفيش موظفين لسه</h3><p>ضيف أول موظف، وابعتله اللينك باسم المستخدم وكلمة السر، وهو هيسجّل حضوره من موبايله.</p><button class="btn btn-primary" data-a="new">＋ موظف جديد</button></div>';
-    var h = liveStats(list);
+    var h = liveStats(list) + roadHtml(L.tasks || []);
     h += '<div class="stf-live"><div class="card stf-mapcard lt">' + mapBox('stf-map', 520, 'tall') + '</div><div class="card stf-lvcard"><div class="stf-lvh ax-hl-off"><b class="ax-hl-off">الموظفين النهارده</b><span class="stf-livedot ax-hl-off"><i></i>مباشر · تحديث كل ' + L.ping_min + ' د</span></div><div class="stf-lvlist" id="stf-lcards">' + liveList(L) + '</div></div></div>';
     return h;
   }
@@ -420,6 +502,13 @@
       '<label class="stf-sw"><input type="checkbox" id="c-tr"' + (c.track === '1' ? ' checked' : '') + '><span><b>تتبع الموقع وقت الشغل</b><small>الموبايل يبعت مكانه كل فترة طول ما هو مسجّل حضور — وبيقف أول ما يسجّل انصراف</small></span></label>' +
       '<div class="stf-grid"><div class="form-group"><label>كل كام دقيقة يبعت الموقع</label><input class="form-control" type="number" min="5" max="120" id="c-pm" value="' + esc(c.ping_min) + '"></div>' +
       '<div class="form-group"><label>نطاق المركز (متر)</label><input class="form-control" type="number" min="80" max="3000" id="c-cr" value="' + esc(c.center_radius || 300) + '"></div>' + '<div class="form-group"><label>لو الموظف برّه المكان</label><select class="form-control" id="c-gf"><option value="off"' + (c.geofence === 'off' ? ' selected' : '') + '>مفيش تحقق من المسافة</option><option value="warn"' + (c.geofence === 'warn' ? ' selected' : '') + '>يسجّل بس يتعلّم «برّه المكان»</option><option value="block"' + (c.geofence === 'block' ? ' selected' : '') + '>يتمنع من تسجيل الحضور</option></select></div></div></div>';
+    var nv = function (k, dflt) { return c[k] === undefined ? dflt : c[k] === '1'; };
+    h += '<div class="card stf-form"><div class="card-header"><h3 class="card-title">الإشعارات 🔔</h3></div>' +
+      '<label class="stf-sw"><input type="checkbox" id="c-ni"' + (nv('notify_in', true) ? ' checked' : '') + '><span><b>لما موظف يسجّل حضور</b><small>إشعار على موبايلك (والشاشة المفتوحة) بالاسم والوقت والتأخير</small></span></label>' +
+      '<label class="stf-sw"><input type="checkbox" id="c-no"' + (nv('notify_out', true) ? ' checked' : '') + '><span><b>لما موظف يسجّل انصراف</b><small>بمدة الشغل وعدد الزيارات</small></span></label>' +
+      '<label class="stf-sw"><input type="checkbox" id="c-na"' + (nv('notify_arrive', true) ? ' checked' : '') + '><span><b>لما فني يوصل المركز</b><small>🎉 وهو في الطريق بتشوفه على لوحة «الفنيين في الطريق»</small></span></label>' +
+      '<label class="stf-sw"><input type="checkbox" id="c-nv"' + (nv('notify_visit', false) ? ' checked' : '') + '><span><b>لما موظف يبدأ زيارة مركز</b><small>مقفول افتراضيًا علشان ما يكترش</small></span></label>' +
+      '<div data-axp></div><p class="stf-note">علشان الإشعار يوصلك والتطبيق مقفول: افتح مركز الإشعارات 🔔 واضغط «تفعيل» على الجهاز ده.</p></div>';
     h += '<div class="card stf-form"><div class="card-header"><h3 class="card-title">أماكن الشغل</h3><button class="btn btn-sm btn-secondary" data-a="addsite">＋ مكان</button></div><div id="c-sites">' + sites().map(siteRow).join('') + (sites().length ? '' : '<p class="stf-note" id="c-nosite">ضيف مكان الشغل (المكتب أو الفرع) وحدد نطاقه، علشان البرنامج يعرف الموظف وصل ولا لأ.</p>') + '</div></div>';
     h += '<div class="stf-savebar"><button class="btn btn-primary" data-a="savecfg">💾 حفظ الإعدادات</button></div>';
     h += '<div class="card"><div class="card-header"><h3 class="card-title">آخر العمليات</h3></div><div class="stf-log">' + ((S.logs || []).length ? S.logs.slice(0, 25).map(function (r) {
@@ -442,6 +531,12 @@
     if (a === 'send') return sendCreds(id);
     if (a === 'link') return linkModal();
     if (a === 'focus') return focusEmp(id);
+    if (a === 'newtask') return taskModal();
+    if (a === 'tcancel') { if (!confirm('تلغي المهمة دي؟')) return; return api('POST', '/task/cancel', { id: Number(id) }).then(function () { T('اتلغت المهمة'); refreshLive(); }).catch(function (e) { T(e.message, 'error'); }); }
+    if (a === 'fadd') return faultModal();
+    if (a === 'fvote') return api('POST', '/fault/vote', { id: Number(id) }).then(function (r) { el.textContent = '👍 ' + r.votes; el.classList.toggle('on', r.voted); }).catch(function (e) { T(e.message, 'error'); });
+    if (a === 'fdel') { if (!confirm('تمسح الحل ده من البنك؟')) return; return api('POST', '/fault/delete', { id: Number(id) }).then(function () { T('اتمسح'); load(); }).catch(function (e) { T(e.message, 'error'); }); }
+    if (a === 'fsearch') { S.fq = (document.getElementById('stf-fq') || {}).value || ''; return load(); }
     if (a === 'day') { var e = empById(id); return dayModal(id, S.live ? S.live.now.date : today(), e && e.name); }
     if (a === 'emprep') return empReport(id);
     if (a === 'cvis') return centerVisits(id);
@@ -473,7 +568,7 @@
     var rest = [].filter.call(document.querySelectorAll('#c-rest input'), function (i) { return i.checked; }).map(function (i) { return i.value; }).join(',');
     api('POST', '/cfg', {
       shift_start: document.getElementById('c-ss').value, shift_end: document.getElementById('c-se').value, grace_min: document.getElementById('c-gr').value, rest_days: rest,
-      require_location: document.getElementById('c-rl').checked, track: document.getElementById('c-tr').checked, ping_min: document.getElementById('c-pm').value, geofence: document.getElementById('c-gf').value, center_radius: document.getElementById('c-cr').value, sites: rows
+      notify_in: document.getElementById('c-ni').checked, notify_out: document.getElementById('c-no').checked, notify_arrive: document.getElementById('c-na').checked, notify_visit: document.getElementById('c-nv').checked, require_location: document.getElementById('c-rl').checked, track: document.getElementById('c-tr').checked, ping_min: document.getElementById('c-pm').value, geofence: document.getElementById('c-gf').value, center_radius: document.getElementById('c-cr').value, sites: rows
     }).then(function (r) { S.boot.cfg = r.cfg; S.boot.sites = r.sites; T('اتحفظت الإعدادات ✅'); paint(); }).catch(function (e) { T(e.message, 'error'); });
   }
 

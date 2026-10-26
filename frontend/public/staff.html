@@ -115,6 +115,27 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
 .chips button{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 13px;font-size:13px;cursor:pointer}
 .chips button.on{background:var(--red);border-color:var(--red);color:#fff}
 .sh .bx h2{margin:0 0 4px}
+/* 4.63 · المهام + بنك الأعطال + الإشعارات */
+.vc.tk{border-color:rgba(224,27,15,.35);background:linear-gradient(180deg,rgba(224,27,15,.07),transparent 70%),var(--card)}
+.vc.tk.going{border-color:rgba(30,154,76,.45);background:linear-gradient(180deg,rgba(30,154,76,.09),transparent 70%),var(--card)}
+.vc.tk .ic{background:rgba(224,27,15,.12);font-size:18px}.vc.tk.going .ic,.vc.tk.arrived .ic{background:rgba(30,154,76,.14)}
+.trk{position:relative;height:10px;border-radius:99px;background:rgba(128,128,128,.3);margin:22px 8px 8px}
+.trk i{position:absolute;inset-block:0;inset-inline-start:0;border-radius:99px;background:linear-gradient(90deg,var(--ok),#7ad39a);transition:width 1s}
+.trk em{position:absolute;top:-17px;font-style:normal;font-size:20px;transform:translateX(50%);transition:inset-inline-start 1s;line-height:1}
+.trk b{position:absolute;inset-inline-end:-6px;top:-17px;font-size:20px;line-height:1}
+.tk .nums{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mut);margin:0 6px}
+.tk .nums b{color:var(--ink)}
+.fbk{display:flex;align-items:center;gap:12px;width:100%;margin-top:12px;padding:13px 14px;border-radius:18px;border:1px solid var(--line);background:var(--card);cursor:pointer;text-align:right}
+.fbk .ic{font-size:22px}.fbk b{display:block;font-size:14.5px}.fbk small{color:var(--mut);font-size:12px}
+.fres{max-height:min(56vh,480px);overflow:auto;margin:10px -4px 0;padding:0 4px}
+.fi{border:1px solid var(--line);background:var(--card);border-radius:15px;padding:12px;margin-bottom:8px}
+.fi h4{margin:0 0 4px;font-size:14.5px}.fi .sol{font-size:13.5px;line-height:1.8;background:rgba(30,154,76,.09);border-radius:10px;padding:8px 10px;margin:6px 0}
+.fi .meta{display:flex;flex-wrap:wrap;gap:6px 10px;font-size:11.5px;color:var(--mut);align-items:center}
+.fi .cd{font:700 11.5px monospace;background:var(--soft);border-radius:7px;padding:1px 7px;direction:ltr}
+.fi .rep{color:var(--red);font-weight:700}
+.fi .vt{margin-inline-start:auto;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer}.fi .vt.on{background:rgba(30,154,76,.14);border-color:var(--ok);color:var(--ok);font-weight:700}
+.bell{position:relative}.bell.on::after{content:"";position:absolute;top:7px;inset-inline-end:7px;width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.pushb{display:flex;gap:10px;align-items:center;margin-top:12px;padding:12px 14px;border-radius:16px;border:1px dashed var(--line);background:var(--card);font-size:13px}.pushb .btn{width:auto;height:38px;padding:0 14px;font-size:13px;flex:none}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style>
 </head>
@@ -133,6 +154,27 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   </div>
   <div id="csx0" style="margin-top:10px"><button class="btn ghost" id="csno0">إلغاء</button></div>
 </div></div>
+<div class="sh" id="fsh"><div class="bx">
+  <h2>🛠 بنك الأعطال</h2>
+  <p class="hint" style="text-align:right;margin:0">دوّر بكود العطل أو بوصفه — هتلاقي الحل ومين اللي حلّه.</p>
+  <input class="in" id="fq" placeholder="🔎 كود العطل أو كلمة من وصفه" style="margin-top:10px" autocomplete="off">
+  <div class="fres" id="fl"><div class="empty">بنحمّل…</div></div>
+  <div id="fnew" class="hide" style="margin-top:8px">
+    <input class="in" id="fc" placeholder="كود العطل (اختياري) مثلاً E45" maxlength="30" dir="ltr" style="margin-bottom:8px">
+    <input class="in" id="ft" placeholder="وصف العطل" maxlength="160" style="margin-bottom:8px">
+    <textarea class="in" id="fs" placeholder="الحل اللي اشتغل" maxlength="800" rows="3" style="height:auto;padding:10px 14px;margin-bottom:8px"></textarea>
+    <div style="display:flex;gap:10px"><button class="btn" id="fsv">حفظ الحل</button><button class="btn ghost" id="fcn" style="width:38%">رجوع</button></div>
+  </div>
+  <div id="fbt" style="display:flex;gap:10px;margin-top:10px"><button class="btn" id="fadd">＋ سجّل حل جديد</button><button class="btn ghost" id="fx" style="width:34%">إغلاق</button></div>
+</div></div>
+<div class="sh" id="esh"><div class="bx">
+  <h2>خلّصت في <span id="ec"></span>؟</h2>
+  <p class="hint" style="text-align:right;margin:0">لو كان فيه عطل وحلّيته، سجّل الحل — أي زميل يدوّر بالكود هيلاقيه.</p>
+  <input class="in" id="ecd" placeholder="كود العطل (اختياري)" maxlength="30" dir="ltr" style="margin-top:10px">
+  <input class="in" id="etl" placeholder="وصف العطل" maxlength="160" style="margin-top:8px">
+  <textarea class="in" id="esl" placeholder="الحل اللي اشتغل" maxlength="800" rows="3" style="height:auto;padding:10px 14px;margin-top:8px"></textarea>
+  <div style="display:flex;gap:10px;margin-top:12px"><button class="btn" id="ego">✓ خلّصت</button><button class="btn ghost" id="eno" style="width:34%">إلغاء</button></div>
+</div></div>
 <div class="sh" id="pwsh"><div class="bx">
   <h2 style="margin-top:0">تغيير كلمة السر</h2>
   <div class="err" id="pwerr"></div>
@@ -149,7 +191,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var ls = { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }, del: function (k) { try { localStorage.removeItem(k); } catch (e) {} } };
   var TOKEN = ls.get('ozs_t') || '';
-  var H = null, brand = { name: '', logo: '' }, pos = null, posAt = 0, month = '', hist = null, pingTimer = 0, clockTimer = 0, offset = 0, busy = false;
+  var H = null, brand = { name: '', logo: '' }, pos = null, posAt = 0, month = '', hist = null, pingTimer = 0, clockTimer = 0, taskTimer = 0, pushOn = ls.get('ozs_push') === '1', offset = 0, busy = false;
   var DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
   var MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
   var ICON = {
@@ -188,7 +230,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   function dur(m) { m = Math.max(0, Math.round(m)); return p2(Math.floor(m / 60)) + ':' + p2(m % 60); }
   function tsMs(ts) { return Date.parse(ts.replace(' ', 'T') + 'Z'); }
 
-  function stop() { clearInterval(pingTimer); clearInterval(clockTimer); pingTimer = clockTimer = 0; }
+  function stop() { clearInterval(pingTimer); clearInterval(clockTimer); clearInterval(taskTimer); pingTimer = clockTimer = taskTimer = 0; }
 
   /* ── location ── */
   function dist(a, b, c, d) { var R = 6371000, r = function (x) { return x * Math.PI / 180; }, dla = r(c - a), dlo = r(d - b); var h = Math.sin(dla / 2) * Math.sin(dla / 2) + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(dlo / 2) * Math.sin(dlo / 2); return 2 * R * Math.asin(Math.sqrt(h)); }
@@ -252,7 +294,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   }
 
   function load() {
-    return api('GET', '/home').then(function (h) { H = h; syncClock(h.now.ts); month = h.month.month; hist = h.month; renderHome(); startPings(); }).catch(function (e) { if (e.message) toast(e.message, true); });
+    return api('GET', '/home').then(function (h) { H = h; syncClock(h.now.ts); month = h.month.month; hist = h.month; renderHome(); startPings(); startTaskPings(); }).catch(function (e) { if (e.message) toast(e.message, true); });
   }
 
   function stateChip() {
@@ -272,12 +314,12 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     var d = srvNow(), dd = H.now.date.split('-');
     var wd = DAYS[new Date(H.now.date + 'T00:00:00Z').getUTCDay()];
     $('app').innerHTML = '<div class="top"><div class="lg">' + logoHtml() + '</div><div class="nm"><b>أهلاً ' + esc(H.emp.name) + '</b><span>' + esc(H.emp.job || brand.name || '') + '</span></div>' +
-      '<button class="ib" id="bth" title="الوضع">' + ICON.sun + '</button><button class="ib" id="bpw" title="كلمة السر">' + ICON.key + '</button><button class="ib" id="bout" title="خروج">' + ICON.out + '</button></div>' +
+      '<button class="ib bell' + (pushOn ? ' on' : '') + '" id="bbl" title="الإشعارات">🔔</button><button class="ib" id="bth" title="الوضع">' + ICON.sun + '</button><button class="ib" id="bpw" title="كلمة السر">' + ICON.key + '</button><button class="ib" id="bout" title="خروج">' + ICON.out + '</button></div>' +
       '<section class="hero"><div class="clk" id="clk">--:--:--</div><div class="dt">' + wd + ' ' + (+dd[2]) + ' ' + MONTHS[+dd[1] - 1] + ' ' + dd[0] + '</div>' +
       '<div class="st">' + stateChip() + '</div>' + bigBtn() +
       '<div class="wk"><div><span>ميعاد الشغل</span><b>' + H.rules.start + ' - ' + H.rules.end + '</b></div><div><span>مدة الشغل النهارده</span><b id="wk">' + (H.rec ? dur(H.rec.worked) : '00:00') + '</b></div></div></section>' +
       '<div class="loc" id="loc">' + ICON.pin + '<span>بنحدد موقعك…</span></div>' +
-      '<div id="vis"></div>' +
+      '<div id="tsk"></div><div id="vis"></div><button class="fbk" id="fbk"><span class="ic">🛠</span><span><b>بنك الأعطال</b><small>' + (H.faults ? H.faults + ' حل متسجّل — دوّر بالكود أو بالوصف' : 'سجّل أول حل واتشاركه مع زمايلك') + '</small></span></button><div id="pushb"></div>' +
       (H.track ? '<p class="hint" style="margin:10px 6px 0;text-align:right">موقعك بيتبعت للإدارة كل ' + H.ping_min + ' دقيقة <b>وإنت في الشغل بس</b> (من تسجيل الحضور لحد الانصراف). سيب الصفحة مفتوحة، وبعد الانصراف مفيش أي تتبع.</p>' : '') +
       '<h2>الشهر ده</h2><div class="mn" id="mn"></div>' +
       '<h2>السجل <span class="sp"><button class="nv" id="mp">' + ICON.prev + '</button><b id="ml" style="font-size:13px;min-width:92px;text-align:center"></b><button class="nv" id="mnx">' + ICON.next + '</button></span></h2><div id="hl"></div>';
@@ -286,7 +328,8 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     $('bth').onclick = function () { theme(dark() ? 'light' : 'dark'); };
     $('pb').onclick = punch;
     $('mp').onclick = function () { shift(-1); }; $('mnx').onclick = function () { shift(1); };
-    paintHist(); paintLoc(true); paintVisit();
+    $('bbl').onclick = askPush; $('fbk').onclick = openFaults;
+    paintHist(); paintLoc(true); paintVisit(); paintTasks(); paintPushBanner();
     clearInterval(clockTimer); tick(); clockTimer = setInterval(tick, 1000);
   }
   function tick() {
@@ -323,7 +366,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
       var ok = $('okm'); if (ok) { ok.classList.add('on'); }
       H = r.home; syncClock(H.now.ts); hist = H.month; month = H.month.month;
       ls.set('ozs_lp', String(Date.now()));
-      setTimeout(function () { renderHome(); startPings(); toast(type === 'in' ? (r.resumed ? 'تمام — كمّلت شغلك' : 'اتسجّل حضورك ' + hm(H.rec.in_at) + ' ✅') : 'اتسجّل انصرافك ' + hm(H.rec.out_at) + ' — تعيش 👋'); fin(); }, 900);
+      setTimeout(function () { renderHome(); startPings(); startTaskPings(); toast(type === 'in' ? (r.resumed ? 'تمام — كمّلت شغلك' : 'اتسجّل حضورك ' + hm(H.rec.in_at) + ' ✅') : 'اتسجّل انصرافك ' + hm(H.rec.out_at) + ' — تعيش 👋'); fin(); }, 900);
     }).catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
   }
 
@@ -394,10 +437,115 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
     }).catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
   };
   function endVisit() {
-    if (busy) return; busy = true;
-    var fin = function () { busy = false; };
-    getPos(true).catch(function () { return null; }).then(function (p) { return api('POST', '/visit/end', { lat: p && p.lat, lng: p && p.lng }); })
-      .then(function (r) { fin(); H = r.home; paintVisit(); paintLoc(); toast('تمام — خلّصت في المركز'); }).catch(function (e) { fin(); if (e.message) toast(e.message, true); });
+    $('ec').textContent = H.visit ? H.visit.center : 'المركز'; $('ecd').value = $('etl').value = $('esl').value = ''; $('esh').classList.add('on');
+  }
+  $('eno').onclick = function () { $('esh').classList.remove('on'); };
+  $('esh').onclick = function (e) { if (e.target === this) this.classList.remove('on'); };
+  $('ego').onclick = function () {
+    if (busy) return;
+    var t = $('etl').value.trim(), s = $('esl').value.trim(), c = $('ecd').value.trim();
+    if ((t || c) && !(t && s)) return toast('اكتب وصف العطل والحل مع بعض — أو سيبهم فاضيين', true);
+    busy = true; var b = this; b.disabled = true;
+    var fin = function () { busy = false; b.disabled = false; };
+    getPos(true).catch(function () { return null; }).then(function (p) { return api('POST', '/visit/end', { lat: p && p.lat, lng: p && p.lng, fault: t && s ? { code: c, title: t, solution: s } : null }); })
+      .then(function (r) { fin(); $('esh').classList.remove('on'); H = r.home; paintVisit(); paintTasks(); paintLoc(); toast(r.fault ? 'خلّصت — والحل اتسجّل في بنك الأعطال 🛠' : 'تمام — خلّصت في المركز'); startTaskPings(); }).catch(function (e) { fin(); if (e.message) toast(e.message, true); });
+  };
+
+  /* ── 4.63 · المهام: «ابدأ الطريق» → الموقع كل 30 ثانية → وصلت ── */
+  function kmText(m) { return m == null ? '' : (m < 1000 ? m + ' م' : (m / 1000).toFixed(1) + ' كم'); }
+  function paintTasks() {
+    var el = $('tsk'); if (!el || !H) return;
+    var list = (H.tasks || []).filter(function (t) { return !(t.status === 'arrived' && H.visit && H.visit.center_key === t.center_key); });
+    el.innerHTML = list.map(function (t) {
+      var going = t.status === 'going', arr = t.status === 'arrived';
+      var head = '<div class="row1"><span class="ic">' + (arr ? '📍' : '🚗') + '</span><div style="flex:1;min-width:0"><div class="sub">' + (arr ? 'وصلت — ابدأ الزيارة' : going ? 'في الطريق إلى' : 'مهمة جديدة من الإدارة') + '</div><div class="big">' + esc(t.center) + '</div></div></div>';
+      var info = '<div class="sub">' + esc(t.title) + (t.note ? ' · ' + esc(t.note) : '') + '</div>';
+      var bar = going ? '<div class="trk"><i style="width:' + t.pct + '%"></i><em style="inset-inline-start:' + t.pct + '%">🚶</em><b>🏥</b></div><div class="nums"><span>باقي <b>' + (t.dist != null ? kmText(t.dist) : '—') + '</b></span><span>' + (t.eta ? 'حوالي <b>' + t.eta + '</b> دقيقة' : '') + '</span><span><b>' + t.pct + '%</b></span></div>' : '';
+      var acts = !H.state || H.state !== 'in' ? '<div class="sub" style="margin-top:8px">سجّل حضورك الأول علشان تبدأ المهمة.</div>' :
+        t.status === 'new' ? '<div class="acts"><button class="btn" data-ts="' + t.id + '">🚗 ابدأ الطريق</button></div>' :
+        going ? '<div class="acts"><button class="btn" data-ta="' + t.id + '">وصلت ✓</button></div>' :
+        '<div class="acts"><button class="btn" data-tv="' + t.id + '">ابدأ الزيارة هنا</button></div>';
+      return '<div class="vc tk ' + t.status + '">' + head + info + bar + acts + '</div>';
+    }).join('');
+    [].forEach.call(el.querySelectorAll('[data-ts]'), function (b) { b.onclick = function () { taskStart(b); }; });
+    [].forEach.call(el.querySelectorAll('[data-ta]'), function (b) { b.onclick = function () { taskArrive(b); }; });
+    [].forEach.call(el.querySelectorAll('[data-tv]'), function (b) { b.onclick = function () { taskVisit(b); }; });
+  }
+  function taskById(id) { return (H.tasks || []).filter(function (t) { return String(t.id) === String(id); })[0]; }
+  function taskStart(b) {
+    if (busy) return; busy = true; b.disabled = true;
+    var fin = function () { busy = false; b.disabled = false; };
+    getPos(true).catch(function (e) { if (H.need_location) throw e; return null; }).then(function (p) { return battery().then(function (bt) { return api('POST', '/task/start', { id: b.dataset.ts, lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt }); }); })
+      .then(function () { fin(); return load(); }).then(function () { toast('ماشي — الإدارة شايفاك في الطريق 🚗'); }).catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
+  }
+  function taskArrive(b) {
+    if (busy) return; busy = true; b.disabled = true;
+    api('POST', '/task/arrive', { id: b.dataset.ta }).then(function () { busy = false; return load(); }).catch(function (e) { busy = false; b.disabled = false; if (e.message) toast(e.message, true); });
+  }
+  function taskVisit(b) {
+    var t = taskById(b.dataset.tv); if (!t || busy) return; busy = true; b.disabled = true;
+    var fin = function () { busy = false; b.disabled = false; };
+    getPos(true).catch(function (e) { if (H.need_location) throw e; return null; }).then(function (p) { return battery().then(function (bt) { return api('POST', '/visit', { center: t.center_key, task: t.id, purpose: 'متابعة / زيارة', lat: p && p.lat, lng: p && p.lng, acc: p && p.acc, battery: bt }); }); })
+      .then(function (r) { fin(); H = r.home; paintVisit(); paintTasks(); paintLoc(); toast('اتسجّل إنك في ' + t.center + ' ✅'); }).catch(function (e) { fin(); if (e && (e.message || e.code)) toast(e.status ? e.message : posErr(e), true); });
+  }
+  function goingTask() { return (H && H.state === 'in' && (H.tasks || []).filter(function (t) { return t.status === 'going'; })[0]) || null; }
+  function startTaskPings() {
+    clearInterval(taskTimer); taskTimer = 0;
+    if (!goingTask()) return;
+    var send = function () {
+      var t = goingTask(); if (!t) { clearInterval(taskTimer); taskTimer = 0; return; }
+      getPos(true).then(function (p) { return battery().then(function (bt) { return api('POST', '/task/ping', { id: t.id, lat: p.lat, lng: p.lng, acc: p.acc, battery: bt }); }); }).then(function (r) {
+        if (r && r.stop) return load();
+        if (r && r.task) { for (var i = 0; i < H.tasks.length; i++) if (H.tasks[i].id === r.task.id) H.tasks[i] = r.task; }
+        if (r && r.arrived) { toast('🎉 وصلت! دوس «ابدأ الزيارة هنا»'); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} }
+        paintTasks(); paintLoc();
+      }).catch(function () {});
+    };
+    send(); taskTimer = setInterval(send, 30000);
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && H && goingTask() && !taskTimer) startTaskPings(); });
+
+  /* ── 4.63 · بنك الأعطال ── */
+  var fqT = 0;
+  function openFaults() { $('fq').value = ''; $('fnew').className = 'hide'; $('fbt').className = ''; $('fsh').classList.add('on'); searchFaults(); }
+  function searchFaults() {
+    api('GET', '/faults?q=' + encodeURIComponent($('fq').value.trim())).then(function (r) {
+      var q = $('fq').value.trim();
+      $('fl').innerHTML = r.list.length ? (q ? '' : '<div class="hint" style="text-align:right;margin:2px 4px 8px">الأحدث والأعلى تقييمًا (' + r.total + ' حل)</div>') + r.list.map(function (f) {
+        return '<div class="fi"><h4>' + esc(f.title) + '</h4>' + (f.code ? '<span class="cd">' + esc(f.code) + '</span>' : '') + '<div class="sol">' + esc(f.solution) + '</div><div class="meta"><span>👷 ' + esc(f.emp) + '</span>' + (f.center ? '<span>🏥 ' + esc(f.center) + '</span>' : '') + '<span>' + esc(f.at.slice(0, 10)) + '</span>' + (f.repeats > 1 ? '<span class="rep">اتكرر ' + f.repeats + ' مرات</span>' : '') +
+          '<button class="vt' + (f.voted ? ' on' : '') + '" data-v="' + f.id + '">👍 ' + f.votes + '</button></div></div>';
+      }).join('') : '<div class="empty">' + (q ? 'مفيش حل مسجّل للعطل ده — لو حلّيته سجّله 👇' : 'لسه مفيش حلول — كن أول واحد يسجّل') + '</div>';
+      [].forEach.call($('fl').querySelectorAll('.vt'), function (b) { b.onclick = function () { api('POST', '/fault/vote', { id: Number(b.dataset.v) }).then(function (r) { b.textContent = '👍 ' + r.votes; b.classList.toggle('on', r.voted); }).catch(function (e) { toast(e.message, true); }); }; });
+    }).catch(function (e) { $('fl').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+  }
+  $('fq').oninput = function () { clearTimeout(fqT); fqT = setTimeout(searchFaults, 280); };
+  $('fx').onclick = function () { $('fsh').classList.remove('on'); };
+  $('fsh').onclick = function (e) { if (e.target === this) this.classList.remove('on'); };
+  $('fadd').onclick = function () { $('fnew').className = ''; $('fbt').className = 'hide'; $('ft').value = $('fq').value.trim(); };
+  $('fcn').onclick = function () { $('fnew').className = 'hide'; $('fbt').className = ''; };
+  $('fsv').onclick = function () {
+    var t = $('ft').value.trim(), s = $('fs').value.trim(); if (!t || !s) return toast('اكتب وصف العطل والحل', true);
+    api('POST', '/fault', { code: $('fc').value.trim(), title: t, solution: s }).then(function () { $('fc').value = $('ft').value = $('fs').value = ''; $('fnew').className = 'hide'; $('fbt').className = ''; toast('اتسجّل الحل 🛠 — الكل اتبلّغ'); H.faults = (H.faults || 0) + 1; searchFaults(); }).catch(function (e) { toast(e.message, true); });
+  };
+
+  /* ── 4.63 · إشعارات على الموبايل (من غير أي خدمة خارجية) ── */
+  function pushOK() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+  function b64u(s) { var p = '='.repeat((4 - s.length % 4) % 4), b = (s + p).replace(/-/g, '+').replace(/_/g, '/'), r = atob(b), o = new Uint8Array(r.length); for (var i = 0; i < r.length; i++) o[i] = r.charCodeAt(i); return o; }
+  function askPush() {
+    if (!pushOK()) return toast('الإشعارات مش مدعومة هنا — على الآيفون ضيف الصفحة للشاشة الرئيسية الأول', true);
+    if (pushOn) { return navigator.serviceWorker.getRegistration('/staff').then(function (reg) { return reg && reg.pushManager.getSubscription(); }).then(function (sub) { if (sub) { api('POST', '/push/off', { endpoint: sub.endpoint }).catch(function () {}); return sub.unsubscribe(); } }).then(function () { pushOn = false; ls.set('ozs_push', '0'); var b = $('bbl'); if (b) b.classList.remove('on'); paintPushBanner(); toast('اتقفلت الإشعارات'); }); }
+    Notification.requestPermission().then(function (perm) {
+      if (perm !== 'granted') throw new Error('الإشعارات اتمنعت — فعّلها من إعدادات المتصفح للموقع ده');
+      return navigator.serviceWorker.register('/staff-sw.js', { scope: '/staff' }).then(function () { return navigator.serviceWorker.ready; }).then(function () { return navigator.serviceWorker.getRegistration('/staff'); });
+    }).then(function (reg) { return api('GET', '/push/key').then(function (k) { return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(k.key) }); }); })
+      .then(function (sub) { return api('POST', '/push/subscribe', { subscription: sub.toJSON() }); })
+      .then(function () { pushOn = true; ls.set('ozs_push', '1'); var b = $('bbl'); if (b) b.classList.add('on'); paintPushBanner(); toast('الإشعارات شغّالة ✅ — هيوصلك أي مهمة جديدة'); })
+      .catch(function (e) { toast(e.message || 'مقدرتش أفعّل الإشعارات', true); });
+  }
+  function paintPushBanner() {
+    var el = $('pushb'); if (!el) return;
+    el.innerHTML = pushOK() && !pushOn && (!window.Notification || Notification.permission !== 'denied') ? '<div class="pushb"><span style="flex:1">🔔 فعّل الإشعارات علشان توصلك المهام الجديدة وحلول الأعطال حتى والتطبيق مقفول.</span><button class="btn" id="pbo">تفعيل</button></div>' : '';
+    var b = $('pbo'); if (b) b.onclick = askPush;
   }
 
   /* ── month ── */
