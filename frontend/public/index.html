@@ -9767,7 +9767,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 4.76</div>
+      <div class="version">الإصدار 4.77</div>
     </footer>
   </div>
 </div>
@@ -10432,6 +10432,19 @@ const OfflineManager = (() => {
     try {
       const reg = await navigator.serviceWorker.register(API_BASE + '/sw.js', { scope: API_BASE + '/' });
       _sw = reg;
+      /* 4.77 · a new release reaches a window that stays open for days (the desktop app):
+         look for a new version every 10 minutes, and when it takes over → reload once, when nothing is being typed */
+      const hadCtl = !!navigator.serviceWorker.controller;
+      setInterval(() => { reg.update().catch(() => {}); }, 10 * 60e3);
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+      let _reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadCtl || _reloading) return;
+        _reloading = true;
+        const busy = () => { const m = document.getElementById('modal-overlay'); if (m && m.classList.contains('show')) return true; const a = document.activeElement; return !!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.value); };
+        const go = () => { if (busy() || _pending > 0) return setTimeout(go, 5000); if (typeof toast === 'function') toast('✨ نزل تحديث جديد — بنحدّث الصفحة', 'info'); setTimeout(() => location.reload(), 1400); };
+        go();
+      });
       navigator.serviceWorker.addEventListener('message', e => {
         if (e.data?.type === 'SYNC_COMPLETE') {
           console.info('[SW] background sync', e.data.sent, e.data.codes);
