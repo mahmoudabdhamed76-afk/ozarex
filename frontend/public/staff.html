@@ -408,7 +408,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   function paintCenters() {
     var q = $('csq').value.trim(), list = CS.list;
     if (q) list = list.filter(function (c) { return (c.name + ' ' + c.address).indexOf(q) >= 0; });
-    $('csl').innerHTML = list.length ? list.slice(0, 120).map(function (c) {
+    $('csl').innerHTML = list.length ? list.map(function (c) {
       var d = c.dist != null ? (c.dist < 1000 ? c.dist + ' م' : (c.dist / 1000).toFixed(1) + ' كم') : '';
       return '<button class="ci' + (CS.pick === c.key ? ' sel' : '') + '" data-k="' + esc(c.key) + '"><div class="t"><b>' + esc(c.name) + '</b><small>' + esc([c.address, c.branch].filter(Boolean).join(' · ') || (c.mine ? 'زرته ' + c.mine + ' مرة' : '')) + '</small></div>' +
         (d ? '<span class="d' + (c.dist > 1500 ? ' f' : '') + '">' + (c.dist <= 1500 ? 'قريب · ' : '') + d + '</span>' : (c.mine ? '<span class="d f">زرته ' + c.mine + '</span>' : '')) + '</button>';

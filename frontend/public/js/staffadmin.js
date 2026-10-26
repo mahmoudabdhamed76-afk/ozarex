@@ -253,7 +253,7 @@
       if (!es.length) { T('ضيف موظف الأول', 'error'); return; }
       openModal('📌 مهمة جديدة لموظف',
         '<div class="form-group"><label>الموظف</label><select class="form-control" id="tk-e">' + es.map(function (e) { return '<option value="' + esc(e.id) + '"' + (e.id === empId ? ' selected' : '') + '>' + esc(e.name) + '</option>'; }).join('') + '</select></div>' +
-        '<div class="form-group"><label>المركز</label><input class="form-control" id="tk-c" placeholder="🔎 دوّر باسم المركز…" autocomplete="off"><div class="stf-cpick" id="tk-cl"></div><small class="stf-note">لو المركز مكانه لسه مش معروف هتتحسب المسافة بعد أول زيارة ليه أو ثبّت مكانه من تبويب «المراكز».</small></div>' +
+        '<div class="form-group"><label>المركز</label><input class="form-control" id="tk-c" placeholder="🔎 دوّر (اختياري) — أو اختار من القايمة تحت" autocomplete="off"><div class="stf-cpick" id="tk-cl"></div><small class="stf-note">لو المركز مكانه لسه مش معروف هتتحسب المسافة بعد أول زيارة ليه أو ثبّت مكانه من تبويب «المراكز».</small></div>' +
         '<div class="form-group"><label>المطلوب (اختياري)</label><input class="form-control" id="tk-t" placeholder="مثلاً: توصيل ورق / تحصيل / صيانة الطابعة" maxlength="120"></div>' +
         '<div class="form-group"><label>ملاحظة (اختياري)</label><input class="form-control" id="tk-n" maxlength="300"></div>',
         '<button class="btn btn-primary" id="tk-go">إرسال المهمة</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
@@ -264,8 +264,11 @@
       var many = Object.keys(brn).length > 1;
       function draw() {
         var q = nz(inp.value), L = r.list.filter(function (c) { return !q || nz(c.name).indexOf(q) > -1; });
-        box.innerHTML = L.length ? L.slice(0, 150).map(function (c) {
-          return '<button type="button" class="stf-cpi' + (pick && pick.key === c.key ? ' on' : '') + '" data-k="' + esc(c.key) + '"><b>' + esc(c.name) + '</b><small>' + (many && brn[c.branch] ? esc(brn[c.branch]) + ' · ' : '') + (c.known ? '📍 مكانه معروف' : 'مكانه لسه مش معروف') + '</small></button>'; }).join('') + (L.length > 150 ? '<p class="stf-note">… اكتب جزء من الاسم علشان تلاقي الباقي</p>' : '')
+        L.sort(function (a, b) { return (many ? String(brn[a.branch] || '').localeCompare(String(brn[b.branch] || ''), 'ar') : 0) || a.name.localeCompare(b.name, 'ar'); });
+        var lastB = null;
+        box.innerHTML = L.length ? '<div class="stf-cph">' + (q ? L.length + ' من ' + r.list.length + ' مركز' : 'كل المراكز المتعاقد معاها · ' + r.list.length + ' مركز') + '</div>' + L.map(function (c) {
+          var hd = many && brn[c.branch] !== lastB ? '<div class="stf-cpb ax-hl-off">' + esc(brn[c.branch] || 'فرع') + '</div>' : ''; lastB = brn[c.branch];
+          return hd + '<button type="button" class="stf-cpi' + (pick && pick.key === c.key ? ' on' : '') + '" data-k="' + esc(c.key) + '"><b>' + esc(c.name) + '</b><small>' + (c.known ? '📍 مكانه معروف' : 'مكانه لسه مش معروف') + '</small></button>'; }).join('')
           : '<p class="stf-note" style="padding:10px">' + (r.list.length ? 'مفيش مركز بالاسم ده' : 'مفيش مراكز — المراكز بتيجي من «العملاء والمراكز» في البرنامج') + '</p>';
         [].forEach.call(box.querySelectorAll('.stf-cpi'), function (b) { b.onclick = function () { pick = r.list.filter(function (x) { return x.key === b.dataset.k; })[0]; inp.value = pick.name; draw(); }; });
       }
