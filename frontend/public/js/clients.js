@@ -116,7 +116,10 @@
       .sort(function (a, b) { return b.n - a.n || b.bal - a.bal || String(a.c.name).localeCompare(String(b.c.name), 'ar'); });
     var on = f.filter(function (r) { return r.tok; }), off = f.filter(function (r) { return !r.tok; }), allOn = all.filter(function (r) { return r.tok; }).length;
     var longN = all.filter(function (r) { return r.tok && r.tok.length > 6; }).length;
-    return '<div class="cl-st"><div><b>' + all.length + '</b><span>مركز ومستشفى</span></div><div class="ok"><b>' + allOn + '</b><span>ليهم لينك</span></div><div><b>' + (all.length - allOn) + '</b><span>من غير لينك</span></div></div>' +
+    var ow = owing();
+    var dueBar = canDue() ? '<div class="cl-g" style="padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:22px">' + (dueOn() ? '🔔' : '🔕') + '</span><div style="flex:1;min-width:180px"><b>تذكير يومي بالمراكز المتأخرة</b><div style="font-size:12.5px;opacity:.7">' + ow.length + ' مركز عليه فلوس من أسبوع أو أكتر — كل واحد بيطلعلك مرة في اليوم في وقت عشوائي</div></div>' +
+      '<button class="btn btn-secondary btn-sm" onclick="AXClients.dueTry()">جرّب</button><button class="btn ' + (dueOn() ? 'btn-ghost' : 'btn-primary') + ' btn-sm" onclick="AXClients.dueToggle()">' + (dueOn() ? 'إيقاف' : 'تشغيل') + '</button></div>' : '';
+    return dueBar + '<div class="cl-st"><div><b>' + all.length + '</b><span>مركز ومستشفى</span></div><div class="ok"><b>' + allOn + '</b><span>ليهم لينك</span></div><div><b>' + (all.length - allOn) + '</b><span>من غير لينك</span></div></div>' +
       '<input class="cl-q" placeholder="🔍 دوّر على مركز بالاسم أو التليفون" value="' + esc(ui.q) + '" oninput="AXClients.search(this.value)">' +
       group('on', '🔗 ليهم لينك', on, longN ? '<div class="cl-gx"><button class="btn btn-secondary btn-sm" onclick="AXClients.shortAll()">✂ اختصر ' + longN + ' لينك طويل</button></div>' : '') +
       group('off', '⚪ من غير لينك', off, off.length ? '<div class="cl-gx"><button class="btn btn-primary btn-sm" onclick="AXClients.makeAll()">🔗 اعمل لينك لكل المراكز دي (' + (all.length - allOn) + ')</button></div>' : '') +
@@ -214,6 +217,12 @@
       '.clp-ok{border:1px solid #8EE29B;background:#69C973;color:#fff;font-weight:800;font-size:19px;font-family:inherit;padding:15px;border-radius:14px;cursor:pointer;box-shadow:0 0 0 4px rgba(105,201,115,.14);transition:transform .15s,filter .15s}.clp-ok:hover{filter:brightness(1.05);transform:translateY(-1px)}',
       '.clp-ok:focus,.clp-go:focus{outline:none!important;box-shadow:0 0 0 4px rgba(105,201,115,.25)!important}.clp-go:focus{box-shadow:none!important;text-decoration:underline}',
       '.clp-go{border:0;background:transparent;color:#2F855A;font-weight:700;font-size:15px;font-family:inherit;padding:8px;cursor:pointer}',
+      '.clp-ck path.lg{stroke-dasharray:80;stroke-dashoffset:80;animation:clpCk .9s .55s ease forwards}',
+      '.clp .amt{font-size:44px;font-weight:800;color:#2F855A;line-height:1.1;margin:6px 0 2px;font-variant-numeric:tabular-nums;animation:clpRow .5s .6s both}.clp .amt small{font-size:18px;color:#64748B;font-weight:700}',
+      '.clp .late{display:inline-block;background:#FEF3C7;color:#B45309;font-weight:800;font-size:15px;border-radius:999px;padding:5px 14px;margin:6px 0 12px;animation:clpRow .5s .7s both}',
+      '.clp .late.hot{background:#FEE2E2;color:#B91C1C}',
+      '.clp-two{display:flex;gap:8px}.clp-b2{flex:1;border:1px solid #CDEBD1;background:#F1FBF3;color:#2F855A;font-weight:700;font-size:15px;font-family:inherit;padding:12px 8px;border-radius:14px;cursor:pointer}.clp-b2:hover{background:#E3F6E6}.clp-b2.wa{color:#15803D}',
+      '.clp-b2:focus{outline:none!important}',
       '.clp-more{display:inline-block;margin-top:4px;font-size:13px;color:#fff;background:#ef4444;border-radius:999px;padding:3px 10px}'
     ].join('\n');
     document.head.appendChild(s);
@@ -221,26 +230,89 @@
   function showPop(m) {
     popCss();
     var ov = document.querySelector('.clp-ov');
-    if (ov) { POPQ.push(m); var mo = ov.querySelector('.clp-more'); if (mo) { mo.textContent = '+' + POPQ.length + ' طلب كمان'; mo.style.display = ''; } return; }
+    if (ov) { POPQ.push(m); var mo = ov.querySelector('.clp-more'); if (mo) { mo.textContent = '+' + POPQ.length + ' إشعار كمان'; mo.style.display = ''; } return; }
     ov = document.createElement('div'); ov.className = 'clp-ov ax-hl-off';
-    var items = Array.isArray(m.items) ? m.items : [];
+    var items = Array.isArray(m.items) ? m.items : [], due = m.kind === 'due';
+    var ic = due ? '<svg viewBox="0 0 24 24"><path class="lg" d="M12 3.5a8.5 8.5 0 1 1 0 17a8.5 8.5 0 1 1 0-17M12 7.5V12l3 2"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
     ov.innerHTML = '<div class="clp" role="dialog" aria-modal="true"><div class="clp-hd"><span class="clp-dot"></span><span class="clp-ln l"></span>' +
-      '<span class="clp-ring"><span class="clp-ck"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span><span class="clp-ln r"></span><span class="clp-dot"></span></div>' +
+      '<span class="clp-ring"><span class="clp-ck">' + ic + '</span></span><span class="clp-ln r"></span><span class="clp-dot"></span></div>' +
+      (due ? dueBody(m) : '') + (due ? '' :
       '<h3>📦 طلب ورق جديد</h3><p class="ctr">' + esc(m.center || '') + '</p>' +
       (items.length ? '<ul>' + items.map(function (x, i) { return '<li style="animation-delay:' + (0.7 + i * 0.08).toFixed(2) + 's"><b>' + num(x.qty) + '</b><span>' + esc(x.name) + '</span></li>'; }).join('') + '</ul>' : '<p class="mt2">' + esc(m.text || '') + '</p>') +
       (m.contact ? '<p class="mt2">👤 ' + esc(m.contact) + '</p>' : '') + (m.note ? '<p class="mt2">📝 ' + esc(m.note) + '</p>' : '') +
-      '<span class="clp-more" style="display:none"></span>' +
-      '<div class="clp-bt"><button class="clp-ok" type="button">حسنا</button><button class="clp-go" type="button">افتح الطلبات ←</button></div></div>';
+      '') + '<span class="clp-more" style="display:none"></span>' +
+      '<div class="clp-bt"><button class="clp-ok" type="button">حسنا</button>' + (due ? '<div class="clp-two"><button class="clp-b2" data-x="pay" type="button">💵 تحصيل</button>' + (m.phone ? '<button class="clp-b2 wa" data-x="wa" type="button">واتساب</button>' : '') + '<button class="clp-b2" data-x="stmt" type="button">📒 كشف الحساب</button></div>' : '<button class="clp-go" type="button">افتح الطلبات ←</button>') + '</div></div>';
     document.body.appendChild(ov);
     var close = function (then) {
       ov.classList.add('out'); setTimeout(function () { ov.remove(); if (then) then(); else if (POPQ.length) showPop(POPQ.shift()); }, 220);
     };
     ov.querySelector('.clp-ok').onclick = function () { close(); };
-    ov.querySelector('.clp-go').onclick = function () { POPQ = []; close(function () { ui.tab = 'req'; ui.rq = null; if (isPage()) render(); else if (typeof navigate === 'function') navigate('clients'); }); };
+    [].forEach.call(ov.querySelectorAll('.clp-b2'), function (b) { b.onclick = function () { var x = b.dataset.x; close(function () {
+      try { if (x === 'pay' && typeof openPaymentForm === 'function') openPaymentForm(m.cid); else if (x === 'wa' && window.AXAging) AXAging.whatsapp(m.cid); else if (x === 'stmt' && typeof viewCustomerStatement === 'function') viewCustomerStatement(m.cid); } catch (e) {}
+      if (POPQ.length) setTimeout(function () { showPop(POPQ.shift()); }, 400); }); }; });
+    var goB = ov.querySelector('.clp-go'); if (goB) goB.onclick = function () { POPQ = []; close(function () { ui.tab = 'req'; ui.rq = null; if (isPage()) render(); else if (typeof navigate === 'function') navigate('clients'); }); };
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
     var key = function (e) { if (!document.body.contains(ov)) return document.removeEventListener('keydown', key); if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); document.removeEventListener('keydown', key); close(); } };
     document.addEventListener('keydown', key);
   }
+  /* ── 4.78 · daily reminders: every center that owes money for a week or more pops up once a day, at a random time ── */
+  var DUE = { min: 7, from: 9 * 60 + 30, to: 21 * 60, gap: 4 };
+  function lsGet(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function dueOn() { try { return localStorage.getItem('ax_due_on') !== '0'; } catch (e) { return true; } }
+  function canDue() { try { if (isAdmin()) return true; return typeof can === 'function' && can('payments'); } catch (e) { return false; } }
+  function owing() {
+    var X = window.AXCore; if (!X || !X.aging) return [];
+    var t = today();
+    return A('customers').filter(function (c) { return c && !c.archived && (Number(c.balance) || 0) > 0.5; }).map(function (c) {
+      var a = X.aging(D(), c.id, t); return { c: c, a: a };
+    }).filter(function (x) { return x.a.balance > 0.5 && x.a.oldestDays >= DUE.min; }).sort(function (x, y) { return y.a.oldestDays - x.a.oldestDays; });
+  }
+  function nowMin() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
+  function plan() {
+    var k = 'ax_due_' + today(), p = lsGet(k);
+    if (p && p.slots) return p;
+    var list = owing(), slots = {}, span = Math.max(60, DUE.to - DUE.from);
+    list.forEach(function (x) { slots[x.c.id] = DUE.from + Math.floor(Math.random() * span); });
+    p = { slots: slots, shown: {}, last: 0 };
+    lsSet(k, p);
+    try { Object.keys(localStorage).forEach(function (kk) { if (/^ax_due_\d{4}-/.test(kk) && kk !== k) localStorage.removeItem(kk); }); } catch (e) {}
+    return p;
+  }
+  function dueMsg(x) {
+    var a = x.a, cur = (S().currency || 'جنيه') === 'جنيه' ? 'ج' : S().currency;
+    return { kind: 'due', cid: x.c.id, center: x.c.name, amount: a.balance, days: a.oldestDays, cur: cur, last: a.lastPay, phone: phoneOf(x.c) };
+  }
+  function dueBody(m) {
+    var d = m.days, dt = d >= 60 ? 'hot' : '';
+    var dtx = d === 1 ? 'يوم' : d === 2 ? 'يومين' : d <= 10 ? d + ' أيام' : d + ' يوم';
+    return '<h3>⏰ تذكير تحصيل</h3><p class="ctr">' + esc(m.center) + '</p>' +
+      '<div class="amt">' + num(m.amount) + ' <small>' + esc(m.cur || 'ج') + '</small></div>' +
+      '<span class="late ' + dt + '">متأخر من ' + dtx + '</span>' +
+      (m.last ? '<p class="mt2">آخر دفعة: ' + num(m.last.amount) + ' يوم ' + esc(String(m.last.date || '').split('-').reverse().join('/')) + '</p>' : '<p class="mt2">مفيش دفعات متسجلة</p>');
+  }
+  function dueTick(force) {
+    if (!canDue() || (!dueOn() && !force)) return;
+    if (document.querySelector('.clp-ov') || (document.getElementById('modal-overlay') || { classList: { contains: function () { return false; } } }).classList.contains('show')) return;
+    var p = plan(), m = nowMin(), k = 'ax_due_' + today();
+    if (!force && Date.now() - (p.last || 0) < DUE.gap * 60e3) return;
+    var ids = Object.keys(p.slots).filter(function (id) { return !p.shown[id] && (force || p.slots[id] <= m); }).sort(function (a, b) { return p.slots[a] - p.slots[b]; });
+    var list = owing(), byId = {}; list.forEach(function (x) { byId[x.c.id] = x; });
+    for (var i = 0; i < ids.length; i++) {
+      var x = byId[ids[i]];
+      p.shown[ids[i]] = 1;
+      if (!x) continue;                       // paid meanwhile → nothing to say
+      p.last = Date.now(); lsSet(k, p);
+      showPop(dueMsg(x));
+      try { var Ac = window.AudioContext || window.webkitAudioContext; if (Ac) { var ac = new Ac(); [660, 880].forEach(function (f, j) { var o = ac.createOscillator(), g = ac.createGain(); o.connect(g); g.connect(ac.destination); o.frequency.value = f; g.gain.setValueAtTime(.1, ac.currentTime + j * .18); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + j * .18 + .35); o.start(ac.currentTime + j * .18); o.stop(ac.currentTime + j * .18 + .36); }); } } catch (e) {}
+      return;
+    }
+    lsSet(k, p);
+  }
+  function dueTry() { var x = owing()[Math.floor(Math.random() * Math.max(1, owing().length))]; if (!x) return T('مفيش مراكز متأخرة أسبوع أو أكتر 🎉', 'info'); showPop(dueMsg(x)); }
+  function dueToggle() { try { localStorage.setItem('ax_due_on', dueOn() ? '0' : '1'); } catch (e) {} T(dueOn() ? '🔔 التذكير اليومي اشتغل' : 'التذكير اليومي اتوقف', 'info'); render(); }
+  (function dueBoot() { var n = 0; (function w() { if (typeof currentUser === 'undefined' || !currentUser || !window.AXCore || !A('customers').length) { if (++n < 120) setTimeout(w, 1000); return; } setTimeout(function () { dueTick(); }, 90e3); setInterval(function () { dueTick(); }, 60e3); })(); })();
+
   document.addEventListener('ax:sse', function (ev) {
     var m = ev.detail || {}; if (m.event !== 'portal' || !isAdmin()) return;
     if (m.kind === 'order') {
@@ -302,7 +374,7 @@
   };
   window.AXClients = {
     render: render, make: make, makeAll: makeAll, shortAll: shortAll, rotate: rotate, stop: stop, copy: copy, wa: wa,
-    st: setSt, del: del, _pop: showPop, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
+    st: setSt, del: del, _pop: showPop, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
     tab: function (t) { ui.tab = t; if (t === 'req') ui.rq = null; render(); },
     rf: function (f) { ui.rf = f; render(); },
     grp: function (k) { ui.grp[k] = !ui.grp[k]; render(); },
