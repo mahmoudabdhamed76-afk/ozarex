@@ -6945,19 +6945,4 @@ html[dir=rtl] .rd-man { transform: translateX(50%); }
 /* 4.71 · قفل الموظفين */
 .stf-lock{max-width:380px;margin:30px auto;text-align:center}.stf-lk{font-size:46px;margin-bottom:10px}
 
-/* 4.72 · متابعة العملاء */
-.cl-st{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
-.cl-st div{background:var(--ax-card,rgba(255,255,255,.04));border:1px solid var(--ax-line,rgba(255,255,255,.08));border-radius:16px;padding:12px 14px}
-.cl-st b{display:block;font-size:22px}.cl-st span{font-size:12.5px;opacity:.7}.cl-st .ok b{color:#22c55e}
-.cl-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}.cl-q{flex:1;min-width:220px}
-.cl-seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:var(--ax-card,rgba(255,255,255,.04));border:1px solid var(--ax-line,rgba(255,255,255,.08))}
-.cl-seg button{border:0;background:transparent;color:inherit;font:inherit;font-size:13px;padding:7px 12px;border-radius:10px;cursor:pointer;opacity:.75}.cl-seg button.on{background:var(--ax-accent,#e3342f);color:#fff;opacity:1}
-.cl-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
-.cl-it{background:var(--ax-card,rgba(255,255,255,.04));border:1px solid var(--ax-line,rgba(255,255,255,.08));border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:10px}
-.cl-it.on{border-color:rgba(14,165,164,.45)}
-.cl-h{display:flex;align-items:center;gap:10px}.cl-av{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;background:rgba(14,165,164,.16);color:#14b8a6;font-weight:800;flex:none}
-.cl-n{flex:1;min-width:0}.cl-n b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cl-n small{font-size:12px;opacity:.7}
-.cl-b{text-align:left}.cl-b b{display:block;font-size:16px}.cl-b small{font-size:11.5px;opacity:.7}.cl-b.d b{color:#f87171}
-.cl-l{display:flex;gap:6px}.cl-l input{flex:1;min-width:0;font:inherit;font-size:12px;direction:ltr;padding:8px 10px;border-radius:10px;border:1px solid var(--ax-line,rgba(255,255,255,.1));background:transparent;color:inherit}
-.cl-a{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.cl-mt{font-size:12px;opacity:.6}.cl-wa{color:#22c55e}
-@media (max-width:600px){.cl-list{grid-template-columns:1fr}}
+

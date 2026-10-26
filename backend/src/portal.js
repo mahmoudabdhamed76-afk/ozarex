@@ -1,161 +1,328 @@
 'use strict';
 /* ════════════════════════════════════════════════════════════════════
-   ERP · لينك المركز — /p/<token>
-   A read-only page for ONE center: balance, how old the debt is, the
-   latest movements and a printable statement. No login: the token in
-   settings._portal (made from «أعمار الديون») is the key, and the admin
-   can stop it any time. Numbers come from js/axcore.js — the same code
-   the program itself uses.
+   ERP · لينك المركز — /c/<code> (و /p/<token> القديم)
+   صفحة لمركز واحد من غير تسجيل دخول: المستحق وأعمار الدين، وكل شهر
+   سحب كام (كميات الورق مجمّعة) واتحصّل منه كام، ورسم بياني للسنة،
+   وفواتير الشهر، وكشف الحساب — وكمان «اطلب ورق» يوصل للبرنامج في
+   «متابعة العملاء» بإشعار. الكود في settings._portal والأدمن يوقفه في أي وقت.
+   الأرقام من js/axcore.js — نفس كود البرنامج.
 ════════════════════════════════════════════════════════════════════ */
 const path = require('node:path');
 const zlib = require('node:zlib');
 const AX = require(process.env.PUBLIC_DIR ? path.join(process.env.PUBLIC_DIR, 'js', 'axcore.js') : path.join(__dirname, '..', '..', 'frontend', 'public', 'js', 'axcore.js'));
+const { db } = require('../db');
+
+/* 4.74 · طلبات الورق من المراكز */
+db.exec(`CREATE TABLE IF NOT EXISTS portal_req (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, branch TEXT, branch_name TEXT, customer_id TEXT NOT NULL, customer_name TEXT,
+  items TEXT NOT NULL, note TEXT, contact TEXT, status TEXT NOT NULL DEFAULT 'new', created_at TEXT NOT NULL,
+  seen_at TEXT, done_at TEXT, done_by TEXT, reply TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_portal_req ON portal_req (customer_id, id);
+CREATE INDEX IF NOT EXISTS ix_portal_req_st ON portal_req (status, id);`);
+const STATUS = { new: 'اتبعت — مستني التأكيد', ok: 'اتأكد — بيتجهز', sent: 'اتسلّم ✓', no: 'اتلغى' };
 
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = n => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
+const n0 = n => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
 function cur(s) { const c = (s && s.currency) || 'جنيه'; return c === 'جنيه' ? 'ج.م' : c === 'ريال' ? 'ر.س' : c === 'درهم' ? 'د.إ' : c; }
-function today() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: process.env.TZ_APP || 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); } catch (e) { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); } }   // 4.72 · Egypt's date even on a UTC server
+const TZ = process.env.TZ_APP || 'Africa/Cairo';
+function today() { try { return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()); } catch (e) { return new Date().toISOString().slice(0, 10); } }   // Egypt's date even on a UTC server
+function nowTs() { try { return new Intl.DateTimeFormat('sv-SE', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date()).replace('T', ' '); } catch (e) { return new Date().toISOString().slice(0, 19).replace('T', ' '); } }
 const dmy = ds => { if (!ds) return ''; const p = String(ds).slice(0, 10).split('-'); return (+p[2]) + '/' + (+p[1]) + '/' + p[0]; };
+const MON = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const p2 = n => String(n).padStart(2, '0');
+function hm(ts) { const m = /(\d{2}):(\d{2})/.exec(String(ts || '').slice(11)); if (!m) return ''; const h = +m[1]; return ((h % 12) || 12) + ':' + m[2] + (h < 12 ? ' ص' : ' م'); }
 
 function findCenter(d, token) {
-  if (!/^[A-Za-z0-9]{8,64}$/.test(String(token || ''))) return null;   // 4.73 · short codes (/c/xxxxxxxx) or the old long ones
+  if (!/^[A-Za-z0-9]{8,64}$/.test(String(token || ''))) return null;   // short codes (/c/xxxxxxxx) or the old long ones
   const map = (d.settings && d.settings._portal) || {};
   const cid = Object.keys(map).find(k => map[k] === token);
   if (!cid) return null;
   return (d.customers || []).find(c => c.id === cid) || null;
 }
 
-
-/* 4.72 · متابعة العملاء — يوم / شهر / سنة: الورق اللي وصل، الفواتير، والتحصيلات في الفترة */
-const MON = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-const p2 = n => String(n).padStart(2, '0');
-function periodOf(q, t) {
-  let v = ['day', 'month', 'year'].includes(q.get('v')) ? q.get('v') : 'month', d = String(q.get('d') || '');
-  if (v === 'day' && !/^\d{4}-\d{2}-\d{2}$/.test(d)) d = t;
-  if (v === 'month' && !/^\d{4}-\d{2}$/.test(d)) d = t.slice(0, 7);
-  if (v === 'year' && !/^\d{4}$/.test(d)) d = t.slice(0, 4);
-  const shift = k => {
-    if (v === 'year') return String(+d + k);
-    if (v === 'month') { const x = +d.slice(0, 4) * 12 + (+d.slice(5, 7) - 1) + k; return Math.floor(x / 12) + '-' + p2(x % 12 + 1); }
-    const z = new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10) + k)); return z.toISOString().slice(0, 10);
-  };
-  const label = v === 'year' ? 'سنة ' + d : v === 'month' ? MON[+d.slice(5, 7) - 1] + ' ' + d.slice(0, 4) : (d === t ? 'النهارده · ' : '') + dmy(d);
-  const cut = v === 'year' ? t.slice(0, 4) : v === 'month' ? t.slice(0, 7) : t;
-  return { v, d, t, label, prev: shift(-1), next: d < cut ? shift(1) : null, has: x => String(x || '').slice(0, d.length) === d };
+/* the products this center draws (name + unit) — what the order form offers */
+function productsOf(d, cid) {
+  const seen = new Map();
+  (d.issuances || []).filter(i => i.customerId === cid).sort((a, b) => String(b.date).localeCompare(String(a.date))).forEach(i => {
+    const k = String(i.productName || '').trim(); if (!k || seen.has(k)) return; seen.set(k, { name: k, unit: i.productUnit || '' });
+  });
+  return [...seen.values()].slice(0, 30);
 }
-function periodHtml(d, c, P, C, tok, pre) {
-  const iss = (d.issuances || []).filter(i => i.customerId === c.id && P.has(i.date)).sort((a, b) => String(b.date).localeCompare(String(a.date)) || (b.number || 0) - (a.number || 0));
-  const inv = (d.invoices || []).filter(v => v.customerId === c.id && !v.archived && P.has(v.date)).sort((a, b) => String(b.date).localeCompare(String(a.date)) || (b.number || 0) - (a.number || 0));
-  const pay = (d.payments || []).filter(x => x.customerId === c.id && P.has(x.date) && Number(x.amount) > 0).sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  const issVal = iss.reduce((t, i) => t + (Number(i.total) || 0), 0), payVal = pay.reduce((t, x) => t + (Number(x.amount) || 0), 0);
-  const byP = {}; iss.forEach(i => { const k = (i.productName || 'صنف') + '|' + (i.productUnit || ''); const x = byP[k] || (byP[k] = { name: i.productName || 'صنف', unit: i.productUnit || '', qty: 0, val: 0 }); x.qty += Number(i.quantity) || 0; x.val += Number(i.total) || 0; });
-  const st = (tot, paid) => { const r = (Number(tot) || 0) - (Number(paid) || 0); return r <= 0.5 ? '<span class="tg ok">مسدد</span>' : (Number(paid) || 0) > 0.5 ? '<span class="tg pt">باقي ' + num(r) + '</span>' : '<span class="tg no">آجل</span>'; };
-  const href = (v, dd) => '/' + (pre || 'p') + '/' + tok + '?v=' + v + '&d=' + dd;
-  const t = P.t, inP = P.has(t);
-  const tabs = [['day', 'يوم', P.v === 'day' ? P.d : inP ? t : (P.v === 'month' ? P.d + '-01' : P.d + '-01-01')], ['month', 'شهر', P.v === 'year' ? (inP ? t.slice(0, 7) : P.d + '-01') : P.d.slice(0, 7)], ['year', 'سنة', P.d.slice(0, 4)]];
-  const days = new Set(iss.map(i => i.date)).size;
-  return `<nav class="per">
-<div class="seg">${tabs.map(x => `<a class="${P.v === x[0] ? 'on' : ''}" href="${href(x[0], x[2])}">${x[1]}</a>`).join('')}</div>
-<div class="mv"><a class="ar" href="${href(P.v, P.prev)}" aria-label="اللي قبله">‹</a><b>${esc(P.label)}</b>${P.next ? `<a class="ar" href="${href(P.v, P.next)}" aria-label="اللي بعده">›</a>` : '<span class="ar off">›</span>'}</div>
-${P.v === 'day' ? `<form class="pk" method="get" action="/${pre || 'p'}/${tok}"><input type="hidden" name="v" value="day"><input type="date" name="d" value="${P.d}" onchange="this.form.submit()"></form>` : ''}
-</nav>
-<div class="facts f3"><div><span>الورق اللي وصلكم</span><b>${iss.length}</b><span>${iss.length ? 'عملية صرف' + (P.v !== 'day' ? ' في ' + days + ' يوم' : '') : 'مفيش صرف في الفترة دي'}</span></div>
-<div><span>قيمة المسحوب</span><b>${num(issVal)}</b><span>${esc(C)}</span></div>
-<div><span>اللي دفعتوه</span><b class="c">${num(payVal)}</b><span>${pay.length ? pay.length + ' دفعة' : '—'}</span></div></div>
-${Object.keys(byP).length ? `<section class="card"><h2>📦 ملخص الأصناف</h2><div class="chips">${Object.values(byP).sort((a, b) => b.qty - a.qty).map(x => `<div class="chip"><b>${num(x.qty)}</b><span>${esc(x.unit)}</span><small>${esc(x.name)}</small></div>`).join('')}</div></section>` : ''}
-<section class="card"><h2>🚚 الورق اللي وصلكم</h2>${iss.length ? `<div class="il">${iss.map(i => `<div class="ir"><div class="ip"><b>${esc(i.productName || 'صنف')}</b><span>${dmy(i.date)} · إذن #${esc(i.number)}</span></div><div class="iq"><b>${num(i.quantity)}</b><span>${esc(i.productUnit || '')}</span></div><div class="iv2"><b class="n">${num(i.total)}</b>${st(i.total, i.paid)}</div></div>`).join('')}</div>` : '<p class="mt">مفيش ورق اتصرف في الفترة دي.</p>'}</section>
-<section class="card"><h2>🧾 الفواتير</h2>${inv.length ? inv.map(v => `<details class="iv"><summary><span class="n">#${esc(v.number)}</span><span>${dmy(v.date)}</span><b class="n">${num(v.total)} ${esc(C)}</b>${st(v.total, v.paid)}</summary>
-${Array.isArray(v.items) && v.items.length ? `<table><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>${v.items.map(x => `<tr><td>${esc(x.productName || x.name || '')}</td><td class="n">${num(x.qty != null ? x.qty : x.quantity)}</td><td class="n">${num(x.price != null ? x.price : x.unitPrice)}</td><td class="n">${num(x.total)}</td></tr>`).join('')}</tbody></table>` : ''}
-<div class="ivf"><span>المدفوع: <b class="c">${num(v.paid)}</b></span><span>الباقي: <b class="${(Number(v.total) || 0) - (Number(v.paid) || 0) > 0.5 ? 'd' : ''}">${num(Math.max(0, (Number(v.total) || 0) - (Number(v.paid) || 0)))}</b></span></div></details>`).join('') : '<p class="mt">مفيش فواتير في الفترة دي.</p>'}</section>
-${pay.length ? `<section class="card"><h2>💵 التحصيلات</h2><table><thead><tr><th>التاريخ</th><th>الطريقة</th><th>المبلغ</th></tr></thead><tbody>${pay.map(x => `<tr><td class="n">${dmy(x.date)}</td><td>${esc(x.method || 'نقدي')}${x.reference ? ' · ' + esc(x.reference) : ''}</td><td class="n c">${num(x.amount)}</td></tr>`).join('')}</tbody></table></section>` : ''}`;
+/* one year by month: what was drawn (value + qty by product) and what was paid */
+function yearOf(d, cid, y) {
+  const M = Array.from({ length: 12 }, () => ({ val: 0, paid: 0, n: 0, items: {} }));
+  (d.issuances || []).forEach(i => {
+    if (i.customerId !== cid || String(i.date || '').slice(0, 4) !== y) return;
+    const m = M[+String(i.date).slice(5, 7) - 1]; if (!m) return;
+    m.val += Number(i.total) || 0; m.n++;
+    const k = String(i.productName || 'صنف').trim(), x = m.items[k] || (m.items[k] = { name: k, unit: i.productUnit || '', qty: 0, val: 0 });
+    x.qty += Number(i.quantity) || 0; x.val += Number(i.total) || 0;
+  });
+  (d.invoices || []).forEach(v => {   // an invoice made on its own (not from a صرف) counts too
+    if (v.customerId !== cid || v.archived || v.sourceIssuanceId || v.fromIssuance || v.isConsolidated || String(v.date || '').slice(0, 4) !== y) return;
+    const m = M[+String(v.date).slice(5, 7) - 1]; if (!m) return;
+    m.val += Number(v.total) || 0; m.n++;
+    (Array.isArray(v.items) ? v.items : []).forEach(it => {
+      const k = String(it.productName || it.name || 'صنف').trim(), x = m.items[k] || (m.items[k] = { name: k, unit: '', qty: 0, val: 0 });
+      x.qty += Number(it.qty != null ? it.qty : it.quantity) || 0; x.val += Number(it.total) || 0;
+    });
+  });
+  (d.payments || []).forEach(p => {
+    if (p.customerId !== cid || String(p.date || '').slice(0, 4) !== y) return;
+    const m = M[+String(p.date).slice(5, 7) - 1]; if (m) m.paid += Number(p.amount) || 0;
+  });
+  return M;
 }
 
-function page(d, c, q, tok, pre) {
+/* the yearly chart: two bars a month (سحبتوا / دفعتوا), the chosen month highlighted; each month is a link */
+function chart(M, y, mi, href) {
+  const W = 340, H = 170, top = 14, base = 132, max = Math.max(1, ...M.map(m => Math.max(m.val, m.paid)));
+  const cw = W / 12, bw = Math.max(5, cw * 0.28);
+  const sc = v => Math.max(v > 0 ? 3 : 0, (v / max) * (base - top));
+  let g = '';
+  for (let k = 1; k <= 3; k++) { const yy = base - (base - top) * k / 3; g += `<line x1="0" x2="${W}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" class="gl"/>`; }
+  const bars = M.map((m, i) => {
+    const x = W - (i + 1) * cw + cw / 2, on = i === mi, h1 = sc(m.val), h2 = sc(m.paid);
+    return `<a href="${href(y, i + 1)}" aria-label="${MON[i]}"><rect x="${(x - cw / 2).toFixed(1)}" y="0" width="${cw.toFixed(1)}" height="${H}" class="hit${on ? ' on' : ''}"/>` +
+      `<rect x="${(x - bw - 1).toFixed(1)}" y="${(base - h1).toFixed(1)}" width="${bw.toFixed(1)}" height="${h1.toFixed(1)}" rx="3" class="b1"/>` +
+      `<rect x="${(x + 1).toFixed(1)}" y="${(base - h2).toFixed(1)}" width="${bw.toFixed(1)}" height="${h2.toFixed(1)}" rx="3" class="b2"/>` +
+      `<text x="${x.toFixed(1)}" y="${base + 16}" class="ml${on ? ' on' : ''}">${MON[i].slice(0, 3)}</text></a>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="ch" role="img" aria-label="المسحوب والمدفوع كل شهر في ${y}">${g}<line x1="0" x2="${W}" y1="${base}" y2="${base}" class="bl"/>${bars}</svg>`;
+}
+
+function page(d, c, q, tok, pre, br) {
   const s = d.settings || {}, C = cur(s), t = today();
-  const a = AX.aging(d, c.id, t), st = AX.statement(d, c.id, 60), P = periodOf(q, t);
+  const a = AX.aging(d, c.id, t), st = AX.statement(d, c.id, 40);
+  let y = String(q.get('y') || ''), m = Number(q.get('m'));
+  if (!/^\d{4}$/.test(y)) y = t.slice(0, 4);
+  if (!(m >= 1 && m <= 12)) m = y === t.slice(0, 4) ? +t.slice(5, 7) : 12;
+  if (y === t.slice(0, 4) && m > +t.slice(5, 7)) m = +t.slice(5, 7);
+  const ym = y + '-' + p2(m), M = yearOf(d, c.id, y), cm = M[m - 1];
+  const href = (yy, mm) => '/' + pre + '/' + tok + '?y=' + yy + '&m=' + mm + '#mon';
   const due = Math.max(0, a.balance), total = a.buckets.reduce((x, v) => x + v, 0) || 1;
-  const labels = ['30 يوم أو أقل', '31 – 60 يوم', '61 – 90 يوم', 'أكتر من 90 يوم'];
-  const colors = ['#1E9A4C', '#D98200', '#E8590C', '#E01B0F'];
+  const labels = ['30 يوم أو أقل', '31 – 60 يوم', '61 – 90 يوم', 'أكتر من 90 يوم'], colors = ['#16A34A', '#F59E0B', '#F97316', '#DC2626'];
   const logo = typeof s.companyLogo === 'string' && s.companyLogo.startsWith('data:image') ? s.companyLogo : '';
+  const yTot = M.reduce((o, x) => ({ val: o.val + x.val, paid: o.paid + x.paid }), { val: 0, paid: 0 });
+  const items = Object.values(cm.items).sort((a1, b1) => b1.qty - a1.qty), qmax = Math.max(1, ...items.map(x => x.qty));
+  const inv = (d.invoices || []).filter(v => v.customerId === c.id && !v.archived && String(v.date || '').slice(0, 7) === ym).sort((a1, b1) => String(b1.date).localeCompare(String(a1.date)));
+  const pays = (d.payments || []).filter(p => p.customerId === c.id && String(p.date || '').slice(0, 7) === ym && Number(p.amount) > 0).sort((a1, b1) => String(b1.date).localeCompare(String(a1.date)));
+  const prods = productsOf(d, c.id);
+  const orders = db.prepare('SELECT * FROM portal_req WHERE customer_id = ? AND branch = ? ORDER BY id DESC LIMIT 8').all(c.id, br || 'main');
+  const ty = +t.slice(0, 4), years = []; for (let k = ty; k >= ty - 3; k--) years.push(String(k));
+  const st2 = (tot, paid) => { const r = (Number(tot) || 0) - (Number(paid) || 0); return r <= 0.5 ? '<span class="tg ok">مسددة</span>' : (Number(paid) || 0) > 0.5 ? '<span class="tg pt">باقي ' + n0(r) + '</span>' : '<span class="tg no">آجل</span>'; };
+
   return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<title>${esc(c.name)} — كشف حساب ${esc(s.companyName || 'Ozarex')}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow">
+<meta name="color-scheme" content="light only"><meta name="theme-color" content="#F4F6FA">
+<title>${esc(c.name)} — ${esc(s.companyName || 'Ozarex')}</title>
 <link rel="stylesheet" href="/fonts/fonts.css">
 <style>
-:root{--bg:#F2F2F2;--card:#fff;--soft:#F6F6F6;--line:#E6E6E6;--ink:#000;--mut:#6B6B6B;--faint:#9A9A9A}
-@media (prefers-color-scheme:dark){:root{--bg:#000;--card:#121212;--soft:#1A1A1A;--line:#262626;--ink:#fff;--mut:#9E9E9E;--faint:#6E6E6E}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans Arabic','Cairo',Tahoma,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-.w{max-width:760px;margin:0 auto;padding:18px 16px 40px}
-.top{display:flex;align-items:center;gap:12px;margin-bottom:14px}.top img{width:46px;height:46px;border-radius:12px;object-fit:contain;background:#fff}
-.top b{display:block;font-size:17px}.top span{font-size:12.5px;color:var(--mut)}
-.hero{background:#000;color:#fff;border-radius:24px;padding:22px}
-@media (prefers-color-scheme:dark){.hero{background:#161616;box-shadow:0 0 0 1px var(--line)}}
-.hero small{display:block;color:#A6A6A6;font-size:13px}.hero .v{font:800 40px/1.15 'Zain','IBM Plex Sans Arabic',sans-serif;margin:4px 0 2px;font-variant-numeric:tabular-nums}
-.bar{display:flex;gap:2px;height:12px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.12);margin-top:14px}.bar i{display:block;height:100%}
-.leg{list-style:none;padding:0;margin:12px 0 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
-.leg li{display:flex;align-items:center;gap:8px;font-size:12.5px;background:rgba(255,255,255,.07);border-radius:12px;padding:8px 10px}
-.leg i{width:10px;height:10px;border-radius:3px;flex:none}.leg b{margin-inline-start:auto;font-variant-numeric:tabular-nums}
-.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
-.facts div{background:var(--card);border-radius:18px;padding:14px}.facts span{display:block;font-size:12px;color:var(--mut)}.facts b{font-size:17px}
-.card{background:var(--card);border-radius:20px;padding:16px;margin-top:12px}.card h2{font-size:15px;margin:0 0 10px}
-table{width:100%;border-collapse:collapse;font-size:13px}th{font-weight:700;color:var(--mut);text-align:right;padding:8px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
-td{padding:9px 6px;border-bottom:1px solid var(--line);vertical-align:top}td.n{white-space:nowrap;font-variant-numeric:tabular-nums}
-.d{color:#E01B0F}.c{color:#1E9A4C}.foot{margin-top:16px;font-size:12px;color:var(--faint);text-align:center}
-.btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:14px;padding:11px 16px;background:var(--ink);color:var(--bg);font:700 14px inherit;cursor:pointer;font-family:inherit}
-.acts{display:flex;justify-content:flex-end;margin-top:12px}
-
-.per{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:14px 0 2px}.seg{display:flex;background:var(--card);border-radius:14px;padding:4px;gap:2px}
-.seg a{padding:8px 16px;border-radius:11px;color:var(--mut);text-decoration:none;font-weight:700;font-size:14px}.seg a.on{background:var(--ink);color:var(--bg)}
-.mv{display:flex;align-items:center;gap:8px;margin-inline-start:auto}.mv b{font-size:15px;min-width:110px;text-align:center}
-.ar{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:var(--card);color:var(--ink);text-decoration:none;font-size:20px}.ar.off{opacity:.3}
-.pk input{font:inherit;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
-.facts.f3{grid-template-columns:repeat(3,minmax(0,1fr))}@media (max-width:480px){.facts.f3 div{padding:12px 10px}.facts.f3 b{font-size:15px}.mv{margin-inline-start:0;width:100%;justify-content:space-between}}
-.chips{display:flex;flex-wrap:wrap;gap:8px}.chip{background:var(--soft);border-radius:14px;padding:10px 12px;min-width:96px}.chip b{font-size:18px}.chip span{font-size:12px;color:var(--mut);margin-inline-start:4px}.chip small{display:block;font-size:12px;color:var(--mut)}
-.il{display:flex;flex-direction:column}.ir{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}.ir:last-child{border-bottom:0}.ip{flex:1;min-width:0}.ip b{display:block;font-size:14px}.ip span{font-size:12px;color:var(--mut)}.iq{text-align:center;min-width:54px;background:var(--soft);border-radius:12px;padding:6px 8px}.iq b{display:block;font-size:16px}.iq span{font-size:11px;color:var(--mut)}.iv2{text-align:left;display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:76px}.tw{overflow-x:auto}.mt{color:var(--mut);margin:0}
-.tg{display:inline-block;font-size:11.5px;font-weight:700;border-radius:8px;padding:2px 8px;white-space:nowrap}.tg.ok{background:rgba(30,154,76,.14);color:#1E9A4C}.tg.pt{background:rgba(217,130,0,.14);color:#D98200}.tg.no{background:rgba(224,27,15,.12);color:#E01B0F}
-.iv{border:1px solid var(--line);border-radius:14px;margin-top:8px;overflow:hidden}.iv summary{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;list-style:none;font-size:14px}.iv summary::-webkit-details-marker{display:none}
-.iv summary b{margin-inline-start:auto}.iv table{margin:0 0 4px}.iv td,.iv th{padding-inline:12px}.ivf{display:flex;gap:16px;padding:8px 12px 12px;font-size:13px;color:var(--mut)}
-details.stm summary{cursor:pointer;font-weight:700;font-size:15px}
-@media print{.per{display:none}details{display:block}details>*{display:block}body{background:#fff;color:#000}.acts,.foot a{display:none}.hero{background:#fff;color:#000;border:1px solid #000}.hero small{color:#444}.card,.facts div{border:1px solid #ccc}}
+:root{color-scheme:light;--bg:#F4F6FA;--card:#fff;--soft:#F1F4F9;--line:#E6EAF0;--ink:#0F172A;--mut:#64748B;--faint:#94A3B8;--pri:#0E9F9A;--pri2:#0B7F7B;--draw:#2563EB;--pay:#16A34A;--red:#DC2626;--sh:0 1px 2px rgba(15,23,42,.04),0 8px 24px -12px rgba(15,23,42,.12)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans Arabic','Cairo',Tahoma,system-ui,sans-serif;-webkit-font-smoothing:antialiased;line-height:1.5}
+.w{max-width:720px;margin:0 auto;padding:16px 16px 48px}
+.n{font-variant-numeric:tabular-nums;direction:ltr;unicode-bidi:isolate}
+.top{display:flex;align-items:center;gap:12px;padding:4px 2px 14px}.top img{width:44px;height:44px;border-radius:12px;object-fit:contain;background:#fff;box-shadow:var(--sh)}
+.top .lg{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--pri),#22C1B8);color:#fff;font-weight:800;font-size:18px}
+.top b{display:block;font-size:16px}.top span{font-size:12.5px;color:var(--mut)}
+.card{background:var(--card);border-radius:22px;padding:18px;margin-top:12px;box-shadow:var(--sh);animation:up .5s cubic-bezier(.2,.8,.2,1) both}
+.card:nth-of-type(2){animation-delay:.05s}.card:nth-of-type(3){animation-delay:.1s}.card:nth-of-type(4){animation-delay:.15s}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+h2{font-size:15.5px;margin:0 0 12px;display:flex;align-items:center;gap:8px}h2 small{margin-inline-start:auto;font-size:12px;color:var(--mut);font-weight:500}
+.hero{background:linear-gradient(140deg,#0E9F9A 0%,#0B7F7B 55%,#0A5F70 100%);color:#fff;border-radius:26px;padding:20px 20px 16px;box-shadow:0 18px 40px -20px rgba(11,127,123,.7);animation:up .5s both}
+.hero small{display:block;color:rgba(255,255,255,.78);font-size:13px}.hero .v{font:800 38px/1.15 'Zain','IBM Plex Sans Arabic',sans-serif;margin:4px 0 2px}.hero .v span{font-size:18px;font-weight:700;opacity:.85}
+.bar{display:flex;gap:2px;height:10px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.18);margin-top:14px}.bar i{display:block;height:100%}
+.leg{list-style:none;padding:0;margin:10px 0 0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.leg li{display:flex;align-items:center;gap:7px;font-size:12px;background:rgba(255,255,255,.12);border-radius:11px;padding:7px 9px}.leg i{width:9px;height:9px;border-radius:3px;flex:none}.leg b{margin-inline-start:auto}
+.hq{display:flex;gap:8px;margin-top:14px}.hq a,.hq button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:14px;padding:11px;font:700 14px inherit;font-family:inherit;cursor:pointer;text-decoration:none}
+.hq .a1{background:#fff;color:var(--pri2)}.hq .a2{background:rgba(255,255,255,.16);color:#fff}
+.yr{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:10px}.yr::-webkit-scrollbar{display:none}
+.yr a{flex:none;padding:6px 14px;border-radius:999px;background:var(--soft);color:var(--mut);text-decoration:none;font-weight:700;font-size:13px}.yr a.on{background:var(--ink);color:#fff}
+.ch{width:100%;height:auto;display:block}.ch .gl{stroke:var(--line);stroke-dasharray:3 4}.ch .bl{stroke:#CBD5E1}
+.ch .b1{fill:var(--draw)}.ch .b2{fill:var(--pay)}.ch .hit{fill:transparent}.ch .hit.on{fill:rgba(37,99,235,.07)}.ch a{cursor:pointer}
+.ch .ml{font-size:10px;fill:var(--faint);text-anchor:middle;font-family:inherit}.ch .ml.on{fill:var(--ink);font-weight:800}
+.lgd{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-top:6px}.lgd i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:5px;vertical-align:-1px}
+.ytot{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.ytot div{background:var(--soft);border-radius:14px;padding:10px 12px}.ytot span{font-size:12px;color:var(--mut);display:block}.ytot b{font-size:16px}
+.mh{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;margin-bottom:12px}.mh::-webkit-scrollbar{display:none}
+.mh a{flex:none;min-width:54px;text-align:center;padding:8px 10px;border-radius:14px;background:var(--soft);color:var(--mut);text-decoration:none;font-size:12.5px;font-weight:700;transition:transform .2s}
+.mh a.on{background:linear-gradient(135deg,var(--pri),#22C1B8);color:#fff;transform:scale(1.04)}.mh a.off{opacity:.35;pointer-events:none}.mh a.has::after{content:'';display:block;width:5px;height:5px;border-radius:50%;background:currentColor;margin:3px auto 0;opacity:.6}
+.kp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.kp div{border-radius:16px;padding:12px 10px;background:var(--soft)}
+.kp span{font-size:11.5px;color:var(--mut);display:block}.kp b{font-size:17px;display:block;margin-top:2px}.kp .d b{color:var(--draw)}.kp .p b{color:var(--pay)}
+.it{margin-top:14px}.ir{padding:10px 0;border-bottom:1px solid var(--line)}.ir:last-child{border-bottom:0}
+.ir .r{display:flex;align-items:baseline;gap:8px}.ir .r b{flex:1;font-size:14px}.ir .r em{font-style:normal;font-weight:800;font-size:16px}.ir .r small{color:var(--mut);font-size:12px}
+.ir .tr{height:6px;border-radius:999px;background:var(--soft);margin-top:7px;overflow:hidden}.ir .tr i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#60A5FA,var(--draw));animation:gr .9s cubic-bezier(.2,.8,.2,1) both}
+@keyframes gr{from{width:0!important}}
+.mt{color:var(--mut);margin:0;font-size:14px}.emp{text-align:center;padding:18px 6px;color:var(--mut)}.emp i{font-style:normal;font-size:30px;display:block;margin-bottom:4px}
+.tg{display:inline-block;font-size:11.5px;font-weight:700;border-radius:8px;padding:2px 8px;white-space:nowrap}.tg.ok{background:#DCFCE7;color:#15803D}.tg.pt{background:#FEF3C7;color:#B45309}.tg.no{background:#FEE2E2;color:#B91C1C}.tg.nw{background:#E0F2FE;color:#0369A1}
+details.iv{border:1px solid var(--line);border-radius:14px;margin-top:8px;overflow:hidden}details.iv summary{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;list-style:none;font-size:14px}
+details summary::-webkit-details-marker{display:none}details.iv summary b{margin-inline-start:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}th{font-weight:700;color:var(--mut);text-align:right;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}td{padding:8px 10px;border-bottom:1px solid var(--line)}
+.ivf{display:flex;gap:16px;padding:8px 12px 12px;font-size:13px;color:var(--mut)}.c{color:var(--pay)}.dd{color:var(--red)}
+.pl{display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}.pl:last-child{border-bottom:0}
+details.stm>summary{cursor:pointer;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}details.stm>summary::after{content:'⌄';margin-inline-start:auto;color:var(--mut);transition:transform .2s}details.stm[open]>summary::after{transform:rotate(180deg)}
+.tw{overflow-x:auto;margin-top:10px}
+/* order */
+.oform{display:none}.oform.on{display:block;animation:up .35s both}
+.ol{display:flex;gap:8px;align-items:center;margin-bottom:8px}.ol select,.ol input,.fld{font:inherit;font-size:15px;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;color:var(--ink);min-width:0}
+.ol select{flex:1}.ol input{width:96px;text-align:center}.ol .x{border:0;background:var(--soft);color:var(--mut);width:40px;height:44px;border-radius:12px;font-size:18px;cursor:pointer;flex:none}
+.fld{width:100%;margin-top:8px}.add{border:1px dashed #94A3B8;background:transparent;color:var(--pri2);border-radius:12px;padding:10px;width:100%;font:700 14px inherit;font-family:inherit;cursor:pointer}
+.go{margin-top:12px;width:100%;border:0;border-radius:14px;padding:14px;background:linear-gradient(135deg,var(--pri),#22C1B8);color:#fff;font:800 15.5px inherit;font-family:inherit;cursor:pointer;box-shadow:0 10px 24px -12px rgba(14,159,154,.8)}
+.go:disabled{opacity:.6}.omsg{margin-top:10px;font-size:14px;text-align:center}
+.or{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}.or:last-child{border-bottom:0}.or .dt{flex:1;font-size:13.5px}.or .dt small{display:block;color:var(--mut);font-size:12px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:14px;padding:11px 16px;background:var(--ink);color:#fff;font:700 14px inherit;font-family:inherit;cursor:pointer}
+.acts{display:flex;justify-content:center;margin-top:16px}.foot{margin-top:14px;font-size:12px;color:var(--faint);text-align:center}
+.done{position:fixed;inset:0;display:grid;place-items:center;background:rgba(244,246,250,.85);backdrop-filter:blur(6px);z-index:9;animation:up .3s both}.done div{background:#fff;border-radius:24px;padding:26px 30px;text-align:center;box-shadow:var(--sh)}.done i{font-style:normal;font-size:48px;display:block;animation:pop .6s cubic-bezier(.2,1.6,.4,1) both}
+@keyframes pop{from{transform:scale(.3)}to{transform:none}}
+@media (max-width:420px){.hero .v{font-size:33px}.kp b{font-size:15px}}
+@media print{body{background:#fff}.hq,.yr,.mh,.acts,#order,.foot{display:none!important}.card,.hero{box-shadow:none;border:1px solid #ddd;animation:none}.hero{background:#fff;color:#000}.hero small{color:#444}details{display:block}details>*{display:block}}
 </style></head><body><div class="w">
-<div class="top">${logo ? `<img src="${esc(logo)}" alt="">` : ''}<div><b>${esc(s.companyName || 'Ozarex')}</b><span>كشف حساب — ${dmy(t)}</span></div></div>
-<section class="hero"><small>المستحق على ${esc(c.name)}</small><div class="v">${num(due)} <span style="font-size:20px">${esc(C)}</span></div>
-<small>${due > 0.5 ? (a.oldestDays > 0 ? 'أقدم مبلغ مستحق من ' + a.oldestDays + ' يوم' : 'مستحق حديثاً') : 'الحساب مسدد بالكامل — شكراً لكم 🙏'}</small>
+<div class="top">${logo ? `<img src="${esc(logo)}" alt="">` : `<span class="lg">${esc(String(s.companyName || 'O').charAt(0))}</span>`}<div><b>${esc(c.name)}</b><span>حسابكم عند ${esc(s.companyName || 'Ozarex')} · ${dmy(t)}</span></div></div>
+
+<section class="hero"><small>المستحق عليكم</small><div class="v n">${n0(due)} <span>${esc(C)}</span></div>
+<small>${due > 0.5 ? (a.oldestDays > 0 ? 'أقدم مبلغ مستحق من ' + a.oldestDays + ' يوم' : 'مستحق حديثاً') : 'الحساب مسدد بالكامل — شكراً لكم 🙏'}${a.lastPay ? ' · آخر دفعة ' + n0(a.lastPay.amount) + ' يوم ' + dmy(a.lastPay.date) : ''}</small>
 ${due > 0.5 ? `<div class="bar">${a.buckets.map((v, i) => v > 0 ? `<i style="width:${(v / total * 100).toFixed(2)}%;background:${colors[i]}"></i>` : '').join('')}</div>
-<ul class="leg">${a.buckets.map((v, i) => `<li><i style="background:${colors[i]}"></i><span>${labels[i]}</span><b>${num(v)}</b></li>`).join('')}</ul>` : ''}
+<ul class="leg">${a.buckets.map((v, i) => `<li><i style="background:${colors[i]}"></i><span>${labels[i]}</span><b class="n">${n0(v)}</b></li>`).join('')}</ul>` : ''}
+<div class="hq"><button class="a1" type="button" onclick="openOrder()">📦 اطلب ورق</button><a class="a2" href="#mon">📊 حساب الشهر</a></div>
 </section>
-<div class="facts"><div><span>آخر دفعة</span><b>${a.lastPay ? num(a.lastPay.amount) + ' ' + esc(C) : '—'}</b><span>${a.lastPay ? dmy(a.lastPay.date) : ''}</span></div>
-<div><span>عدد الحركات</span><b>${st.count}</b><span>من أول التعامل</span></div></div>
-${periodHtml(d, c, P, C, tok, pre)}
-<section class="card"><details class="stm"><summary>📒 كشف الحساب (آخر الحركات)</summary>${st.rows.length ? `<table><thead><tr><th>التاريخ</th><th>البيان</th><th>عليكم</th><th>دفعتم</th><th>الرصيد</th></tr></thead><tbody>
-${st.rows.map(r => `<tr><td class="n">${dmy(r.date)}</td><td>${esc(r.label)}</td><td class="n d">${r.debit ? num(r.debit) : ''}</td><td class="n c">${r.credit ? num(r.credit) : ''}</td><td class="n">${num(r.balance)}</td></tr>`).join('')}
-</tbody></table>` : '<p style="color:var(--mut)">مفيش حركات لسه</p>'}</details></section>
+
+<section class="card" id="order"><h2>📦 اطلب ورق</h2>
+<p class="mt" id="o-lead">اختار الصنف واكتب الكمية اللي محتاجينها، والطلب هيوصلنا على طول.</p>
+<div class="oform" id="oform">
+<div id="olines"></div>
+<button class="add" type="button" onclick="addLine()">＋ صنف تاني</button>
+<input class="fld" id="o-who" maxlength="60" placeholder="اسم اللي طالب ورقم تليفونه (اختياري)">
+<textarea class="fld" id="o-note" rows="2" maxlength="300" placeholder="ملاحظة (اختياري) — مثلاً: محتاجينه قبل الخميس"></textarea>
+<button class="go" id="o-go" type="button" onclick="sendOrder()">ابعت الطلب</button><div class="omsg" id="o-msg"></div>
+</div>
+<button class="go" id="o-open" type="button" onclick="openOrder()">اطلب دلوقتي</button>
+${orders.length ? `<div style="margin-top:14px"><h2 style="font-size:14px">طلباتكم الأخيرة</h2>${orders.map(o => { let it = []; try { it = JSON.parse(o.items); } catch (e) {} return `<div class="or"><div class="dt"><b>${it.map(x => esc(x.qty) + ' ' + esc(x.unit || '') + ' ' + esc(x.name)).join(' · ')}</b><small>${dmy(o.created_at)} ${hm(o.created_at)}${o.reply ? ' · ' + esc(o.reply) : ''}</small></div><span class="tg ${o.status === 'sent' ? 'ok' : o.status === 'no' ? 'no' : o.status === 'ok' ? 'pt' : 'nw'}">${STATUS[o.status] || o.status}</span></div>`; }).join('')}</div>` : ''}
+</section>
+
+<section class="card"><h2>📊 السحب والتحصيل ${esc(y)}</h2>
+<div class="yr">${years.map(x => `<a class="${x === y ? 'on' : ''}" href="${href(x, x === t.slice(0, 4) ? +t.slice(5, 7) : 12)}">${x}</a>`).join('')}</div>
+${chart(M, y, m - 1, href)}
+<div class="lgd"><span><i style="background:var(--draw)"></i>سحبتوا</span><span><i style="background:var(--pay)"></i>دفعتوا</span><span style="margin-inline-start:auto">دوس على أي شهر</span></div>
+<div class="ytot"><div><span>سحبتوا في ${esc(y)}</span><b class="n" style="color:var(--draw)">${n0(yTot.val)}</b></div><div><span>دفعتوا في ${esc(y)}</span><b class="n" style="color:var(--pay)">${n0(yTot.paid)}</b></div></div>
+</section>
+
+<section class="card" id="mon"><h2>🗓 ${MON[m - 1]} ${esc(y)}</h2>
+<div class="mh">${MON.map((x, i) => { const fut = y === t.slice(0, 4) && i + 1 > +t.slice(5, 7); return `<a class="${i === m - 1 ? 'on' : ''}${fut ? ' off' : ''}${M[i].n || M[i].paid ? ' has' : ''}" href="${href(y, i + 1)}">${x}</a>`; }).join('')}</div>
+<div class="kp"><div class="d"><span>سحبتوا</span><b class="n">${n0(cm.val)}</b></div><div class="p"><span>دفعتوا</span><b class="n">${n0(cm.paid)}</b></div><div><span>${cm.val - cm.paid >= 0 ? 'الفرق عليكم' : 'دفعتوا زيادة'}</span><b class="n">${n0(Math.abs(cm.val - cm.paid))}</b></div></div>
+<div class="it">${items.length ? `<h2 style="font-size:14px;margin-bottom:4px">الورق اللي وصلكم الشهر ده</h2>` + items.map(x => `<div class="ir"><div class="r"><b>${esc(x.name)}</b><em class="n">${n0(x.qty)}</em><small>${esc(x.unit)}</small></div><div class="tr"><i style="width:${(x.qty / qmax * 100).toFixed(1)}%"></i></div></div>`).join('') : '<div class="emp"><i>📭</i>مفيش ورق اتسحب في الشهر ده</div>'}</div>
+${pays.length ? `<h2 style="font-size:14px;margin:16px 0 4px">💵 دفعات الشهر</h2>${pays.map(p => `<div class="pl"><span>${dmy(p.date)} · ${esc(p.method || 'نقدي')}</span><b class="n c">${n0(p.amount)}</b></div>`).join('')}` : ''}
+</section>
+
+${inv.length ? `<section class="card"><h2>🧾 فواتير ${MON[m - 1]} <small>${inv.length} فاتورة</small></h2>${inv.map(v => `<details class="iv"><summary><span class="n">#${esc(v.number)}</span><span>${dmy(v.date)}</span><b class="n">${n0(v.total)} ${esc(C)}</b>${st2(v.total, v.paid)}</summary>
+${Array.isArray(v.items) && v.items.length ? `<table><thead><tr><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الإجمالي</th></tr></thead><tbody>${v.items.map(x => `<tr><td>${esc(x.productName || x.name || '')}</td><td class="n">${num(x.qty != null ? x.qty : x.quantity)}</td><td class="n">${num(x.price != null ? x.price : x.unitPrice)}</td><td class="n">${num(x.total)}</td></tr>`).join('')}</tbody></table>` : ''}
+<div class="ivf"><span>المدفوع: <b class="c n">${n0(v.paid)}</b></span><span>الباقي: <b class="n ${(Number(v.total) || 0) - (Number(v.paid) || 0) > 0.5 ? 'dd' : ''}">${n0(Math.max(0, (Number(v.total) || 0) - (Number(v.paid) || 0)))}</b></span></div></details>`).join('')}</section>` : ''}
+
+<section class="card"><details class="stm"><summary>📒 كشف الحساب</summary>${st.rows.length ? `<div class="tw"><table><thead><tr><th>التاريخ</th><th>البيان</th><th>عليكم</th><th>دفعتم</th><th>الرصيد</th></tr></thead><tbody>
+${st.rows.map(r => `<tr><td class="n">${dmy(r.date)}</td><td>${esc(r.label)}</td><td class="n dd">${r.debit ? n0(r.debit) : ''}</td><td class="n c">${r.credit ? n0(r.credit) : ''}</td><td class="n">${n0(r.balance)}</td></tr>`).join('')}
+</tbody></table></div>` : '<p class="mt" style="margin-top:10px">مفيش حركات لسه</p>'}</details></section>
 <div class="acts"><button class="btn" onclick="print()">🖨️ طباعة / PDF</button></div>
 <p class="foot">الصفحة دي لحسابكم بس، والأرقام بتتحدّث أول بأول.${s.companyPhone ? ' للاستفسار: ' + esc(s.companyPhone) : ''}</p>
-</div></body></html>`;
+</div>
+<script>
+try{var mo=document.querySelector('.mh a.on');if(mo)mo.parentNode.scrollLeft=mo.offsetLeft-mo.parentNode.clientWidth/2+mo.clientWidth/2;}catch(e){}
+var P=${JSON.stringify(prods).replace(/</g, '\\u003c')},U=${JSON.stringify('/' + pre + '/' + tok + '/order')};
+function opts(){return '<option value="">اختار الصنف…</option>'+P.map(function(p,i){return '<option value="'+i+'">'+p.name.replace(/[<&]/g,'')+(p.unit?' ('+p.unit.replace(/[<&]/g,'')+')':'')+'</option>'}).join('')+'<option value="x">صنف تاني…</option>'}
+function addLine(){var d=document.createElement('div');d.className='ol';d.innerHTML='<select onchange="other(this)">'+opts()+'</select><input type="number" inputmode="numeric" min="1" placeholder="الكمية"><button class="x" type="button" aria-label="شيل" onclick="this.parentNode.remove()">×</button>';document.getElementById('olines').appendChild(d);}
+function other(s){if(s.value!=='x')return;var i=document.createElement('input');i.className='fld';i.style.marginTop='0';i.style.flex='1';i.placeholder='اسم الصنف';i.maxLength=80;s.replaceWith(i);i.focus();}
+function openOrder(){var f=document.getElementById('oform');if(!f.classList.contains('on')){f.classList.add('on');document.getElementById('o-open').style.display='none';if(!document.querySelector('.ol'))addLine();}document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});}
+function sendOrder(){var items=[].map.call(document.querySelectorAll('.ol'),function(l){var s=l.querySelector('select'),t=l.querySelector('.fld'),q=Number(l.querySelector('input[type=number]').value);var p=s&&s.value!==''&&s.value!=='x'?P[+s.value]:null;var name=p?p.name:(t?t.value.trim():'');return name&&q>0?{name:name,unit:p?p.unit:'',qty:q}:null}).filter(Boolean);
+var m=document.getElementById('o-msg');if(!items.length){m.textContent='اختار صنف واكتب الكمية';m.style.color='#DC2626';return;}
+var b=document.getElementById('o-go');b.disabled=true;b.textContent='بنبعت…';
+fetch(U,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,contact:document.getElementById('o-who').value,note:document.getElementById('o-note').value})}).then(function(r){return r.json().then(function(j){if(!r.ok)throw new Error(j.message||'محصلش');return j})})
+.then(function(){var o=document.createElement('div');o.className='done';o.innerHTML='<div><i>✅</i><b>الطلب وصلنا</b><p class="mt">هنأكده معاكم في أقرب وقت</p></div>';document.body.appendChild(o);setTimeout(function(){location.reload()},1800);})
+.catch(function(e){m.textContent=e.message;m.style.color='#DC2626';b.disabled=false;b.textContent='ابعت الطلب';});}
+</script></body></html>`;
 }
 
 function notFound() {
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
-<title>اللينك مش شغال</title><style>body{margin:0;display:grid;place-items:center;min-height:100vh;font-family:Tahoma,system-ui,sans-serif;background:#F2F2F2;color:#000;text-align:center;padding:16px}b{display:block;font-size:20px;margin-bottom:6px}span{color:#6B6B6B}</style></head>
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="color-scheme" content="light only">
+<title>اللينك مش شغال</title><style>body{margin:0;display:grid;place-items:center;min-height:100vh;font-family:Tahoma,system-ui,sans-serif;background:#F4F6FA;color:#0F172A;text-align:center;padding:16px}b{display:block;font-size:20px;margin-bottom:6px}span{color:#64748B}</style></head>
 <body><div><b>اللينك ده مش شغال</b><span>يمكن اتوقف أو اتغير — اطلب لينك جديد من الشركة.</span></div></body></html>`;
+}
+
+/* ── notifications to the admins (set by server.js) ── */
+let NT = { admins: () => [], event: () => {}, push: null };
+function setNotify(n) { NT = Object.assign(NT, n || {}); }
+
+/* a center sends an order → stored, the admins hear about it */
+const ORD = new Map();   // token → [times]
+function takeOrder(req, res, stores, tok) {
+  let found = null;
+  for (const x of stores) { const k = findCenter(x.data, tok); if (k) { found = { st: x, c: k }; break; } }
+  const send = (s, o) => { res.writeHead(s, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(o)); };
+  if (!found) return send(404, { message: 'اللينك ده مش شغال' });
+  const now = Date.now(), times = (ORD.get(tok) || []).filter(t => now - t < 3600e3);
+  if (times.length >= 8) return send(429, { message: 'بعتّوا طلبات كتير — كلمونا لو مستعجلين' });
+  let raw = '', size = 0;
+  req.on('data', ch => { size += ch.length; if (size > 20000) { req.destroy(); return; } raw += ch; });
+  req.on('end', () => {
+    let b = {}; try { b = JSON.parse(raw || '{}'); } catch (e) { return send(400, { message: 'الطلب مش مفهوم' }); }
+    const clean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
+    const items = (Array.isArray(b.items) ? b.items : []).slice(0, 12).map(x => ({ name: clean(x && x.name, 80), unit: clean(x && x.unit, 20), qty: Math.round(Number(x && x.qty) || 0) }))
+      .filter(x => x.name && x.qty > 0 && x.qty <= 1000000);
+    if (!items.length) return send(400, { message: 'اختار صنف واكتب الكمية' });
+    times.push(now); ORD.set(tok, times); if (ORD.size > 5000) ORD.clear();
+    const r = db.prepare('INSERT INTO portal_req (branch, branch_name, customer_id, customer_name, items, note, contact, status, created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(found.st.id || 'main', found.st.name || '', found.c.id, String(found.c.name || '').slice(0, 120), JSON.stringify(items), clean(b.note, 300), clean(b.contact, 60), 'new', nowTs());
+    const what = items.map(x => x.qty + ' ' + (x.unit ? x.unit + ' ' : '') + x.name).join(' · ');
+    try { NT.event('portal', { kind: 'order', id: Number(r.lastInsertRowid), text: '📦 طلب ورق من ' + found.c.name + ': ' + what }); } catch (e) {}
+    try { const ids = (NT.admins() || []).slice(0, 50); if (ids.length && NT.push) NT.push.send(ids, { title: '📦 طلب ورق — ' + found.c.name, body: what, url: './?go=clients', tag: 'preq-' + r.lastInsertRowid, urgent: true }).catch(() => {}); } catch (e) {}
+    send(200, { ok: true });
+  });
+}
+
+/* ── the admin side: /api/portal/* (server.js checks admin) ── */
+function rowOut(r) { let items = []; try { items = JSON.parse(r.items); } catch (e) {} return Object.assign({}, r, { items }); }
+function adminApi(req, res, pathname, me, h) {
+  const { sendJSON, readBody } = h, q = new URL(req.url, 'http://x').searchParams;
+  if (req.method === 'GET' && pathname === '/api/portal/requests') {
+    const st = q.get('status');
+    const rows = (st === 'open' ? db.prepare("SELECT * FROM portal_req WHERE status IN ('new','ok') ORDER BY id DESC LIMIT 200").all() : db.prepare('SELECT * FROM portal_req ORDER BY id DESC LIMIT 200').all()).map(rowOut);
+    return sendJSON(res, 200, { list: rows, newCount: db.prepare("SELECT COUNT(*) AS n FROM portal_req WHERE status = 'new'").get().n });
+  }
+  if (req.method === 'GET' && pathname === '/api/portal/count') return sendJSON(res, 200, { newCount: db.prepare("SELECT COUNT(*) AS n FROM portal_req WHERE status = 'new'").get().n });
+  if (req.method === 'POST' && pathname === '/api/portal/request') {
+    return readBody(req, 0.02).then(b => {
+      b = b || {}; const id = Number(b.id), st = String(b.status || '');
+      if (!['new', 'ok', 'sent', 'no'].includes(st)) return sendJSON(res, 400, { error: 'bad', message: 'حالة غلط' });
+      const who = me.name || me.username || 'admin';
+      const ch = db.prepare('UPDATE portal_req SET status = ?, reply = ?, done_at = ?, done_by = ? WHERE id = ?').run(st, String(b.reply || '').slice(0, 160) || null, nowTs(), who, id).changes;
+      if (!ch) return sendJSON(res, 404, { error: 'not_found', message: 'الطلب مش موجود' });
+      try { NT.event('portal', { kind: 'status', id }); } catch (e) {}
+      return sendJSON(res, 200, { ok: true });
+    });
+  }
+  if (req.method === 'POST' && pathname === '/api/portal/request/delete') {
+    return readBody(req, 0.02).then(b => { db.prepare('DELETE FROM portal_req WHERE id = ?').run(Number((b || {}).id)); try { NT.event('portal', { kind: 'status' }); } catch (e) {} return sendJSON(res, 200, { ok: true }); });
+  }
+  return sendJSON(res, 404, { error: 'not_found' });
 }
 
 /* → true when handled */
 const MISS = new Map();
 function handle(req, res, pathname, data) {
-  const m = /^\/[pc]\/([A-Za-z0-9]+)\/?$/.exec(pathname);
-  if (!m || req.method !== 'GET') return false;
-  /* 4.73 · a short code is guessable only by trying a lot — too many wrong ones from one address → wait */
+  const m = /^\/([pc])\/([A-Za-z0-9]+)(\/order)?\/?$/.exec(pathname);
+  if (!m) return false;
+  const isOrder = !!m[3];
+  if (isOrder ? req.method !== 'POST' : req.method !== 'GET') return false;
+  /* a short code is guessable only by trying a lot — too many wrong ones from one address → wait */
   const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim(), now = Date.now();
   const miss = MISS.get(ip);
   if (miss && miss.n >= 30 && now - miss.t < 600e3) { res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '600' }); res.end('حاولت كتير — جرّب بعد شوية'); return true; }
-  /* 4.32 · data() may give one dataset or the list of every branch's: the token is looked up in each */
-  const all = [].concat(data() || []);
-  let d = all[0] || {}, c = null;
-  for (const x of all) { const k = findCenter(x, m[1]); if (k) { d = x; c = k; break; } }
+  /* data() → every branch: [{ id, name, data }] (or plain datasets, older callers) */
+  const stores = [].concat(data() || []).map(x => x && x.data ? x : { id: 'main', name: '', data: x || {} });
+  if (isOrder) { takeOrder(req, res, stores, m[2]); return true; }
+  let st = stores[0] || { data: {} }, c = null;
+  for (const x of stores) { const k = findCenter(x.data, m[2]); if (k) { st = x; c = k; break; } }
   if (!c) { const x = MISS.get(ip); MISS.set(ip, x && now - x.t < 600e3 ? { n: x.n + 1, t: x.t } : { n: 1, t: now }); if (MISS.size > 5000) MISS.clear(); }
-  const html = c ? page(d, c, new URL(req.url, 'http://x').searchParams, m[1], pathname.charAt(1)) : notFound();
+  const html = c ? page(st.data, c, new URL(req.url, 'http://x').searchParams, m[2], m[1], st.id) : notFound();
   const status = c ? 200 : 404;
   const headers = {
     'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow',
@@ -176,4 +343,4 @@ function handle(req, res, pathname, data) {
   return true;
 }
 
-module.exports = { handle };
+module.exports = { handle, adminApi, setNotify };

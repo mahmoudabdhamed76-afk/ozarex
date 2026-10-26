@@ -74,6 +74,7 @@
     (function wait() {
       if (typeof currentUser === 'undefined' || !currentUser || typeof navigate !== 'function' || !document.getElementById('page-content') || !document.getElementById('page-content').children.length) { if (++tries < 60) setTimeout(wait, 250); return; }
       if (p === 'staff') navigate('staff');
+      else if (p === 'clients') navigate('clients');
       else if (p === 'approvals') navigate('approvals');
       else if (p === 'fulus') { navigate('profit'); if (window.AXProfit && AXProfit.view) AXProfit.view('cash'); setTimeout(function () { if (window.AXFulus && AXFulus.digests) AXFulus.digests(); }, 300); }
     })();

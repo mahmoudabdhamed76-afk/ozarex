@@ -44,6 +44,12 @@ staff.setNotify({
   admins: () => ((store.data() || {}).users || []).filter(u => u && u.role === 'admin' && !u.disabled).map(u => u.id),
   event: (name, payload) => { try { broadcast(name, payload); } catch (e) {} }
 });
+/* 4.74 · a center's paper order → the admins (live toast + push) */
+portal.setNotify({
+  admins: () => ((store.data() || {}).users || []).filter(u => u && u.role === 'admin' && !u.disabled).map(u => u.id),
+  event: (name, payload) => { try { broadcast(name, payload); } catch (e) {} },
+  push: webpush
+});
 const digest = require('./src/digest');
 /* 4.39 · the daily summary + instant alerts read every active branch */
 const digestCtx = () => ({
@@ -321,7 +327,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname === '/api/version' && req.method === 'GET') { const vb = String(parsed.query.branch || 'main'); return sendJSON(res, 200, { version: branches.get(vb) ? verOf(vb) : verOf('main') }); }
     /* a center's own read-only page (token link) */
-    if ((pathname.startsWith('/p/') || pathname.startsWith('/c/')) && portal.handle(req, res, pathname, () => branches.allStores().map(st => st.data()))) return;   // 4.32 · a center's link works in any branch
+    if ((pathname.startsWith('/p/') || pathname.startsWith('/c/')) && portal.handle(req, res, pathname, () => branches.list().filter(b => b.active || b.main).map(b => { const st = branches.storeOf(b.id); return st ? { id: b.id, name: b.name, data: st.data() } : null; }).filter(Boolean))) return;   // 4.32 · a center's link works in any branch
 
     /* 4.60 · الموظفين: the employee's own page (/staff) and its API — his own login, never the ERP's */
     if (pathname === '/staff/') { res.writeHead(302, { Location: APP_PATH + '/staff' }); return res.end(); }
@@ -381,6 +387,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       /* 4.60 · الموظفين: the manager's side (admin only) */
+      if (pathname.startsWith('/api/portal/')) { if (!admin) return adminOnly(); return await portal.adminApi(req, res, pathname, me, { sendJSON, readBody }); }
       if (pathname === '/api/staff' || pathname.startsWith('/api/staff/')) { if (!admin) return adminOnly(); return await staff.handleAdmin(req, res, pathname, me, { sendJSON, readBody }); }
 
       /* 4.41 · ads: everyone reads their feed + records views/clicks; only admins manage */
