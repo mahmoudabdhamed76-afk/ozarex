@@ -74,12 +74,12 @@
     var el = $('v-home'), Mo = yr(String(P.today).slice(0, 4)), tv = 0, tp = 0;
     Mo.forEach(function (m) { tv += m.val; tp += m.paid; });
     var pct = P.due <= 0.5 ? 100 : tv > 0 ? Math.max(0, Math.min(100, Math.round(tp / tv * 100))) : 0;
-    var B = P.buckets || [0, 0, 0, 0], tot = B.reduce(function (a, b) { return a + b; }, 0) || 1, col = ['#4ADE80', '#FBBF24', '#FB923C', '#F87171'];
-    var h = '<div class="hero"><div class="ring"><svg width="104" height="104" viewBox="0 0 104 104"><circle cx="52" cy="52" r="43" stroke="rgba(255,255,255,.2)" stroke-width="10" fill="none"/><circle id="rg" cx="52" cy="52" r="43" stroke="#fff" stroke-width="10" fill="none" stroke-linecap="round" stroke-dasharray="270.2" stroke-dashoffset="270.2"/></svg><div class="rv"><b><span id="rp">0</span>%</b><small>اتسدد السنة دي</small></div></div>' +
-      '<div class="k"><small>المستحق عليكم</small><div class="v"><span id="due" class="n">0</span> <span>' + esc(P.cur) + '</span></div>' +
-      (P.due > 0.5 ? '<span class="pill">⏳ ' + (P.oldest > 0 ? 'أقدم مبلغ من ' + P.oldest + ' يوم' : 'مستحق حديثاً') + '</span><div class="bar">' + B.map(function (v, i) { return v > 0 ? '<i style="width:' + (v / tot * 100).toFixed(1) + '%;background:' + col[i] + '"></i>' : ''; }).join('') + '</div>'
-        : '<span class="pill">🎉 الحساب مسدد بالكامل — شكراً لكم</span>') +
-      (P.lastPay ? '<small style="margin-top:6px">آخر دفعة ' + n0(P.lastPay.amount) + ' يوم ' + dmy(P.lastPay.date) + '</small>' : '') + '</div></div>';
+    var od = P.oldest || 0, oc = od >= 90 ? 'r' : od >= 60 ? 'o' : od >= 30 ? 'y' : 'g';
+    var h = '<div class="bk2"><div class="h"><span>المستحق عليكم</span>' + (P.due > 0.5 ? '<em class="' + oc + '">⏳ ' + (od > 0 ? 'أقدم مبلغ من ' + od + ' يوم' : 'مستحق حديثاً') + '</em>' : '<em class="g">🎉 مسدد بالكامل</em>') + '</div>' +
+      '<div class="amt"><span id="due" class="n">0</span><span class="cur">' + esc(P.cur) + '</span></div>' +
+      '<div class="sub">' + (P.due > 0.5 ? (P.lastPay ? 'آخر دفعة ' + n0(P.lastPay.amount) + ' ' + esc(P.cur) + ' يوم ' + dmy(P.lastPay.date) : 'لسه مفيش دفعات متسجّلة') : 'شكراً لكم — مفيش عليكم أي مبالغ') + '</div>' +
+      '<div class="st"><div><b class="n" id="hv">0</b><small>سحبتوا السنة دي</small></div><div><b class="n" id="hp">0</b><small>دفعتوا السنة دي</small></div><div><b class="n"><span id="rp">0</span>%</b><small>نسبة السداد</small><i><u id="rg" data-w="' + pct + '"></u></i></div></div>' +
+      (P.due > 0.5 ? '<button class="go" data-q="pay">💳 ادفع / حوّل دلوقتي</button>' : '') + '</div>';
     h += '<div class="qa"><button data-q="order"><i style="background:#E0F2FE">📦</i>اطلب ورق</button><button data-q="maint"><i style="background:#FFEDD5">🛠</i>صيانة</button><button data-q="pay"><i style="background:#DCFCE7">💳</i>ادفع / حوّل</button><button data-q="stmt"><i style="background:#F3E8FF">📄</i>كشف PDF</button></div>';
     h += banner();
     /* forecast */
@@ -117,8 +117,7 @@
     wire(el);
     var reo = $('reord'); if (reo) reo.onclick = function () { reorder(reo); };
     setTimeout(function () {
-      var rg = $('rg'); if (rg) rg.style.strokeDashoffset = (270.2 * (1 - pct / 100)).toFixed(1);
-      countUp($('due'), P.due, 1300); countUp($('rp'), pct, 1300); grow(el);
+      countUp($('due'), P.due, 1300); countUp($('rp'), pct, 1300); countUp($('hv'), tv, 1300); countUp($('hp'), tp, 1300); grow(el);
     }, 120);
   }
   function grow(el) { [].forEach.call(el.querySelectorAll('[data-w]'), function (x) { x.style.width = x.dataset.w + '%'; }); [].forEach.call(el.querySelectorAll('[data-h]'), function (x) { x.style.height = x.dataset.h + '%'; }); }
