@@ -70,7 +70,7 @@
       '.cl-rq .h{display:flex;align-items:center;gap:10px}.cl-rq .h b{font-size:15px}.cl-rq .h small{display:block;font-size:12px;opacity:.65}.cl-rq .h .tg{margin-inline-start:auto}',
       '.cl-rq ul{list-style:none;padding:0;margin:10px 0;display:flex;flex-direction:column;gap:6px}.cl-rq li{display:flex;align-items:baseline;gap:8px;background:rgba(127,127,127,.07);border-radius:12px;padding:9px 12px}.cl-rq li b{font-size:17px}.cl-rq li span{opacity:.75;font-size:13px}',
       '.cl-rq .nt{font-size:13px;opacity:.8;margin:0 0 10px}.cl-tg{font-size:11.5px;font-weight:700;border-radius:8px;padding:3px 9px;white-space:nowrap}',
-      '.cl-tg.new{background:rgba(239,68,68,.15);color:#f87171}.cl-tg.ok{background:rgba(245,158,11,.15);color:#fbbf24}.cl-tg.sent{background:rgba(34,197,94,.15);color:#4ade80}.cl-tg.no{background:rgba(148,163,184,.15);color:#94a3b8}',
+      '.cl-tg.new{background:rgba(239,68,68,.15);color:#f87171}.cl-tg.ok{background:rgba(245,158,11,.15);color:#fbbf24}.cl-tg.sent{background:rgba(34,197,94,.15);color:#4ade80}.cl-tg.road{background:rgba(59,130,246,.15);color:#60a5fa}.cl-tg.no{background:rgba(148,163,184,.15);color:#94a3b8}',
       '.cl-rf{display:flex;gap:6px;margin-bottom:12px}.cl-rf button{border:1px solid var(--cl-l);background:transparent;color:inherit;font:inherit;font-size:13px;padding:7px 14px;border-radius:999px;cursor:pointer;opacity:.75}.cl-rf button.on{background:var(--cl-a);border-color:transparent;color:#fff;opacity:1}',
       '.cl-emp{text-align:center;padding:36px 12px;opacity:.7;border:1px dashed var(--cl-l);border-radius:18px}.cl-emp i{font-style:normal;font-size:34px;display:block;margin-bottom:6px}',
       '.cl-note{font-size:12.5px;opacity:.6;margin-top:12px}',
@@ -126,6 +126,8 @@
     if (canStock()) { var sl = stockList(), sr = sl.filter(function (x) { return x.st === 'r'; }).length, so = sl.filter(function (x) { return x.st === 'o'; }).length;
       dueBar += '<div class="cl-g" style="padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:22px">' + (stockOn() ? '📦' : '🔕') + '</span><div style="flex:1;min-width:180px"><b>تقرير المخزن اليومي</b><div style="font-size:12.5px;opacity:.7">كل يوم الصبح: ' + sl.length + ' صنف · ' + sr + ' ناقص · ' + so + ' قرب يخلص</div></div>' +
         '<button class="btn btn-secondary btn-sm" onclick="AXClients.stockShow()">اعرض دلوقتي</button><button class="btn ' + (stockOn() ? 'btn-ghost' : 'btn-primary') + ' btn-sm" onclick="AXClients.stockToggle()">' + (stockOn() ? 'إيقاف' : 'تشغيل') + '</button></div>'; }
+    if (isAdmin()) { var pf = S()._payinfo || {}, pset = ['instapay', 'wallet', 'bank', 'iban'].filter(function (k) { return pf[k]; }).length;
+      dueBar += '<div class="cl-g" style="padding:12px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:22px">💳</span><div style="flex:1;min-width:180px"><b>بيانات الدفع للمراكز</b><div style="font-size:12.5px;opacity:.7">' + (pset ? 'ظاهرة للمراكز: ' + esc([pf.instapay ? 'InstaPay' : '', pf.wallet ? 'محفظة' : '', pf.bank || pf.iban ? 'بنك' : ''].filter(Boolean).join(' · ')) : 'لسه مش متسجّلة — المراكز مش شايفة طريقة تحوّل بيها') + '</div></div><button class="btn ' + (pset ? 'btn-secondary' : 'btn-primary') + ' btn-sm" onclick="AXClients.payInfo()">' + (pset ? 'تعديل' : 'سجّلها') + '</button></div>'; }
     return dueBar + '<div class="cl-st"><div><b>' + all.length + '</b><span>مركز ومستشفى</span></div><div class="ok"><b>' + allOn + '</b><span>ليهم لينك</span></div><div><b>' + (all.length - allOn) + '</b><span>من غير لينك</span></div></div>' +
       '<input class="cl-q" placeholder="🔍 دوّر على مركز بالاسم أو التليفون" value="' + esc(ui.q) + '" oninput="AXClients.search(this.value)">' +
       group('on', '🔗 ليهم لينك', on, (on.length || longN) ? '<div class="cl-gx">' + (on.length ? '<button class="btn btn-secondary btn-sm" onclick="AXClients.qrPrint()">🖨 اطبع باركود كل المراكز (' + allOn + ')</button>' : '') + (longN ? '<button class="btn btn-secondary btn-sm" onclick="AXClients.shortAll()">✂ اختصر ' + longN + ' لينك طويل</button>' : '') + '</div>' : '') +
@@ -134,31 +136,41 @@
   }
 
   /* ── the requests tab ── */
-  var ST = { new: 'جديد', ok: 'اتأكد — بيتجهز', sent: 'اتسلّم', no: 'اتلغى' };
+  var ST = { new: 'جديد', ok: 'اتأكد — بيتجهز', road: 'في الطريق 🚚', sent: 'اتسلّم', no: 'اتلغى' };
+  function stars(r) { if (!r.rating) return ''; var t = {}; try { t = JSON.parse(r.rate_tags || '{}') || {}; } catch (e) {} return '<p class="nt" style="color:#f59e0b;font-weight:700">' + '★'.repeat(r.rating) + '<span style="opacity:.3">' + '★'.repeat(5 - r.rating) + '</span> <span style="color:inherit;opacity:.8;font-weight:500">' + esc((t.tags || []).join('، ')) + (t.note ? ' — «' + esc(t.note) + '»' : '') + '</span></p>'; }
+  function payHtml(r, c, ph) {
+    var it = r.items && !Array.isArray(r.items) ? r.items : {}, PS = { new: 'جديد — راجعه', ok: 'بيتراجع', sent: 'اتسجّل ✓', no: 'اترفض' };
+    return '<div class="cl-rq ' + r.status + '"><div class="h"><span class="cl-av" style="background:rgba(22,163,74,.15)">💳</span><div><b>' + esc(r.customer_name) + ' — تحويل ' + num(it.amount) + '</b><small>' + ago(r.created_at) + (it.method ? ' · ' + esc(it.method) : '') + (r.contact ? ' · ' + esc(r.contact) : '') + '</small></div><span class="cl-tg ' + r.status + '">' + PS[r.status] + '</span></div>' +
+      phStrip(r.id, r.photos, 'cl-ph') + (r.note ? '<p class="nt">📝 ' + esc(r.note) + '</p>' : '') + (r.done_by && r.status !== 'new' ? '<p class="nt" style="opacity:.55">' + esc(PS[r.status]) + ' بواسطة ' + esc(r.done_by) + '</p>' : '') +
+      '<div class="cl-a">' + (r.status === 'new' || r.status === 'ok' ? (c && typeof openPaymentForm === 'function' ? '<button class="btn btn-primary btn-sm" onclick="AXClients.payReg(' + r.id + ')">💰 سجّل تحصيل</button>' : '') + '<button class="btn btn-secondary btn-sm" onclick="AXClients.st(' + r.id + ',\'sent\')">✓ اتسجّل</button><button class="btn btn-ghost btn-sm" onclick="AXClients.st(' + r.id + ',\'no\')">رفض</button>' : '<button class="btn btn-ghost btn-sm" onclick="AXClients.del(' + r.id + ')">🗑 مسح</button>') +
+      (ph ? '<button class="btn btn-secondary btn-sm cl-wa" onclick="AXClients.waReq(' + r.id + ')">واتساب</button>' : '') + '</div></div>';
+  }
   function reqHtml() {
     if (!ui.rq) { loadReq(); return '<div class="cl-emp"><i>⏳</i>بنحمّل الطلبات…</div>'; }
-    var list = ui.rq.filter(function (r) { return ui.rf === 'all' || r.status === 'new' || r.status === 'ok'; });
+    var list = ui.rq.filter(function (r) { return ui.rf === 'all' || r.status === 'new' || r.status === 'ok' || r.status === 'road'; });
     var h = '<div class="cl-rf"><button class="' + (ui.rf === 'open' ? 'on' : '') + '" onclick="AXClients.rf(\'open\')">المفتوحة</button><button class="' + (ui.rf === 'all' ? 'on' : '') + '" onclick="AXClients.rf(\'all\')">الكل</button></div>';
     if (!list.length) return h + '<div class="cl-emp"><i>📭</i>' + (ui.rf === 'open' ? 'مفيش طلبات مفتوحة.' : 'لسه مفيش طلبات.') + '<br><small>المراكز بتطلب ورق من اللينك بتاعها، والطلب بيظهر هنا بإشعار.</small></div>';
     if (!EMPS && list.some(function (r) { return r.kind === 'maint'; })) loadEmps(function () { if (isPage() && ui.tab === 'req') render(); });
     return h + list.map(function (r) {
       var c = A('customers').filter(function (x) { return x.id === r.customer_id; })[0], ph = c ? phoneOf(c) : '';
+      if (r.kind === 'pay') return payHtml(r, c, ph);
       if (r.kind === 'maint') {
         var it = r.items && !Array.isArray(r.items) ? r.items : {}, MS = { new: 'جديد', ok: 'اتحوّل لفني', sent: 'اتصلحت', no: 'اتلغى' };
         return '<div class="cl-rq ' + r.status + '"><div class="h"><span class="cl-av" style="background:rgba(249,115,22,.15)">' + (it.urgent ? '🚨' : '🛠') + '</span><div><b>' + esc(r.customer_name) + ' — طلب صيانة</b><small>' + ago(r.created_at) + (r.branch_name ? ' · ' + esc(r.branch_name) : '') + (r.contact ? ' · ' + esc(r.contact) : '') + '</small></div><span class="cl-tg ' + r.status + '">' + MS[r.status] + '</span></div>' +
           phStrip(r.id, r.photos, 'cl-ph') + '<ul><li>' + (it.device ? '<span style="opacity:1;font-weight:800;color:#f59e0b">' + esc(it.device) + '</span>' : '') + '<span style="opacity:1">' + esc(r.note || '') + '</span></li></ul>' +
-          (it.urgent ? '<p class="nt" style="color:#f87171;font-weight:700">🚨 مستعجل — الشغل واقف</p>' : '') + (r.reply ? '<p class="nt" style="opacity:.7">👷 ' + esc(r.reply) + (r.done_by ? ' · بواسطة ' + esc(r.done_by) : '') + '</p>' : '') +
+          (it.urgent ? '<p class="nt" style="color:#f87171;font-weight:700">🚨 مستعجل — الشغل واقف</p>' : '') + (r.reply ? '<p class="nt" style="opacity:.7">👷 ' + esc(r.reply) + (r.done_by ? ' · بواسطة ' + esc(r.done_by) : '') + '</p>' : '') + stars(r) +
           '<div class="cl-a">' + (r.status === 'new' || r.status === 'ok' ? (EMPS ? empSel(r.id) + '<button class="btn btn-primary btn-sm" onclick="AXClients.assign(' + r.id + ', this.previousElementSibling)">👷 حوّل للموظف</button>' : '<span class="cl-note">بنحمّل الموظفين…</span>') +
             '<button class="btn btn-secondary btn-sm" onclick="AXClients.st(' + r.id + ',\'sent\')">✅ اتصلحت</button><button class="btn btn-ghost btn-sm" onclick="AXClients.st(' + r.id + ',\'no\')">إلغاء</button>' : '<button class="btn btn-ghost btn-sm" onclick="AXClients.del(' + r.id + ')">🗑 مسح</button>') +
           (ph ? '<button class="btn btn-secondary btn-sm cl-wa" onclick="AXClients.waReq(' + r.id + ')">واتساب</button>' : '') + '</div></div>';
       }
       return '<div class="cl-rq ' + r.status + '"><div class="h"><span class="cl-av">📦</span><div><b>' + esc(r.customer_name) + '</b><small>' + ago(r.created_at) + (r.branch_name ? ' · ' + esc(r.branch_name) : '') + (r.contact ? ' · ' + esc(r.contact) : '') + '</small></div><span class="cl-tg ' + r.status + '">' + ST[r.status] + '</span></div>' +
-        '<ul>' + r.items.map(function (x) { return '<li><b>' + num(x.qty) + '</b><span>' + esc(x.unit || '') + '</span><span style="opacity:1">' + esc(x.name) + '</span></li>'; }).join('') + '</ul>' +
+        '<ul>' + (Array.isArray(r.items) ? r.items : []).map(function (x) { return '<li><b>' + num(x.qty) + '</b><span>' + esc(x.unit || '') + '</span><span style="opacity:1">' + esc(x.name) + '</span></li>'; }).join('') + '</ul>' +
         (r.note ? '<p class="nt">📝 ' + esc(r.note) + '</p>' : '') + (r.done_by && r.status !== 'new' ? '<p class="nt" style="opacity:.55">' + esc(ST[r.status]) + ' بواسطة ' + esc(r.done_by) + '</p>' : '') +
         '<div class="cl-a">' +
           (r.status === 'new' ? '<button class="btn btn-primary btn-sm" onclick="AXClients.st(' + r.id + ',\'ok\')">✓ تأكيد</button>' : '') +
-          (r.status === 'new' || r.status === 'ok' ? '<button class="btn btn-secondary btn-sm" onclick="AXClients.st(' + r.id + ',\'sent\')">🚚 اتسلّم</button>' : '') +
-          (r.status === 'new' || r.status === 'ok' ? '<button class="btn btn-ghost btn-sm" onclick="AXClients.st(' + r.id + ',\'no\')">إلغاء</button>' : '<button class="btn btn-ghost btn-sm" onclick="AXClients.del(' + r.id + ')">🗑 مسح</button>') +
+          (r.status === 'new' || r.status === 'ok' ? '<button class="btn btn-secondary btn-sm" onclick="AXClients.st(' + r.id + ',\'road\')">🚚 في الطريق</button>' : '') +
+          (r.status === 'new' || r.status === 'ok' || r.status === 'road' ? '<button class="btn btn-secondary btn-sm" onclick="AXClients.st(' + r.id + ',\'sent\')">📦 اتسلّم</button>' : '') +
+          (r.status === 'new' || r.status === 'ok' || r.status === 'road' ? '<button class="btn btn-ghost btn-sm" onclick="AXClients.st(' + r.id + ',\'no\')">إلغاء</button>' : '<button class="btn btn-ghost btn-sm" onclick="AXClients.del(' + r.id + ')">🗑 مسح</button>') +
           (ph ? '<button class="btn btn-secondary btn-sm cl-wa" onclick="AXClients.waReq(' + r.id + ')">واتساب</button>' : '') +
           (typeof openIssuanceForm === 'function' && c && r.status !== 'no' && r.status !== 'sent' ? '<button class="btn btn-secondary btn-sm" onclick="AXClients.issue(\'' + c.id + '\')">🧾 صرف</button>' : '') +
         '</div></div>';
@@ -274,16 +286,16 @@
     var ov = document.querySelector('.clp-ov');
     if (ov) { POPQ.push(m); var mo = ov.querySelector('.clp-more'); if (mo) { mo.textContent = '+' + POPQ.length + ' إشعار كمان'; mo.style.display = ''; } return; }
     ov = document.createElement('div'); ov.className = 'clp-ov ax-hl-off';
-    var items = Array.isArray(m.items) ? m.items : [], due = m.kind === 'due', stk = m.kind === 'stock', mnt = m.kind === 'maint';
-    var ic = mnt ? '<svg viewBox="0 0 24 24"><path class="lg" d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.6 17.2a1.9 1.9 0 0 0 2.7 2.7l5.7-5.7a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>' : stk ? '<svg viewBox="0 0 24 24"><path class="lg" d="M3.5 8L12 3.5L20.5 8V16L12 20.5L3.5 16zM3.5 8L12 12.5L20.5 8M12 12.5V20.5"/></svg>' : due ? '<svg viewBox="0 0 24 24"><path class="lg" d="M12 3.5a8.5 8.5 0 1 1 0 17a8.5 8.5 0 1 1 0-17M12 7.5V12l3 2"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+    var items = Array.isArray(m.items) ? m.items : [], due = m.kind === 'due', stk = m.kind === 'stock', mnt = m.kind === 'maint', pay = m.kind === 'pay';
+    var ic = pay ? '<svg viewBox="0 0 24 24"><path class="lg" d="M3.5 7.5h17v10h-17zM3.5 11h17M7 14.5h3"/></svg>' : mnt ? '<svg viewBox="0 0 24 24"><path class="lg" d="M14.7 6.3a4 4 0 0 0-5.4 5.2L3.6 17.2a1.9 1.9 0 0 0 2.7 2.7l5.7-5.7a4 4 0 0 0 5.2-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>' : stk ? '<svg viewBox="0 0 24 24"><path class="lg" d="M3.5 8L12 3.5L20.5 8V16L12 20.5L3.5 16zM3.5 8L12 12.5L20.5 8M12 12.5V20.5"/></svg>' : due ? '<svg viewBox="0 0 24 24"><path class="lg" d="M12 3.5a8.5 8.5 0 1 1 0 17a8.5 8.5 0 1 1 0-17M12 7.5V12l3 2"/></svg>' : '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
     ov.innerHTML = '<div class="clp" role="dialog" aria-modal="true"><div class="clp-hd"><span class="clp-dot"></span><span class="clp-ln l"></span>' +
       '<span class="clp-ring"><span class="clp-ck">' + ic + '</span></span><span class="clp-ln r"></span><span class="clp-dot"></span></div>' +
-      (mnt ? maintBody(m) : stk ? stockBody(m) : due ? dueBody(m) : '') + (due || stk || mnt ? '' :
+      (pay ? payBody(m) : mnt ? maintBody(m) : stk ? stockBody(m) : due ? dueBody(m) : '') + (due || stk || mnt || pay ? '' :
       '<h3>📦 طلب ورق جديد</h3><p class="ctr">' + esc(m.center || '') + '</p>' +
       (items.length ? '<ul>' + items.map(function (x, i) { return '<li style="animation-delay:' + (0.7 + i * 0.08).toFixed(2) + 's"><b>' + num(x.qty) + '</b><span>' + esc(x.name) + '</span></li>'; }).join('') + '</ul>' : '<p class="mt2">' + esc(m.text || '') + '</p>') +
       (m.contact ? '<p class="mt2">👤 ' + esc(m.contact) + '</p>' : '') + (m.note ? '<p class="mt2">📝 ' + esc(m.note) + '</p>' : '') +
       '') + '<span class="clp-more" style="display:none"></span>' +
-      '<div class="clp-bt"><button class="clp-ok" type="button">حسنا</button>' + (mnt ? '<div class="clp-two clp-as"><span class="clp-wait">بنحمّل الموظفين…</span></div><button class="clp-go" type="button">افتح الطلبات ←</button>' : stk ? '<button class="clp-go" data-go="inv" type="button">افتح المخزن ←</button>' : due ? '<div class="clp-two"><button class="clp-b2" data-x="pay" type="button">💵 تحصيل</button>' + (m.phone ? '<button class="clp-b2 wa" data-x="wa" type="button">واتساب</button>' : '') + '<button class="clp-b2" data-x="stmt" type="button">📒 كشف الحساب</button></div>' : '<button class="clp-go" type="button">افتح الطلبات ←</button>') + '</div></div>';
+      '<div class="clp-bt"><button class="clp-ok" type="button">حسنا</button>' + (pay ? '<div class="clp-two">' + (typeof openPaymentForm === 'function' ? '<button class="clp-b2" data-x="preg" type="button">💰 سجّل تحصيل</button>' : '') + '<button class="clp-b2" data-x="pno" type="button" style="color:#B91C1C;border-color:#FECACA;background:#FEF2F2">رفض</button></div><button class="clp-go" type="button">افتح الطلبات ←</button>' : mnt ? '<div class="clp-two clp-as"><span class="clp-wait">بنحمّل الموظفين…</span></div><button class="clp-go" type="button">افتح الطلبات ←</button>' : stk ? '<button class="clp-go" data-go="inv" type="button">افتح المخزن ←</button>' : due ? '<div class="clp-two"><button class="clp-b2" data-x="pay" type="button">💵 تحصيل</button>' + (m.phone ? '<button class="clp-b2 wa" data-x="wa" type="button">واتساب</button>' : '') + '<button class="clp-b2" data-x="stmt" type="button">📒 كشف الحساب</button></div>' : '<button class="clp-go" type="button">افتح الطلبات ←</button>') + '</div></div>';
     document.body.appendChild(ov);
     if (mnt) loadEmps(function (L) {
       var box = ov.querySelector('.clp-as'); if (!box) return;
@@ -296,7 +308,7 @@
     };
     ov.querySelector('.clp-ok').onclick = function () { close(); };
     [].forEach.call(ov.querySelectorAll('.clp-b2'), function (b) { b.onclick = function () { var x = b.dataset.x; close(function () {
-      try { if (x === 'pay' && typeof openPaymentForm === 'function') openPaymentForm(m.cid); else if (x === 'wa' && window.AXAging) AXAging.whatsapp(m.cid); else if (x === 'stmt' && typeof viewCustomerStatement === 'function') viewCustomerStatement(m.cid); } catch (e) {}
+      try { if (x === 'preg') payReg(m.id, m); else if (x === 'pno') setSt(m.id, 'no'); else if (x === 'pay' && typeof openPaymentForm === 'function') openPaymentForm(m.cid); else if (x === 'wa' && window.AXAging) AXAging.whatsapp(m.cid); else if (x === 'stmt' && typeof viewCustomerStatement === 'function') viewCustomerStatement(m.cid); } catch (e) {}
       if (POPQ.length) setTimeout(function () { showPop(POPQ.shift()); }, 400); }); }; });
     var goB = ov.querySelector('.clp-go'); if (goB && goB.dataset.go === 'inv') { goB.onclick = function () { close(function () { if (typeof navigate === 'function') navigate('inventory'); }); }; goB = null; }
     if (goB) goB.onclick = function () { POPQ = []; close(function () { ui.tab = 'req'; ui.rq = null; if (isPage()) render(); else if (typeof navigate === 'function') navigate('clients'); }); };
@@ -345,6 +357,39 @@
     var b = base().replace(/\/$/, '') + '/api/portal/photo?req=' + id + '&i=';
     var h = '<div class="' + cls + '">'; for (var i = 0; i < n; i++) h += '<a href="' + b + i + '" target="_blank" rel="noopener"><img src="' + b + i + '" alt="صورة العطل" loading="lazy"></a>';
     return h + '</div>';
+  }
+  function payBody(m) {
+    return '<h3>💳 تحويل من مركز</h3><p class="ctr">' + esc(m.center || '') + '</p><div class="clp-big" style="font-size:34px;font-weight:900;color:#15803D;direction:ltr;margin:4px 0 2px">' + num(m.amount) + '</div>' +
+      (m.method ? '<span class="late" style="background:#F0FDF4;color:#15803D">' + esc(m.method) + '</span>' : '') + phStrip(m.id, m.photos, 'clp-ph') + (m.note ? '<p class="mt2">📝 ' + esc(m.note) + '</p>' : '') +
+      '<p class="mt2" style="margin-top:8px">راجع الإيصال، ولو تمام دوس «سجّل تحصيل» — بيتسجّل في حساب المركز وهو بيتبلّغ.</p>';
+  }
+  /* open the normal payment form pre-filled; when a new payment for this center is saved → mark the request done */
+  function payReg(id, m) {
+    var r = m || (ui.rq || []).filter(function (x) { return x.id === id; })[0]; if (!r) return;
+    var cid = r.cid || r.customer_id, it = r.items && !Array.isArray(r.items) ? r.items : {}, amount = r.amount != null ? r.amount : it.amount, method = r.method || it.method || '';
+    if (typeof openPaymentForm !== 'function') return;
+    var before = A('payments').length; openPaymentForm(cid);
+    setTimeout(function () {
+      var a = document.getElementById('pay-amount'); if (a && amount) { a.value = Number(amount).toFixed(2); try { a.dispatchEvent(new Event('input')); } catch (e) {} }
+      var mt = document.getElementById('pay-method'); if (mt) { mt.value = /كاش/.test(method) ? 'كاش' : 'تحويل'; try { mt.dispatchEvent(new Event('change')); } catch (e) {} }
+      var rf = document.getElementById('pay-reference'); if (rf && !rf.value) rf.value = (method ? method + ' — ' : '') + 'من صفحة المركز' + (r.note ? ' · ' + String(r.note).slice(0, 60) : '');
+    }, 80);
+    var n = 0, w = setInterval(function () {
+      var open = (document.getElementById('modal-overlay') || { classList: { contains: function () { return false; } } }).classList.contains('show');
+      if (A('payments').length > before) { clearInterval(w); setSt(id, 'sent'); return; }
+      if (!open || ++n > 1200) clearInterval(w);
+    }, 500);
+  }
+  /* «💳 بيانات الدفع» — اللي بتظهر للمراكز في صفحتهم (InstaPay / محفظة / بنك) */
+  function payInfo() {
+    var p = S()._payinfo || {}, f = function (k, l, ph) { return '<div class="form-group"><label>' + l + '</label><input class="form-control" id="cl-pi-' + k + '" value="' + esc(p[k] || '') + '" placeholder="' + ph + '"></div>'; };
+    openModal('💳 بيانات الدفع للمراكز', '<p class="ax-modal-lead">اللي هتكتبه هنا بيظهر لكل المراكز في صفحتهم بزرار «نسخ»، ويقدروا يبعتوا صورة التحويل.</p>' +
+      f('instapay', '⚡ InstaPay (العنوان أو الرقم)', 'name@instapay') + f('wallet', '📱 رقم المحفظة', '010xxxxxxxx') + '<div class="form-row">' + f('bank', '🏦 اسم البنك', 'البنك الأهلي') + f('iban', 'رقم الحساب / IBAN', 'EG..') + '</div>' + f('note', 'ملاحظة (اختياري)', 'مثلاً: اكتبوا اسم المركز في التحويل'),
+      '<button class="btn btn-primary" id="cl-pi-go">💾 حفظ</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+    var go = document.getElementById('cl-pi-go'); if (go) go.onclick = function () {
+      var o = {}; ['instapay', 'wallet', 'bank', 'iban', 'note'].forEach(function (k) { o[k] = String((document.getElementById('cl-pi-' + k) || {}).value || '').trim().slice(0, 120); });
+      S()._payinfo = o; if (typeof DB !== 'undefined' && DB.save) DB.save(); if (typeof closeModal === 'function') closeModal(); T('اتحفظت بيانات الدفع ✓ — ظاهرة للمراكز'); render();
+    };
   }
   function maintBody(m) {
     return '<h3>' + (m.urgent ? '🚨' : '🛠') + ' طلب صيانة</h3><p class="ctr">' + esc(m.center || '') + '</p>' +
@@ -412,6 +457,11 @@
       if (window.innerWidth >= 760) showPop(m); else T(m.text || 'طلب صيانة 🛠', 'success');
       try { var Ac2 = window.AudioContext || window.webkitAudioContext; if (Ac2) { var ac2 = new Ac2(); [520, 780, 520].forEach(function (f, j) { var o = ac2.createOscillator(), g = ac2.createGain(); o.connect(g); g.connect(ac2.destination); o.frequency.value = f; g.gain.setValueAtTime(.1, ac2.currentTime + j * .16); g.gain.exponentialRampToValueAtTime(.001, ac2.currentTime + j * .16 + .3); o.start(ac2.currentTime + j * .16); o.stop(ac2.currentTime + j * .16 + .31); }); } } catch (e) {}
     }
+    if (m.kind === 'pay') {
+      if (window.innerWidth >= 760) showPop(m); else T(m.text || 'تحويل جديد 💳', 'success');
+      try { var Ac3 = window.AudioContext || window.webkitAudioContext; if (Ac3) { var ac3 = new Ac3(); [700, 1050].forEach(function (f, j) { var o = ac3.createOscillator(), g = ac3.createGain(); o.connect(g); g.connect(ac3.destination); o.frequency.value = f; g.gain.setValueAtTime(.1, ac3.currentTime + j * .14); g.gain.exponentialRampToValueAtTime(.001, ac3.currentTime + j * .14 + .3); o.start(ac3.currentTime + j * .14); o.stop(ac3.currentTime + j * .14 + .31); }); } } catch (e) {}
+    }
+    if (m.kind === 'rate') T(m.text || 'تقييم جديد ⭐', 'success');
     if (m.kind === 'order') {
       if (window.innerWidth >= 760) showPop(m); else T(m.text || 'طلب ورق جديد 📦', 'success');
       try { var Ac = window.AudioContext || window.webkitAudioContext; if (Ac) { var ac = new Ac(), o = ac.createOscillator(), g = ac.createGain(); o.connect(g); g.connect(ac.destination); o.frequency.value = 880; g.gain.setValueAtTime(.12, ac.currentTime); g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + .5); o.start(); o.stop(ac.currentTime + .5); } } catch (e) {}
@@ -488,8 +538,8 @@
       var row = function (k, ic, t, cnt) { return '<label class="cl-rs"><input type="checkbox" value="' + k + '"' + (cnt ? ' checked' : ' disabled') + '><span class="ic">' + ic + '</span><span class="tx"><b>' + t + '</b><small>' + (cnt ? cnt + ' طلب هيتمسح' : 'مفيش طلبات') + '</small></span></label>'; };
       openModal('🧹 ريست طلبات ' + esc(c.name),
         '<p class="ax-modal-lead">اختار تمسح إيه من صفحة المركز ومن «الطلبات». الحسابات والفواتير والصرف مش بتتأثر.</p>' +
-        '<div class="cl-rsl">' + row('order', '📦', 'طلبات الورق', n.order) + row('maint', '🛠', 'طلبات الصيانة (والصور)', n.maint) + '</div>',
-        '<button class="btn btn-primary" id="cl-rs-go"' + (n.order || n.maint ? '' : ' disabled') + '>🧹 اعمل ريست</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+        '<div class="cl-rsl">' + row('order', '📦', 'طلبات الورق', n.order) + row('maint', '🛠', 'طلبات الصيانة (والصور)', n.maint) + row('pay', '💳', 'التحويلات المبعوتة (والإيصالات)', n.pay || 0) + '</div>',
+        '<button class="btn btn-primary" id="cl-rs-go"' + (n.order || n.maint || n.pay ? '' : ' disabled') + '>🧹 اعمل ريست</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
       var go = document.getElementById('cl-rs-go');
       if (go) go.onclick = function () {
         var kinds = [].map.call(document.querySelectorAll('.cl-rs input:checked'), function (i) { return i.value; });
@@ -532,13 +582,14 @@
     api('POST', '/request', { id: id, status: st }).then(function () {
       (ui.rq || []).forEach(function (r) { if (r.id === id) r.status = st; });
       setCount((ui.rq || []).filter(function (r) { return r.status === 'new'; }).length);
-      T(st === 'ok' ? 'اتأكد الطلب ✓' : st === 'sent' ? 'اتعلّم إنه اتسلّم 🚚' : 'اتلغى الطلب', st === 'no' ? 'info' : 'success'); render();
+      T(st === 'ok' ? 'اتأكد الطلب ✓' : st === 'road' ? '🚚 المركز اتبلّغ إن الطلب في الطريق' : st === 'sent' ? 'تمام ✓ — المركز اتبلّغ' : 'اتلغى — المركز اتبلّغ', st === 'no' ? 'info' : 'success'); render();
     }).catch(function (e) { T(e.message, 'error'); });
   }
   function del(id) { ask('تمسح الطلب ده من القايمة؟', function () { api('POST', '/request/delete', { id: id }).then(function () { ui.rq = (ui.rq || []).filter(function (r) { return r.id !== id; }); render(); }).catch(function (e) { T(e.message, 'error'); }); }); }
   function waReq(id) {
     var r = (ui.rq || []).filter(function (x) { return x.id === id; })[0]; if (!r) return;
     var c = A('customers').filter(function (x) { return x.id === r.customer_id; })[0]; if (!c) return;
+    if (r.kind === 'pay') { var pi = r.items || {}; window.open('https://wa.me/' + phoneOf(c) + '?text=' + encodeURIComponent('السلام عليكم ' + c.name + ' 🌿\nالتحويل ' + num(pi.amount) + (pi.method ? ' (' + pi.method + ')' : '') + ' وصلنا ✅\n' + (r.status === 'sent' ? 'واتسجّل في حسابكم — شكراً لكم 🙏' : 'وبنراجعه وهيتسجّل في حسابكم.') + '\n' + company()), '_blank'); return; }
     if (r.kind === 'maint') { var mi = r.items || {}; window.open('https://wa.me/' + phoneOf(c) + '?text=' + encodeURIComponent('السلام عليكم ' + c.name + ' 🌿\nطلب الصيانة وصلنا ✅' + (mi.device ? ' (' + mi.device + ')' : '') + '\n«' + (r.note || '') + '»\n' + (r.status === 'sent' ? 'واتصلح — شكراً لكم 🙏' : r.reply ? r.reply + ' وهيتواصل معاكم.' : 'والفني هيتواصل معاكم في أقرب وقت.') + '\n' + company()), '_blank'); return; }
     var what = r.items.map(function (x) { return '• ' + x.qty + ' ' + (x.unit || '') + ' ' + x.name; }).join('\n');
     var txt = 'السلام عليكم ' + c.name + ' 🌿\nطلبكم وصلنا ✅\n' + what + '\n' + (r.status === 'sent' ? 'واتسلّم — شكراً لكم 🙏' : 'وجاري تجهيزه، هنبلغكم بميعاد التسليم.') + '\n' + company();
@@ -554,7 +605,7 @@
   };
   window.AXClients = {
     render: render, make: make, makeAll: makeAll, shortAll: shortAll, rotate: rotate, stop: stop, copy: copy, wa: wa,
-    st: setSt, del: del, _pop: showPop, assign: assign, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, reset: resetModal, stockShow: stockShow, stockToggle: stockToggle, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
+    st: setSt, del: del, _pop: showPop, assign: assign, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, reset: resetModal, payReg: payReg, payInfo: payInfo, stockShow: stockShow, stockToggle: stockToggle, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
     tab: function (t) { ui.tab = t; if (t === 'req') ui.rq = null; render(); },
     rf: function (f) { ui.rf = f; render(); },
     grp: function (k) { ui.grp[k] = !ui.grp[k]; render(); },

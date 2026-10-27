@@ -184,6 +184,21 @@ module.exports = function init(H) {
     if (others.length) toEmps(others, { title: '✅ طلب صيانة ' + r.customer_name + ' اتاخد', body: e.name + ' هيروح', tag: 'pmt-' + r.id });
     return { task: t.id, started };
   }
+  /* 4.87 · المركز بيتابع الفني: إشعار للمركز في كل مرحلة، ولما الفني يخلّص الطلب بيتقفل «اتصلحت» */
+  function ctrPing(t, step, e) {
+    if (!t || !t.portal_req) return;
+    let r = null; try { r = db.prepare('SELECT * FROM portal_req WHERE id = ?').get(t.portal_req); } catch (er) {}
+    if (!r) return;
+    if (step === 'done') { try { db.prepare("UPDATE portal_req SET status = 'sent', done_at = ? WHERE id = ? AND status IN ('new','ok')").run(nowLocal().ts, r.id); NT.event('portal', { kind: 'status', id: r.id }); } catch (er) {} }
+    const M = { going: '🚗 ' + e.name + ' في الطريق ليكم', arrived: '📍 ' + e.name + ' وصل', working: '🔧 ' + e.name + ' بدأ يصلّح', done: '✅ العطل اتصلح — قيّموا ' + e.name };
+    try { if (NT.center && M[step]) NT.center(r.customer_id, { title: M[step], body: t.center_name || '', tag: 'pc-' + r.id, urgent: step === 'arrived' }); } catch (er) {}
+  }
+  function taskByReq(rid) {
+    const t = db.prepare('SELECT * FROM staff_task WHERE portal_req = ? ORDER BY id DESC LIMIT 1').get(Number(rid)); if (!t) return null;
+    const e = db.prepare('SELECT id, name, job, photo FROM staff_emp WHERE id = ?').get(t.emp_id) || {};
+    const o = taskOut(t);
+    return { status: o.status, emp: e.name || '', job: e.job || '', has_photo: !!e.photo, emp_id: e.photo ? e.id : null, dist: o.dist, eta: o.eta, pct: o.pct, last_lat: o.last_lat, last_lng: o.last_lng, last_at: o.last_at, c_lat: o.c_lat, c_lng: o.c_lng, created_at: o.created_at, started_at: o.started_at, arrived_at: o.arrived_at, working_at: o.working_at, done_at: o.done_at };
+  }
   const taskOut = t => {
     const c = centerByKey(t.center_key), known = !!(c && c.lat != null);
     const pct = t.status === 'arrived' || t.status === 'done' ? 100 : (t.d0 && t.dist != null ? Math.max(0, Math.min(99, Math.round((1 - t.dist / Math.max(t.d0, 1)) * 100))) : 0);
@@ -227,6 +242,7 @@ module.exports = function init(H) {
     if (has) { const open = openRecord(e.id, now); if (open) H.logLoc(e, open.id, now, lat, lng, num(b.acc), b.battery, 'route'); }
     if (t.status === 'new') {
       db.prepare("UPDATE staff_task SET status = 'going', started_at = ?, d0 = ?, dist = ?, last_lat = ?, last_lng = ?, last_at = ?, seen_at = ? WHERE id = ?").run(now.ts, d0, d0, has ? lat : null, has ? lng : null, has ? now.ts : null, now.ts, t.id);
+      ctrPing(t, 'going', e);
       toAdmins({ kind: 'road', title: '🚗 ' + e.name + ' في الطريق إلى ' + t.center_name, body: d0 != null ? 'المسافة ' + (d0 >= 1000 ? (d0 / 1000).toFixed(1) + ' كم' : d0 + ' م') : '', tag: 'sp-road-' + t.id });
     }
     return { ok: true };
@@ -254,6 +270,7 @@ module.exports = function init(H) {
   function markArrived(e, t, now, dist) {
     const r = db.prepare("UPDATE staff_task SET status = 'arrived', arrived_at = ?, dist = ? WHERE id = ? AND status = 'going'").run(now.ts, dist, t.id);
     if (!Number(r.changes)) return false;
+    ctrPing(t, 'arrived', e);
     if (cfg('notify_arrive') !== '0') toAdmins({ kind: 'arrive', title: '🎉 ' + e.name + ' وصل ' + t.center_name, body: 'بعد ' + dur(tsMin(now.ts) - tsMin(t.started_at || now.ts)) + ' ساعة من بداية الطريق', tag: 'sp-arr-' + t.id });
     return true;
   }
@@ -281,6 +298,7 @@ module.exports = function init(H) {
       else if (!ov.task_id) db.prepare('UPDATE staff_visit SET task_id = ? WHERE id = ?').run(t.id, ov.id);
       db.prepare("UPDATE staff_task SET status = 'working', started_at = COALESCE(started_at, ?), arrived_at = COALESCE(arrived_at, ?), working_at = ? WHERE id = ?").run(now.ts, now.ts, now.ts, t.id);
       toAdmins({ kind: 'work', title: '🔧 ' + e.name + ' بدأ الشغل في ' + t.center_name, body: t.title || '', tag: 'sp-work-' + t.id });
+      ctrPing(t, 'working', e);
       return { ok: true };
     }
     if (step === 'done') {
@@ -288,6 +306,7 @@ module.exports = function init(H) {
       const ov = db.prepare('SELECT * FROM staff_visit WHERE emp_id = ? AND end_at IS NULL AND task_id = ? ORDER BY id DESC LIMIT 1').get(e.id, t.id);
       if (ov) H.endVisit(e, Object.assign({ fault: f }, pos)); else if (f) addFault(e, f, null, t.center_key);
       db.prepare("UPDATE staff_task SET status = 'done', done_at = ?, result = ?, working_at = COALESCE(working_at, ?), arrived_at = COALESCE(arrived_at, ?) WHERE id = ?").run(now.ts, str(b.note, 300), now.ts, now.ts, t.id);
+      ctrPing(t, 'done', e);
       toAdmins({ kind: 'done', title: '✅ ' + e.name + ' خلّص ' + (t.title && t.title.indexOf('زيارة ') !== 0 ? t.title + ' في ' : '') + t.center_name, body: f ? '🛠 ' + f.title + ' ← ' + String(f.solution).slice(0, 80) : (b.note ? str(b.note, 120) : ''), tag: 'sp-done-' + t.id, urgent: true });
       return { ok: true };
     }
@@ -455,5 +474,5 @@ module.exports = function init(H) {
     }
     return false;
   }
-  return { createTask, techs, taskOut, rewardsFor, stepTask, setNotify, onPunch, onVisit, addFault, tasksOf, board, visitStarted, visitEnded, publicRoute, adminRoute, recurring, searchFaults, toAdmins, toEmps };
+  return { createTask, techs, taskByReq, taskOut, rewardsFor, stepTask, setNotify, onPunch, onVisit, addFault, tasksOf, board, visitStarted, visitEnded, publicRoute, adminRoute, recurring, searchFaults, toAdmins, toEmps };
 };

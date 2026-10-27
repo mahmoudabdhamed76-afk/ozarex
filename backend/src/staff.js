@@ -787,4 +787,4 @@ async function handleAdmin(req, res, pathname, me, h) {
 
 module.exports = { handlePublic, handleAdmin, setSource, setNotify: n => X.setNotify(n),
   /* 4.82 · a center's maintenance request → a job for an employee */
-  createTask: (b, who) => X.createTask(b, who), activeEmps: () => db.prepare('SELECT id, name, job FROM staff_emp WHERE active = 1 ORDER BY name').all(), techs: () => X.techs().map(e => e.id), toEmps: (ids, msg) => X.toEmps(ids, msg), _test: { payroll: m => PAY.payroll(m), nowLocal, calc, rulesOf, tsMin } };
+  createTask: (b, who) => X.createTask(b, who), activeEmps: () => db.prepare('SELECT id, name, job FROM staff_emp WHERE active = 1 ORDER BY name').all(), techs: () => X.techs().map(e => e.id), taskByReq: id => X.taskByReq(id), staffPhoto: id => { const e = db.prepare('SELECT * FROM staff_emp WHERE id = ?').get(String(id)); const m = e && e.photo ? /^data:(image\/[a-z]+);base64,(.+)$/.exec(e.photo) : null; return m ? { mime: m[1], buf: Buffer.from(m[2], 'base64') } : null; }, toEmps: (ids, msg) => X.toEmps(ids, msg), _test: { payroll: m => PAY.payroll(m), nowLocal, calc, rulesOf, tsMin } };
