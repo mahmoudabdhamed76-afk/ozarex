@@ -298,6 +298,12 @@ function weakPw(pw, username) { pw = String(pw || ''); return pw.length < 6 || p
 /* ═══════════════════════════════════════════════════════
    REQUEST ROUTER
 ═══════════════════════════════════════════════════════ */
+/* 4.92 · حالات المرضى: a center with no WhatsApp number set → its phone from the ERP (any branch), else the company's */
+cases.setLookup(cid => {
+  for (const b of branches.list().filter(x => x.active || x.main)) { const st = branches.storeOf(b.id); const c = st && ((st.data() || {}).customers || []).find(x => x && x.id === cid); if (c && c.phone) return c.phone; }
+  const st = (store.data() || {}).settings || {};
+  return st.companyPhone || st.companyWhatsapp || '';   /* last resort: the company's own number from الإعدادات */
+});
 const server = http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
   let pathname = parsed.pathname || '/';

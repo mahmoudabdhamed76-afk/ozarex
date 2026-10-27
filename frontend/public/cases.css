@@ -196,3 +196,6 @@ label.l{display:block;font-size:12.5px;font-weight:700;color:var(--mut);margin:1
 @keyframes flash{50%{background:#DCFCE7}}
 .opt .wa2{display:flex;gap:6px;align-items:center;margin-top:10px;flex-wrap:wrap}.opt .wa2 .fld{width:190px;padding:7px 10px;font-size:13px}
 .opt .wa2 span{font-size:12.5px;font-weight:700;color:#15803D}
+
+.f .miss{margin-top:16px;background:#fff;border-radius:22px;padding:16px;box-shadow:var(--sh);text-align:center;border:1px solid #BBF7D0;animation:up .5s .2s both}
+.f .miss b{font-size:15px}.f .miss p{color:var(--mut);font-size:12.5px;margin:4px 0 10px}.f .miss .btn{padding:13px;font-size:15px}

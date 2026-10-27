@@ -17,8 +17,16 @@
       '<button class="btn w" id="go" style="margin-top:14px;padding:14px;font-size:16px">🔍 دوّر على نتيجتي</button><div class="err" id="er" style="color:var(--red);font-weight:700;text-align:center;margin-top:8px;min-height:20px"></div>'
       : '<div class="ld" style="box-shadow:none;padding:6px"><i>⏸</i><b>البحث مقفول دلوقتي</b><p>كلّم المركز يبعتلك لينك نتيجتك.</p></div>') + '</div>' +
     '<div class="res" id="res"></div>' +
+    (C.wa ? '<div class="miss" id="miss"><b>مش لاقي نتيجتك؟</b><p>اكتب موبايلك واسمك فوق، ودوس هنا — هيتفتح واتساب برسالة جاهزة للمركز وهم يبعتولك النتيجة.</p><button class="btn wa w" id="wa0">💬 اطلب نتيجتك من المركز واتساب</button></div>' : '<div class="miss" id="miss"><b>مش لاقي نتيجتك؟</b><p style="margin-bottom:0">كلّم المركز وهيبعتولك النتيجة.</p></div>') +
     '<div class="steps"><div><i>📷</i>مسحت الباركود</div><div><i>✍️</i>اكتب موبايلك واسمك</div><div><i>🩻</i>افتح نتيجتك</div></div>' +
     '<p class="foot">نتيجتك متشفّرة — محدش يقدر يفتحها غير بموبايلك واسمك.</p></div>';
+  /* 4.92 · always there: ask the center on WhatsApp (with the mobile + name typed above, when there are) */
+  var wa0 = $('wa0');
+  if (wa0) wa0.onclick = function () {
+    var ph = C.on ? $('ph').value.trim() : '', nm = C.on ? $('nm').value.trim() : '', er = $('er');
+    if (C.on && (!K.last10(ph) || !K.normName(nm))) { if (er) er.textContent = 'اكتب رقم موبايلك وأول اسمك الأول'; (K.last10(ph) ? $('nm') : $('ph')).focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    askWa(ph, nm, '', wa0);
+  };
   if (!C.on) return;
   try { var last = JSON.parse(sessionStorage.getItem('ozx_find') || 'null'); if (last) { $('ph').value = last.p || ''; $('nm').value = last.n || ''; } } catch (e) {}
   var go = function () {
@@ -44,16 +52,18 @@
   };
   /* 4.92 · not found → ask the center on WhatsApp (and the center sees the request live on its cases page) */
   function waText(ph, nm, note) { return 'السلام عليكم ' + (C.center || '') + ' 🌿\nأنا ' + nm + ' — رقم موبايلي ' + ph + '\nدوّرت على نتيجة الأشعة بتاعتي ومالقيتهاش' + (note ? ' (' + note + ')' : '') + '، ممكن تبعتوهالي؟ 🙏'; }
+  function askWa(ph, name, note, b) {
+    if (ph && name) { try { fetch(location.pathname.replace(/\/$/, '') + '/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, phone: ph, note: note }), keepalive: true }).catch(function () {}); } catch (e) {} }
+    var t = ph && name ? waText(ph, name, note) : 'السلام عليكم ' + (C.center || '') + ' 🌿\nعايز نتيجة الأشعة بتاعتي، ممكن تبعتوهالي؟ 🙏';
+    location.href = 'https://wa.me/' + C.wa + '?text=' + encodeURIComponent(t);
+    if (b) b.innerHTML = '✅ اتفتح واتساب — ابعت الرسالة';
+  }
   function notFound(ph, nm) {
+    var mi = $('miss'); if (mi) mi.style.display = 'none';
     $('res').innerHTML = '<div class="ld"><i>🤔</i><b>ملقيناش نتيجة بالبيانات دي</b><p>اتأكد إن الرقم هو اللي اتسجّل في المركز، والاسم الأول مكتوب زي ما اتكتب هناك. لو النتيجة لسه طالعة النهارده جرّب بعد شوية.</p>' +
       (C.wa ? '<div class="ask"><input class="fld" id="nt" maxlength="100" placeholder="نوع الفحص وتاريخه (اختياري) — مثلاً: مقطعية يوم 25/10"><button class="btn wa" id="wa">💬 اطلب نتيجتك من المركز واتساب</button><small>هيتفتح واتساب برسالة جاهزة للمركز، وهم هيبعتولك النتيجة.</small></div>' : '<p style="margin-top:10px;font-weight:700">كلّم المركز وهيبعتولك النتيجة.</p>') + '</div>';
     var b = $('wa'); if (!b) return;
-    b.onclick = function () {
-      var note = ($('nt') || {}).value || '', name = String(nm).trim();
-      try { fetch(location.pathname.replace(/\/$/, '') + '/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, phone: ph, note: note }), keepalive: true }).catch(function () {}); } catch (e) {}
-      location.href = 'https://wa.me/' + C.wa + '?text=' + encodeURIComponent(waText(ph, name, note));
-      b.innerHTML = '✅ اتفتح واتساب — ابعت الرسالة'; 
-    };
+    b.onclick = function () { askWa(ph, String(nm).trim(), ($('nt') || {}).value || '', b); };
   }
   $('go').onclick = go; $('nm').onkeydown = $('ph').onkeydown = function (e) { if (e.key === 'Enter') go(); };
 })();

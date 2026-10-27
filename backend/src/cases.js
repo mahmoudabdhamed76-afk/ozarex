@@ -65,6 +65,9 @@ function phashOf(p) { const d = last10(p); return d ? crypto.createHmac('sha256'
 function pubOf(site) { if (site.pub) return site.pub; let p; do { p = rnd(8, true); } while (db.prepare('SELECT 1 FROM case_site WHERE pub = ?').get(p)); db.prepare('UPDATE case_site SET pub = ? WHERE customer_id = ?').run(p, site.customer_id); site.pub = p; return p; }
 /* 4.92 · the center's WhatsApp for patients who didn't find their result → wa.me format (Egypt: 01x… → 201x…) */
 function waOf(p) { let d = String(p || '').replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 0x660)).replace(/\D/g, ''); if (!d) return ''; if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0')) d = '2' + d; else if (d.length === 10 && d[0] === '1') d = '20' + d; return d.length >= 10 && d.length <= 15 ? d : ''; }
+let LOOKUP = null;   /* server.js: customer id → the center's phone in the ERP (fallback when the center didn't set a WhatsApp number) */
+function setLookup(f) { LOOKUP = typeof f === 'function' ? f : null; }
+function waFor(cid, wa) { const w = waOf(wa); if (w) return w; try { return LOOKUP ? waOf(LOOKUP(cid)) : ''; } catch (e) { return ''; } }
 function asksOf(cid) { return db.prepare('SELECT id, name, phone, note, at FROM case_ask WHERE customer_id = ? AND done = 0 ORDER BY id DESC LIMIT 60').all(cid); }
 function maskName(n) { return String(n || '').trim().split(/\s+/).slice(0, 3).map(w => w.charAt(0) + '•••').join(' '); }
 
@@ -109,7 +112,7 @@ function itemOut(r) { return { id: r.id, token: r.token, patient: r.patient, pho
 
 function page(title, body, css, js) {
   return '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><meta name="theme-color" content="#0E9F9A">' +
-    '<title>' + esc(title) + '</title><link rel="icon" href="/icons/favicon-32.png"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/cases.css?v=492"></head><body class="' + css + '">' + body + js + '</body></html>';
+    '<title>' + esc(title) + '</title><link rel="icon" href="/icons/favicon-32.png"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/cases.css?v=493"></head><body class="' + css + '">' + body + js + '</body></html>';
 }
 function html(res, code, s) { res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' }); res.end(s); }
 
@@ -132,9 +135,9 @@ async function centerRoute(req, res, m) {
   const me = authed(req, site);
   if (!sub) {
     if (req.method !== 'GET') return false;
-    const CD = { code, center: site.center_name || '', auth: me, cacheDays: CACHE_DAYS, maxMb: MAX_MB, pub: me ? pubOf(site) : '', fixedOn: !!site.fixed_on, wa: me ? (site.wa || '') : '' };
+    const CD = { code, center: site.center_name || '', auth: me, cacheDays: CACHE_DAYS, maxMb: MAX_MB, pub: me ? pubOf(site) : '', fixedOn: !!site.fixed_on, wa: me ? (site.wa || '') : '', waDefault: me && !site.wa ? waFor(cid0(site), '') : '' };
     if (me) db.prepare('UPDATE case_site SET last_seen = ? WHERE customer_id = ?').run(nowTs(), site.customer_id);
-    html(res, 200, page('حالات المرضى — ' + (site.center_name || ''), '<div id="app"></div>', 'k', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/qrcode.js"></script><script src="/cases-kit.js?v=491"></script><script src="/cases-center.js?v=492"></script>'));
+    html(res, 200, page('حالات المرضى — ' + (site.center_name || ''), '<div id="app"></div>', 'k', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/qrcode.js"></script><script src="/cases-kit.js?v=491"></script><script src="/cases-center.js?v=493"></script>'));
     return true;
   }
   if (sub === 'login' && req.method === 'POST') {
@@ -241,8 +244,8 @@ async function viewRoute(req, res, token, file) {
   const it = db.prepare('SELECT i.*, s.center_name, s.active AS site_on, s.wa AS site_wa, s.pub AS site_pub FROM case_item i LEFT JOIN case_site s ON s.customer_id = i.customer_id WHERE i.token = ?').get(token);
   if (!file) {
     if (!it) { if (limited('vx:' + ip, 40, 600e3)) { send(res, 429, { message: 'حاولت كتير' }); return true; } }
-    const CD = it ? { token, center: it.center_name || '', patient: it.patient, exam: it.exam || '', at: it.created_at, pages: it.pages || 0, size: it.size, name: it.file_name || '', active: !!(it.active && it.site_on), ready: !!(it.cached && it.cache_until > Date.now()) || online(it.customer_id), wa: waOf(it.site_wa), pub: it.site_pub || '' } : { missing: true };
-    html(res, it ? 200 : 404, page(it ? 'نتيجة الفحص — ' + (it.center_name || '') : 'الحالة مش موجودة', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/pdfjs/pdf.min.js"></script><script src="/cases-view.js?v=492"></script>'));
+    const CD = it ? { token, center: it.center_name || '', patient: it.patient, exam: it.exam || '', at: it.created_at, pages: it.pages || 0, size: it.size, name: it.file_name || '', active: !!(it.active && it.site_on), ready: !!(it.cached && it.cache_until > Date.now()) || online(it.customer_id), wa: waFor(it.customer_id, it.site_wa), pub: it.site_pub || '' } : { missing: true };
+    html(res, it ? 200 : 404, page(it ? 'نتيجة الفحص — ' + (it.center_name || '') : 'الحالة مش موجودة', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/pdfjs/pdf.min.js"></script><script src="/cases-view.js?v=493"></script>'));
     return true;
   }
   if (!it) { send(res, 404, { message: 'الحالة مش موجودة' }); return true; }
@@ -288,8 +291,8 @@ async function findRoute(req, res, pub, sub) {
   if (!find) {
     if (req.method !== 'GET') return false;
     if (!site) { if (limited('hx:' + ip, 30, 600e3)) { send(res, 429, { message: 'حاولت كتير' }); return true; } }
-    const CD = site ? { pub, center: site.center_name || '', on: !!site.fixed_on, wa: waOf(site.wa) } : { missing: true };
-    html(res, site ? 200 : 404, page(site ? 'نتيجتك — ' + (site.center_name || '') : 'اللينك مش شغال', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/cases-kit.js?v=491"></script><script src="/cases-find.js?v=492"></script>'));
+    const CD = site ? { pub, center: site.center_name || '', on: !!site.fixed_on, wa: waFor(site.customer_id, site.wa) } : { missing: true };
+    html(res, site ? 200 : 404, page(site ? 'نتيجتك — ' + (site.center_name || '') : 'اللينك مش شغال', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/cases-kit.js?v=491"></script><script src="/cases-find.js?v=493"></script>'));
     return true;
   }
   if (req.method !== 'POST') return false;
@@ -334,4 +337,5 @@ async function adminApi(req, res, pathname, me) {
   return send(res, 404, { error: 'not_found' });
 }
 
-module.exports = { handle, adminApi };
+function cid0(site) { return site.customer_id; }
+module.exports = { handle, adminApi, setLookup };
