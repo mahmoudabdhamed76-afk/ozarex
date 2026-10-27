@@ -566,16 +566,18 @@
           '<div class="form-group"><label>الباسوورد (سيبه فاضي ونعملك واحد 6 أرقام)</label><input class="form-control" id="cs-pw" maxlength="40" placeholder="مثلاً 482913"></div>',
           '<button class="btn btn-primary" id="cs-go">📁 اعمل لينك الحالات</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
         document.getElementById('cs-go').onclick = function () {
-          api('POST', '/cases/make', { cid: cid, name: c.name, pass: (document.getElementById('cs-pw') || {}).value || '' }).then(function (x) { casesModal(cid, x.pass); }).catch(function (e) { T(e.message, 'error'); });
+          api('POST', '/cases/make', { cid: cid, name: c.name, wa: c.phone || '', pass: (document.getElementById('cs-pw') || {}).value || '' }).then(function (x) { casesModal(cid, x.pass); }).catch(function (e) { T(e.message, 'error'); });
         };
         return;
       }
+      if (!s.wa && c.phone) api('POST', '/cases/wa', { cid: cid, wa: c.phone, ifEmpty: true }).catch(function () {});   /* 4.92 · patients who don't find their result ask on this WhatsApp */
       var u = casesUrl(s.code), msg = 'السلام عليكم ' + c.name + ' 🌿\nده لينك «حالات المرضى» من *' + company() + '*:\n' + u + (fresh ? '\nالباسوورد: ' + fresh : '') + '\n\nافتحوه من كمبيوتر المركز، اسحبوا PDF الحالة، وهيطلعلكم باركود تلزقوه للمريض — المريض يمسحه ويشوف أشعته على موبايله.\nسيبوا الصفحة مفتوحة على الكمبيوتر عشان الحالات القديمة تفضل تفتح.';
       openModal('📁 حالات المرضى — ' + esc(c.name),
         (fresh ? '<div style="background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;border-radius:14px;padding:12px 14px;margin-bottom:12px;text-align:center"><div style="font-size:13px">الباسوورد (اكتبه دلوقتي — مش هيظهر تاني)</div><div style="font-size:30px;font-weight:900;letter-spacing:4px;direction:ltr">' + esc(fresh) + '</div></div>' : '') +
         '<div class="cl-l"><input readonly value="' + esc(u) + '" onclick="this.select()"><button class="btn btn-secondary btn-sm" id="cs-cp">نسخ</button></div>' +
         '<div class="cl-st" style="margin-top:12px"><div class="' + (s.online ? 'ok' : '') + '"><b>' + (s.online ? '🟢' : '⚪') + '</b><span>' + (s.online ? 'متصل دلوقتي' : (s.last_seen ? 'آخر دخول ' + esc(String(s.last_seen).slice(0, 16)) : 'لسه مدخلش')) + '</span></div><div><b>' + s.cases + '</b><span>حالة</span></div><div><b>' + s.views + '</b><span>مرة اتفتحت</span></div></div>' +
         (s.pub ? '<p class="cl-note" style="margin-top:10px">📌 الباركود الثابت للورق (المريض يكتب موبايله وأول اسمه): <a href="' + esc(base().replace(/\/$/, '') + '/h/' + s.pub) + '" target="_blank" rel="noopener" style="direction:ltr;unicode-bidi:isolate">' + esc(base().replace(/\/$/, '') + '/h/' + s.pub) + '</a>' + (s.fixed ? '' : ' — <b>موقوف من المركز</b>') + '</p>' : '') +
+        '<p class="cl-note">💬 واتساب طلبات المرضى: <b style="direction:ltr;unicode-bidi:isolate">' + esc(s.wa || c.phone || '—') + '</b>' + (s.asks ? ' · <b style="color:#16A34A">' + s.asks + ' طلب مفتوح</b>' : '') + ' (المركز يغيّره من صفحة الحالات)</p>' +
         (!s.active ? '<p class="cl-note" style="color:#f87171;font-weight:700">⏸ اللينك موقوف — المركز مش هيقدر يدخل والمرضى مش هيفتحوا.</p>' : ''),
         '<button class="btn btn-primary" id="cs-wa"' + (ph ? '' : ' disabled title="مفيش رقم للمركز"') + '>واتساب' + (fresh ? ' (اللينك + الباسوورد)' : '') + '</button><a class="btn btn-secondary" href="' + esc(u) + '" target="_blank" rel="noopener">👁 فتح</a><button class="btn btn-secondary" id="cs-pw2">🔑 باسوورد جديد</button><button class="btn btn-ghost" id="cs-st">' + (s.active ? '⏸ إيقاف' : '▶ تشغيل') + '</button><button class="btn btn-ghost" id="cs-rt">↻ لينك جديد</button>');
       var g = function (id) { return document.getElementById(id); };

@@ -34,6 +34,8 @@ try {
   const ic = db.prepare('PRAGMA table_info(case_item)').all().map(c => c.name);
   if (!ic.includes('phash')) db.exec('ALTER TABLE case_item ADD COLUMN phash TEXT');
   if (!ic.includes('wrap')) db.exec('ALTER TABLE case_item ADD COLUMN wrap TEXT');
+  if (!sc.includes('wa')) db.exec('ALTER TABLE case_site ADD COLUMN wa TEXT');
+  db.exec('CREATE TABLE IF NOT EXISTS case_ask (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id TEXT NOT NULL, name TEXT, phone TEXT, phash TEXT, note TEXT, at TEXT, done INTEGER NOT NULL DEFAULT 0); CREATE INDEX IF NOT EXISTS ix_case_ask ON case_ask (customer_id, done, id)');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_case_pub ON case_site (pub); CREATE INDEX IF NOT EXISTS ix_case_phash ON case_item (customer_id, phash)');
 } catch (e) { console.error('[cases] migrate', e.message); }
 
@@ -61,6 +63,9 @@ const fileOf = tok => path.join(DIR, tok + '.bin');
 function last10(p) { const d = String(p || '').replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 0x660)).replace(/\D/g, ''); return d.length >= 8 ? d.slice(-10) : ''; }
 function phashOf(p) { const d = last10(p); return d ? crypto.createHmac('sha256', SECRET).update('ph:' + d).digest('base64url').slice(0, 32) : null; }
 function pubOf(site) { if (site.pub) return site.pub; let p; do { p = rnd(8, true); } while (db.prepare('SELECT 1 FROM case_site WHERE pub = ?').get(p)); db.prepare('UPDATE case_site SET pub = ? WHERE customer_id = ?').run(p, site.customer_id); site.pub = p; return p; }
+/* 4.92 · the center's WhatsApp for patients who didn't find their result → wa.me format (Egypt: 01x… → 201x…) */
+function waOf(p) { let d = String(p || '').replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 0x660)).replace(/\D/g, ''); if (!d) return ''; if (d.startsWith('00')) d = d.slice(2); else if (d.startsWith('0')) d = '2' + d; else if (d.length === 10 && d[0] === '1') d = '20' + d; return d.length >= 10 && d.length <= 15 ? d : ''; }
+function asksOf(cid) { return db.prepare('SELECT id, name, phone, note, at FROM case_ask WHERE customer_id = ? AND done = 0 ORDER BY id DESC LIMIT 60').all(cid); }
 function maskName(n) { return String(n || '').trim().split(/\s+/).slice(0, 3).map(w => w.charAt(0) + '•••').join(' '); }
 
 /* ── center session cookie: code.exp.ver.sig (logs out everywhere when the password changes) ── */
@@ -104,16 +109,16 @@ function itemOut(r) { return { id: r.id, token: r.token, patient: r.patient, pho
 
 function page(title, body, css, js) {
   return '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><meta name="theme-color" content="#0E9F9A">' +
-    '<title>' + esc(title) + '</title><link rel="icon" href="/icons/favicon-32.png"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/cases.css?v=491"></head><body class="' + css + '">' + body + js + '</body></html>';
+    '<title>' + esc(title) + '</title><link rel="icon" href="/icons/favicon-32.png"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/cases.css?v=492"></head><body class="' + css + '">' + body + js + '</body></html>';
 }
 function html(res, code, s) { res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' }); res.end(s); }
 
 /* ════════ public routes ════════ */
 async function handle(req, res, pathname) {
-  let m = /^\/k\/([A-Za-z0-9]{8})(\/(login|logout|list|live|case|relay|item|fixed)(\/[A-Za-z0-9]{6,20})?(\/(stop|start|delete|wrap))?)?\/?$/.exec(pathname);
+  let m = /^\/k\/([A-Za-z0-9]{8})(\/(login|logout|list|live|case|relay|item|fixed|wa|ask)(\/[A-Za-z0-9]{1,20})?(\/(stop|start|delete|wrap|done))?)?\/?$/.exec(pathname);
   if (m) return centerRoute(req, res, m);
-  m = /^\/h\/([A-Za-z0-9]{8})(\/find)?\/?$/.exec(pathname);
-  if (m) return findRoute(req, res, m[1], !!m[2]);
+  m = /^\/h\/([A-Za-z0-9]{8})(\/(find|ask))?\/?$/.exec(pathname);
+  if (m) return findRoute(req, res, m[1], m[3] || '');
   m = /^\/v\/([A-Za-z0-9]{12})(\/file)?\/?$/.exec(pathname);
   if (m) return viewRoute(req, res, m[1], !!m[2]);
   return false;
@@ -127,9 +132,9 @@ async function centerRoute(req, res, m) {
   const me = authed(req, site);
   if (!sub) {
     if (req.method !== 'GET') return false;
-    const CD = { code, center: site.center_name || '', auth: me, cacheDays: CACHE_DAYS, maxMb: MAX_MB, pub: me ? pubOf(site) : '', fixedOn: !!site.fixed_on };
+    const CD = { code, center: site.center_name || '', auth: me, cacheDays: CACHE_DAYS, maxMb: MAX_MB, pub: me ? pubOf(site) : '', fixedOn: !!site.fixed_on, wa: me ? (site.wa || '') : '' };
     if (me) db.prepare('UPDATE case_site SET last_seen = ? WHERE customer_id = ?').run(nowTs(), site.customer_id);
-    html(res, 200, page('حالات المرضى — ' + (site.center_name || ''), '<div id="app"></div>', 'k', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/qrcode.js"></script><script src="/cases-kit.js?v=491"></script><script src="/cases-center.js?v=491"></script>'));
+    html(res, 200, page('حالات المرضى — ' + (site.center_name || ''), '<div id="app"></div>', 'k', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/qrcode.js"></script><script src="/cases-kit.js?v=491"></script><script src="/cases-center.js?v=492"></script>'));
     return true;
   }
   if (sub === 'login' && req.method === 'POST') {
@@ -144,7 +149,7 @@ async function centerRoute(req, res, m) {
 
   if (sub === 'list' && req.method === 'GET') {
     const rows = db.prepare('SELECT * FROM case_item WHERE customer_id = ? ORDER BY id DESC LIMIT 500').all(cid).map(itemOut);
-    send(res, 200, { list: rows, online: (LIVE.get(cid) || new Set()).size }); return true;
+    send(res, 200, { list: rows, online: (LIVE.get(cid) || new Set()).size, asks: asksOf(cid) }); return true;
   }
   if (sub === 'live' && req.method === 'GET') {
     res.writeHead(200, { 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
@@ -186,6 +191,17 @@ async function centerRoute(req, res, m) {
     else db.prepare('UPDATE case_item SET active = ? WHERE id = ?').run(act === 'start' ? 1 : 0, it.id);
     send(res, 200, { ok: true }); return true;
   }
+  if (sub === 'wa' && req.method === 'POST') {
+    let b = {}; try { b = await readJson(req, 500); } catch (e) {}
+    const w = waOf(b.wa); if (b.wa && !w) { send(res, 400, { message: 'رقم الواتساب مش مظبوط' }); return true; }
+    db.prepare('UPDATE case_site SET wa = ? WHERE customer_id = ?').run(w ? clean(b.wa, 20) : null, cid);
+    send(res, 200, { ok: true, wa: w ? clean(b.wa, 20) : '' }); return true;
+  }
+  if (sub === 'ask' && req.method === 'POST') {    /* ask/<id>/done, or ask with {phone} → close every open ask of that mobile (a case was just saved for it) */
+    if (arg && act === 'done') db.prepare('UPDATE case_ask SET done = 1 WHERE id = ? AND customer_id = ?').run(Number(arg), cid);
+    else { let b = {}; try { b = await readJson(req, 500); } catch (e) {} const ph = phashOf(b.phone); if (ph) db.prepare('UPDATE case_ask SET done = 1 WHERE customer_id = ? AND phash = ? AND done = 0').run(cid, ph); }
+    send(res, 200, { ok: true, asks: asksOf(cid) }); return true;
+  }
   if (sub === 'fixed' && req.method === 'POST') {
     let b = {}; try { b = await readJson(req, 500); } catch (e) {}
     db.prepare('UPDATE case_site SET fixed_on = ? WHERE customer_id = ?').run(b.on ? 1 : 0, cid);
@@ -222,11 +238,11 @@ async function viewRoute(req, res, token, file) {
   if (req.method !== 'GET') return false;
   const ip = ipOf(req);
   if (limited('v:' + ip, 60, 60e3)) { send(res, 429, { message: 'استنى دقيقة وجرّب تاني' }); return true; }
-  const it = db.prepare('SELECT i.*, s.center_name, s.active AS site_on FROM case_item i LEFT JOIN case_site s ON s.customer_id = i.customer_id WHERE i.token = ?').get(token);
+  const it = db.prepare('SELECT i.*, s.center_name, s.active AS site_on, s.wa AS site_wa, s.pub AS site_pub FROM case_item i LEFT JOIN case_site s ON s.customer_id = i.customer_id WHERE i.token = ?').get(token);
   if (!file) {
     if (!it) { if (limited('vx:' + ip, 40, 600e3)) { send(res, 429, { message: 'حاولت كتير' }); return true; } }
-    const CD = it ? { token, center: it.center_name || '', patient: it.patient, exam: it.exam || '', at: it.created_at, pages: it.pages || 0, size: it.size, name: it.file_name || '', active: !!(it.active && it.site_on), ready: !!(it.cached && it.cache_until > Date.now()) || online(it.customer_id) } : { missing: true };
-    html(res, it ? 200 : 404, page(it ? 'نتيجة الفحص — ' + (it.center_name || '') : 'الحالة مش موجودة', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/pdfjs/pdf.min.js"></script><script src="/cases-view.js?v=491"></script>'));
+    const CD = it ? { token, center: it.center_name || '', patient: it.patient, exam: it.exam || '', at: it.created_at, pages: it.pages || 0, size: it.size, name: it.file_name || '', active: !!(it.active && it.site_on), ready: !!(it.cached && it.cache_until > Date.now()) || online(it.customer_id), wa: waOf(it.site_wa), pub: it.site_pub || '' } : { missing: true };
+    html(res, it ? 200 : 404, page(it ? 'نتيجة الفحص — ' + (it.center_name || '') : 'الحالة مش موجودة', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/pdfjs/pdf.min.js"></script><script src="/cases-view.js?v=492"></script>'));
     return true;
   }
   if (!it) { send(res, 404, { message: 'الحالة مش موجودة' }); return true; }
@@ -253,14 +269,27 @@ async function viewRoute(req, res, token, file) {
 }
 
 /* ════════ 4.91 · the fixed barcode printed on every report: /h/<pub> → the patient types his mobile + first name ════════ */
-async function findRoute(req, res, pub, find) {
+async function findRoute(req, res, pub, sub) {
+  const find = sub === 'find';
   const ip = ipOf(req);
   const site = db.prepare('SELECT * FROM case_site WHERE pub = ? AND active = 1').get(pub);
+  if (sub === 'ask') {   /* 4.92 · «ملقتش نتيجتي» → the center sees it live in its cases page (and the patient's WhatsApp opens) */
+    if (req.method !== 'POST') return false;
+    if (!site) { send(res, 404, { message: 'مش موجود' }); return true; }
+    if (limited('ha:' + ip, 6, 3600e3)) { send(res, 429, { message: 'طلبك وصل — المركز هيرد عليك' }); return true; }
+    let b = {}; try { b = await readJson(req, 1500); } catch (e) { send(res, 400, { message: 'محصلش' }); return true; }
+    const name = clean(b.name, 60), phone = clean(b.phone, 20), ph = phashOf(phone); if (!name || !ph) { send(res, 400, { message: 'اكتب اسمك وموبايلك' }); return true; }
+    const dup = db.prepare('SELECT id FROM case_ask WHERE customer_id = ? AND phash = ? AND done = 0').get(site.customer_id, ph);
+    if (dup) db.prepare('UPDATE case_ask SET name = ?, note = ?, at = ? WHERE id = ?').run(name, clean(b.note, 120), nowTs(), dup.id);
+    else db.prepare('INSERT INTO case_ask (customer_id, name, phone, phash, note, at) VALUES (?,?,?,?,?,?)').run(site.customer_id, name, phone, ph, clean(b.note, 120), nowTs());
+    tell(site.customer_id, 'ask', { asks: asksOf(site.customer_id), name, phone });
+    send(res, 200, { ok: true }); return true;
+  }
   if (!find) {
     if (req.method !== 'GET') return false;
     if (!site) { if (limited('hx:' + ip, 30, 600e3)) { send(res, 429, { message: 'حاولت كتير' }); return true; } }
-    const CD = site ? { pub, center: site.center_name || '', on: !!site.fixed_on } : { missing: true };
-    html(res, site ? 200 : 404, page(site ? 'نتيجتك — ' + (site.center_name || '') : 'اللينك مش شغال', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/cases-kit.js?v=491"></script><script src="/cases-find.js?v=491"></script>'));
+    const CD = site ? { pub, center: site.center_name || '', on: !!site.fixed_on, wa: waOf(site.wa) } : { missing: true };
+    html(res, site ? 200 : 404, page(site ? 'نتيجتك — ' + (site.center_name || '') : 'اللينك مش شغال', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/cases-kit.js?v=491"></script><script src="/cases-find.js?v=492"></script>'));
     return true;
   }
   if (req.method !== 'POST') return false;
@@ -277,7 +306,7 @@ async function findRoute(req, res, pub, find) {
 /* ════════ the admin side: /api/portal/cases* (server.js checks admin) ════════ */
 async function adminApi(req, res, pathname, me) {
   const q = new URL(req.url, 'http://x').searchParams;
-  const siteOut = s => s ? { code: s.code, pub: pubOf(s), fixed: !!s.fixed_on, active: !!s.active, created_at: s.created_at, last_seen: s.last_seen, online: online(s.customer_id), cases: db.prepare('SELECT COUNT(*) AS n FROM case_item WHERE customer_id = ?').get(s.customer_id).n, views: db.prepare('SELECT COALESCE(SUM(views),0) AS n FROM case_item WHERE customer_id = ?').get(s.customer_id).n } : null;
+  const siteOut = s => s ? { code: s.code, pub: pubOf(s), fixed: !!s.fixed_on, wa: s.wa || '', asks: db.prepare('SELECT COUNT(*) AS n FROM case_ask WHERE customer_id = ? AND done = 0').get(s.customer_id).n, active: !!s.active, created_at: s.created_at, last_seen: s.last_seen, online: online(s.customer_id), cases: db.prepare('SELECT COUNT(*) AS n FROM case_item WHERE customer_id = ?').get(s.customer_id).n, views: db.prepare('SELECT COALESCE(SUM(views),0) AS n FROM case_item WHERE customer_id = ?').get(s.customer_id).n } : null;
   if (req.method === 'GET' && pathname === '/api/portal/cases') {
     const cid = String(q.get('cid') || '');
     if (cid) return send(res, 200, { site: siteOut(db.prepare('SELECT * FROM case_site WHERE customer_id = ?').get(cid)) });
@@ -293,10 +322,11 @@ async function adminApi(req, res, pathname, me) {
     if (pathname === '/api/portal/cases/make') {
       const pass = newPass();
       if (cur) db.prepare('UPDATE case_site SET pass = ?, ver = ver + 1, active = 1, center_name = ? WHERE customer_id = ?').run(hashPass(pass), clean(b.name, 120) || cur.center_name, cid);
-      else { let code; do { code = rnd(8, true); } while (db.prepare('SELECT 1 FROM case_site WHERE code = ?').get(code)); db.prepare('INSERT INTO case_site (customer_id, center_name, code, pass, created_at, created_by) VALUES (?,?,?,?,?,?)').run(cid, clean(b.name, 120), code, hashPass(pass), nowTs(), who); }
+      else { let code; do { code = rnd(8, true); } while (db.prepare('SELECT 1 FROM case_site WHERE code = ?').get(code)); db.prepare('INSERT INTO case_site (customer_id, center_name, code, pass, created_at, created_by, wa) VALUES (?,?,?,?,?,?,?)').run(cid, clean(b.name, 120), code, hashPass(pass), nowTs(), who, waOf(b.wa) ? clean(b.wa, 20) : null); }
       return send(res, 200, { ok: true, pass, site: siteOut(db.prepare('SELECT * FROM case_site WHERE customer_id = ?').get(cid)) });
     }
     if (!cur) return send(res, 404, { message: 'مفيش لينك حالات للمركز ده' });
+    if (pathname === '/api/portal/cases/wa') { const w = waOf(b.wa); if (b.wa && !w) return send(res, 400, { message: 'رقم الواتساب مش مظبوط' }); if (!b.ifEmpty || !cur.wa) db.prepare('UPDATE case_site SET wa = ? WHERE customer_id = ?').run(w ? clean(b.wa, 20) : null, cid); return send(res, 200, { ok: true, site: siteOut(db.prepare('SELECT * FROM case_site WHERE customer_id = ?').get(cid)) }); }
     if (pathname === '/api/portal/cases/pass') { const pass = newPass(); db.prepare('UPDATE case_site SET pass = ?, ver = ver + 1 WHERE customer_id = ?').run(hashPass(pass), cid); for (const r of (LIVE.get(cid) || [])) { try { r.end(); } catch (e) {} } return send(res, 200, { ok: true, pass }); }
     if (pathname === '/api/portal/cases/stop') { db.prepare('UPDATE case_site SET active = ? WHERE customer_id = ?').run(b.on ? 1 : 0, cid); if (!b.on) for (const r of (LIVE.get(cid) || [])) { try { r.end(); } catch (e) {} } return send(res, 200, { ok: true, site: siteOut(db.prepare('SELECT * FROM case_site WHERE customer_id = ?').get(cid)) }); }
     if (pathname === '/api/portal/cases/rotate') { let code; do { code = rnd(8, true); } while (db.prepare('SELECT 1 FROM case_site WHERE code = ?').get(code)); db.prepare('UPDATE case_site SET code = ?, ver = ver + 1 WHERE customer_id = ?').run(code, cid); for (const r of (LIVE.get(cid) || [])) { try { r.end(); } catch (e) {} } return send(res, 200, { ok: true, site: siteOut(db.prepare('SELECT * FROM case_site WHERE customer_id = ?').get(cid)) }); }

@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   var C = window.CD || {}, BASE = '/k/' + C.code, $ = function (id) { return document.getElementById(id); }, K = window.OZK;
-  var ui = { list: [], local: {}, q: '', f: 'all', queue: [], live: false, es: null, fixed: !!C.fixedOn, dir: null, dirName: '', seen: {}, watchT: 0, pend: {}, auto: false, lastScan: 0 };
+  var ui = { asks: [], wa: C.wa || '', prefill: null, list: [], local: {}, q: '', f: 'all', queue: [], live: false, es: null, fixed: !!C.fixedOn, dir: null, dirName: '', seen: {}, watchT: 0, pend: {}, auto: false, lastScan: 0 };
   var QID = 0;
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function toast(t) { var el = $('toast'); if (!el) return; el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function () { el.classList.remove('on'); }, 3000); }
@@ -72,7 +72,7 @@
         '<div class="opt b" id="fx"></div></div>' +
       '<div class="upz"><div class="drop" id="drop"><span class="ic">📄</span><div><b>اسحب ملفات PDF هنا</b><small>ملف واحد أو كذا ملف مرة واحدة · لحد ' + C.maxMb + ' ميجا للملف · بنحاول نقرا الاسم والموبايل من الملف</small></div><div class="db"><button class="btn" id="pk" type="button">＋ اختار ملفات</button></div><input type="file" id="fi" accept="application/pdf,.pdf" multiple hidden></div>' +
         (dirOk ? '<div class="watch" id="wt"></div>' : '') + '</div>' +
-      '<div class="queue" id="qu"></div>' +
+      '<div id="asks"></div><div class="queue" id="qu"></div>' +
       '<div class="card list"><div class="ch"><h2>الحالات</h2><div class="chips" id="fl"></div><input class="fld q" id="q" placeholder="🔍 اسم المريض أو الموبايل أو الفحص"></div><div id="tbl"><div class="emp"><div class="spin"></div></div></div></div>' +
       '<div class="disk" id="disk">💾 <span>بنحسب المساحة…</span></div></div><div class="toast" id="toast"></div>';
     $('out').onclick = function () { api('POST', 'logout').then(function () { location.reload(); }).catch(function () { location.reload(); }); };
@@ -101,11 +101,14 @@
     el.innerHTML = '<span class="qm' + (ui.fixed ? '' : ' off') + '" id="fqm" title="كبّر">' + qrSvg(fixedUrl()) + '</span><div style="flex:1;min-width:0"><h3>📌 باركود ثابت على كل الورق <span class="tg pn">جديد</span><button class="sw' + (ui.fixed ? ' on' : '') + '" id="fsw" type="button" aria-label="تشغيل/إيقاف"></button></h3>' +
       '<p>باركود واحد للمركز تحطه في هيدر سيرفر الطباعة، فيتطبع على كل التقارير. المريض يمسحه ← يكتب <b>رقم موبايله</b> و<b>أول اسمه</b> ← يوصل لحالته.</p>' +
       '<div class="ob"><button class="btn sm" id="fh">⬇ صورة الهيدر</button><button class="btn g sm" id="fq">⬇ الباركود لوحده</button><button class="btn g sm" id="fp">🖨 اطبع</button><button class="btn g sm" id="fc">نسخ اللينك</button></div>' +
-      '<p style="font-size:12px;margin-top:8px">' + (ui.fixed ? '✅ شغال — لازم تكتب موبايل المريض مع كل حالة عشان يلاقيها.' : '⏸ موقوف — المرضى مش هيقدروا يدوّروا.') + '</p></div>';
+      '<p style="font-size:12px;margin-top:8px">' + (ui.fixed ? '✅ شغال — لازم تكتب موبايل المريض مع كل حالة عشان يلاقيها.' : '⏸ موقوف — المرضى مش هيقدروا يدوّروا.') + '</p>' +
+      '<div class="wa2"><span>💬 واتساب طلبات المرضى:</span><input class="fld n" id="fwa" maxlength="20" inputmode="tel" placeholder="01xxxxxxxxx" style="text-align:right" value="' + esc(ui.wa) + '"><button class="btn g sm" id="fws">حفظ</button></div>' +
+      '<p style="font-size:11.5px;color:var(--mut);margin-top:4px">' + (ui.wa ? 'المريض اللي مايلاقيش نتيجته بيلاقي زرار يبعتلكم على الرقم ده، والطلب بيظهر هنا.' : '⚠ اكتب رقم واتساب المركز عشان المريض اللي مايلاقيش نتيجته يقدر يطلبها.') + '</p></div>';
     $('fsw').onclick = function () { var on = !ui.fixed; api('POST', 'fixed', { on: on }).then(function () { ui.fixed = on; fixedCard(); toast(on ? '📌 الباركود الثابت اشتغل' : '⏸ الباركود الثابت اتوقف'); }).catch(function (e) { toast(e.message); }); };
     $('fh').onclick = function () { headerPng(function (u) { dl(u, 'هيدر-باركود-' + C.center + '.png'); }); };
     $('fq').onclick = function () { qrPng(function (u) { dl(u, 'باركود-' + C.center + '.png'); }); };
     $('fp').onclick = printFixed;
+    $('fws').onclick = function () { var v = $('fwa').value.trim(); api('POST', 'wa', { wa: v }).then(function (r) { ui.wa = r.wa || ''; fixedCard(); toast(ui.wa ? '💬 اتحفظ رقم الواتساب' : 'اتشال رقم الواتساب'); }).catch(function (e) { toast(e.message); }); };
     $('fc').onclick = function () { try { navigator.clipboard.writeText(fixedUrl()).then(function () { toast('اتنسخ ✓'); }); } catch (e) {} };
     $('fqm').onclick = function () { headerPng(function (u) { modal('<h3>📌 الباركود الثابت</h3><p>حط الصورة دي في هيدر التقارير على سيرفر الطباعة</p><div class="qbig">' + qrSvg(fixedUrl()) + '</div><img class="hdr" src="' + u + '" alt=""><div class="lk"><input readonly value="' + esc(fixedUrl()) + '"></div><div class="bt"><button class="btn" data-x="h">⬇ صورة الهيدر</button><button class="btn g" data-x="p">🖨 اطبع</button></div><button class="btn g w" data-x="cl" style="margin-top:8px">تمام</button>', function (k) { if (k === 'h') dl(u, 'هيدر-باركود-' + C.center + '.png'); if (k === 'p') printFixed(); }); }); };
   }
@@ -169,9 +172,12 @@
     files.forEach(function (f) {
       if (f.size > C.maxMb * 1048576) return toast(f.name + ' أكبر من ' + C.maxMb + ' ميجا');
       var q = { id: ++QID, file: f, name: f.name, size: f.size, pages: 0, thumb: '', patient: '', phone: '', exam: '', st: 'ready', af: '', dir: !!fromDir };
-      var g = f.name.replace(/\.pdf$/i, '').replace(/[_\-.]+/g, ' ').replace(/\d{5,}/g, ' ').replace(/\s+/g, ' ').trim(); if (/[؀-ۿ]/.test(g)) q.patient = g.slice(0, 80);
+      if (ui.prefill && files.length === 1) { q.patient = ui.prefill.patient || ''; q.phone = ui.prefill.phone || ''; }
+      var g = f.name.replace(/\.pdf$/i, '').replace(/[_\-.]+/g, ' ').replace(/\d{5,}/g, ' ').replace(/\s+/g, ' ').trim(); 
+      if (!q.patient && /[؀-ۿ]/.test(g)) q.patient = g.slice(0, 80);
       ui.queue.push(q); readPdf(q);
     });
+    ui.prefill = null;
     queue();
     if (fromDir) { beep(); toast('📄 ' + (files.length > 1 ? files.length + ' ملفات جديدة' : 'ملف جديد') + ' من فولدر سيرفر الطباعة'); }
   }
@@ -255,6 +261,7 @@
       .then(function (r) {
         ui.local[r.item.token] = { key: rawKey, size: r.blob.size, thumb: q.thumb };
         ui.list.unshift(r.item); q.st = 'done'; q.token = r.item.token; q.wrapped = !!wrapped; q.file = null;
+        if (K.last10(q.phone) && ui.asks.some(function (a) { return K.last10(a.phone) === K.last10(q.phone); })) api('POST', 'ask', { phone: q.phone }).then(function (x) { ui.asks = x.asks || []; asks(); toast('✅ ' + q.patient + ' اتحفظت — وطلبه اتقفل'); }).catch(function () {});
         queue(); table(); stats(); disk();
         var open = ui.queue.filter(function (x) { return x.st !== 'gone' && x.st !== 'done'; }).length;
         if (!quiet && !open && ui.queue.filter(function (x) { return x.st === 'done'; }).length === 1) { showQr(r.item.token, true); setTimeout(function () { q.st = 'gone'; queue(); }, 400); }
@@ -305,6 +312,23 @@
       var h = a[0]; if (!h) return watchBar();
       ui.dir = h; ui.dirName = h.name;
       h.queryPermission({ mode: 'read' }).then(function (p) { if (p === 'granted') startWatch(); else { ui.dirNeed = true; watchBar(); } }).catch(function () { ui.dirNeed = true; watchBar(); });
+    });
+  }
+
+  /* ── 4.92 · patients who didn't find their result and asked on WhatsApp ── */
+  function asks() {
+    var el = $('asks'); if (!el) return; var L = ui.asks || [];
+    if (!L.length) { el.innerHTML = ''; return; }
+    el.innerHTML = '<div class="asks"><div class="ah"><span style="font-size:20px">📨</span><b>مرضى بيطلبوا نتايجهم</b><em>' + L.length + '</em><small style="color:var(--mut);margin-inline-start:auto">دوّروا بالباركود الثابت ومالقوش نتيجتهم</small></div>' +
+      L.map(function (a) { return '<div class="ar' + (ui.newAsk && K.last10(a.phone) === ui.newAsk ? ' new' : '') + '" data-id="' + a.id + '"><span class="ai">🙋</span><div><b>' + esc(a.name) + ' <span class="n" style="font-weight:600;color:var(--mut)">' + esc(a.phone) + '</span></b><small>' + when(a.at) + (a.note ? ' · ' + esc(a.note) : '') + '</small></div><div class="acts"><button class="btn sm" data-k="up">📂 ارفع حالته</button><button class="btn g sm" data-k="wa" style="color:#15803D">واتساب</button><button class="btn g sm" data-k="ok" title="خلصت">✓</button></div></div>'; }).join('') + '</div>';
+    ui.newAsk = null;
+    [].forEach.call(el.querySelectorAll('[data-k]'), function (b) {
+      b.onclick = function () {
+        var id = +b.closest('.ar').dataset.id, a = L.filter(function (x) { return x.id === id; })[0]; if (!a) return; var k = b.dataset.k;
+        if (k === 'up') { ui.prefill = { patient: a.name, phone: a.phone }; clearTimeout(ui.pfT); ui.pfT = setTimeout(function () { ui.prefill = null; }, 120000); $('fi').click(); }
+        if (k === 'wa') { var ph = phoneWa(a.phone); if (ph) window.open('https://wa.me/' + ph + '?text=' + encodeURIComponent('أهلاً ' + a.name + ' 🌿\nطلبك وصل ' + C.center + '، وبنجهّز نتيجتك وهنبعتهالك حالاً 🙏'), '_blank'); }
+        if (k === 'ok') api('POST', 'ask/' + id + '/done').then(function (x) { ui.asks = x.asks || []; asks(); }).catch(function (e) { toast(e.message); });
+      };
     });
   }
 
@@ -428,6 +452,10 @@
         return fetch(BASE + '/relay/' + m.ticket, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream' }, body: rec.blob });
       }).catch(function () {});
     });
+    es.addEventListener('ask', function (ev) {
+      var m = {}; try { m = JSON.parse(ev.data); } catch (e) { return; }
+      ui.asks = m.asks || ui.asks; ui.newAsk = K.last10(m.phone); asks(); beep(); toast('📨 ' + (m.name || 'مريض') + ' بيطلب نتيجته');
+    });
     es.addEventListener('view', function (ev) {
       var m = {}; try { m = JSON.parse(ev.data); } catch (e) { return; }
       var r = itemOf(m.token); if (r) { r.views = m.views; r.last_view = m.last_view; }
@@ -446,7 +474,7 @@
   }
   function boot() {
     shell();
-    Promise.all([api('GET', 'list'), localAll()]).then(function (a) { ui.list = a[0].list || []; ui.local = a[1] || {}; table(); stats(); disk(); backfill(); }).catch(function (e) { $('tbl').innerHTML = '<div class="emp"><i>⚠️</i>' + esc(e.message) + '</div>'; });
+    Promise.all([api('GET', 'list'), localAll()]).then(function (a) { ui.list = a[0].list || []; ui.local = a[1] || {}; ui.asks = a[0].asks || []; asks(); table(); stats(); disk(); backfill(); }).catch(function (e) { $('tbl').innerHTML = '<div class="emp"><i>⚠️</i>' + esc(e.message) + '</div>'; });
     connect(); bootWatch();
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && (!ui.es || ui.es.readyState === 2)) connect(); });
     window.addEventListener('beforeunload', function (e) { if (Object.keys(ui.local).length || ui.queue.some(function (q) { return q.st === 'ready' || q.st === 'saving'; })) { e.preventDefault(); e.returnValue = ''; } });

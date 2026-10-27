@@ -20,7 +20,9 @@
     document.body.innerHTML = '<div class="w">' + head + '<div class="pt"><small>المريض</small><h1>' + esc(C.patient) + '</h1><div class="m">' + (C.exam ? '<span>🩻 ' + esc(C.exam) + '</span>' : '') + '<span>📅 ' + dmy(C.at) + '</span>' + (C.pages ? '<span>📄 ' + C.pages + ' صفحة</span>' : '') + '</div></div>' +
       '<div id="body"></div><p class="foot">الملف متشفّر — بيتفتح بس بالباركود ده. · ' + esc(C.center || '') + '</p></div>';
   }
-  function box(icon, title, sub, extra) { $('body').innerHTML = '<div class="ld">' + (icon === 'spin' ? '<div class="spin"></div>' : '<i>' + icon + '</i>') + '<b>' + title + '</b>' + (sub ? '<p>' + sub + '</p>' : '') + (extra || '') + '</div>'; }
+  /* 4.92 · stuck (center offline / file missing / stopped) → ask the center on WhatsApp */
+  function waBtn() { if (!C.wa) return ''; var t = 'السلام عليكم ' + (C.center || '') + ' 🌿\nأنا ' + (C.patient || '') + '\nحاولت أفتح نتيجة ' + (C.exam || 'الأشعة') + ' بتاعتي' + (C.at ? ' (' + dmy(C.at) + ')' : '') + ' ومفتحتش، ممكن تبعتوهالي؟ 🙏'; return '<a class="btn wa" style="margin-top:10px" href="https://wa.me/' + C.wa + '?text=' + encodeURIComponent(t) + '">💬 اطلبها من المركز واتساب</a>'; }
+  function box(icon, title, sub, extra) { if (icon !== 'spin' && icon !== '🔑') extra = (extra || '') + waBtn(); $('body').innerHTML = '<div class="ld">' + (icon === 'spin' ? '<div class="spin"></div>' : '<i>' + icon + '</i>') + '<b>' + title + '</b>' + (sub ? '<p>' + sub + '</p>' : '') + (extra || '') + '</div>'; }
 
   function load() {
     if (!C.active) return box('⏸', 'الحالة دي اتوقفت', 'كلّم المركز لو محتاجها.');

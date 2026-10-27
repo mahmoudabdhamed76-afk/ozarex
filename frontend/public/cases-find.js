@@ -32,7 +32,7 @@
       .then(function (L) { return Promise.all(L.map(function (x) { return K.unwrap(x.w, nm, ph).then(function (k) { return k ? { x: x, k: k } : null; }); })); })
       .then(function (M) {
         M = M.filter(Boolean); b.disabled = false; b.innerHTML = '🔍 دوّر على نتيجتي';
-        if (!M.length) { er.textContent = ''; $('res').innerHTML = '<div class="ld"><i>🤔</i><b>ملقيناش نتيجة بالبيانات دي</b><p>اتأكد إن الرقم هو اللي اتسجّل في المركز، والاسم الأول مكتوب زي ما اتكتب هناك. لو النتيجة لسه طالعة النهارده جرّب بعد شوية.</p></div>'; return; }
+        if (!M.length) { er.textContent = ''; notFound(ph, nm); return; }
         try { sessionStorage.setItem('ozx_find', JSON.stringify({ p: ph, n: nm })); sessionStorage.setItem('ozx_back', location.pathname.replace(/\/$/, '')); } catch (e) {}
         var href = function (m) { return '/v/' + m.x.token + '#' + m.k; };
         if (M.length === 1) { $('res').innerHTML = '<div class="ld"><i>✅</i><b>لقينا نتيجتك</b><p>بنفتحها…</p></div>'; setTimeout(function () { location.href = href(M[0]); }, 450); return; }
@@ -42,5 +42,18 @@
       })
       .catch(function (e) { b.disabled = false; b.innerHTML = '🔍 دوّر على نتيجتي'; er.textContent = e.message; });
   };
+  /* 4.92 · not found → ask the center on WhatsApp (and the center sees the request live on its cases page) */
+  function waText(ph, nm, note) { return 'السلام عليكم ' + (C.center || '') + ' 🌿\nأنا ' + nm + ' — رقم موبايلي ' + ph + '\nدوّرت على نتيجة الأشعة بتاعتي ومالقيتهاش' + (note ? ' (' + note + ')' : '') + '، ممكن تبعتوهالي؟ 🙏'; }
+  function notFound(ph, nm) {
+    $('res').innerHTML = '<div class="ld"><i>🤔</i><b>ملقيناش نتيجة بالبيانات دي</b><p>اتأكد إن الرقم هو اللي اتسجّل في المركز، والاسم الأول مكتوب زي ما اتكتب هناك. لو النتيجة لسه طالعة النهارده جرّب بعد شوية.</p>' +
+      (C.wa ? '<div class="ask"><input class="fld" id="nt" maxlength="100" placeholder="نوع الفحص وتاريخه (اختياري) — مثلاً: مقطعية يوم 25/10"><button class="btn wa" id="wa">💬 اطلب نتيجتك من المركز واتساب</button><small>هيتفتح واتساب برسالة جاهزة للمركز، وهم هيبعتولك النتيجة.</small></div>' : '<p style="margin-top:10px;font-weight:700">كلّم المركز وهيبعتولك النتيجة.</p>') + '</div>';
+    var b = $('wa'); if (!b) return;
+    b.onclick = function () {
+      var note = ($('nt') || {}).value || '', name = String(nm).trim();
+      try { fetch(location.pathname.replace(/\/$/, '') + '/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, phone: ph, note: note }), keepalive: true }).catch(function () {}); } catch (e) {}
+      location.href = 'https://wa.me/' + C.wa + '?text=' + encodeURIComponent(waText(ph, name, note));
+      b.innerHTML = '✅ اتفتح واتساب — ابعت الرسالة'; 
+    };
+  }
   $('go').onclick = go; $('nm').onkeydown = $('ph').onkeydown = function (e) { if (e.key === 'Enter') go(); };
 })();
