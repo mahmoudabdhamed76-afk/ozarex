@@ -26,6 +26,16 @@ CREATE TABLE IF NOT EXISTS case_item (
 );
 CREATE INDEX IF NOT EXISTS ix_case_item ON case_item (customer_id, id);
 CREATE TABLE IF NOT EXISTS case_kv (k TEXT PRIMARY KEY, v TEXT)`);
+/* 4.91 · الباركود الثابت للورق: كود عام للمركز (/h/<pub>) + مفتاح كل حالة متغلّف بموبايل المريض وأول اسمه */
+try {
+  const sc = db.prepare('PRAGMA table_info(case_site)').all().map(c => c.name);
+  if (!sc.includes('pub')) db.exec('ALTER TABLE case_site ADD COLUMN pub TEXT');
+  if (!sc.includes('fixed_on')) db.exec('ALTER TABLE case_site ADD COLUMN fixed_on INTEGER NOT NULL DEFAULT 1');
+  const ic = db.prepare('PRAGMA table_info(case_item)').all().map(c => c.name);
+  if (!ic.includes('phash')) db.exec('ALTER TABLE case_item ADD COLUMN phash TEXT');
+  if (!ic.includes('wrap')) db.exec('ALTER TABLE case_item ADD COLUMN wrap TEXT');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_case_pub ON case_site (pub); CREATE INDEX IF NOT EXISTS ix_case_phash ON case_item (customer_id, phash)');
+} catch (e) { console.error('[cases] migrate', e.message); }
 
 const DIR = path.join(DATA_DIR, 'cases');
 try { fs.mkdirSync(DIR, { recursive: true }); } catch (e) {}
@@ -47,6 +57,11 @@ function passOk(p, h) { try { const [s, k] = String(h).split(':'); const a = cry
 const isHttps = req => String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https' || !!(req.socket && req.socket.encrypted);
 const ipOf = req => String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
 const fileOf = tok => path.join(DIR, tok + '.bin');
+/* the patient's mobile → its last 10 digits (01xxxxxxxxx / +201xxxxxxxxx / 1xxxxxxxxx all match) → keyed hash */
+function last10(p) { const d = String(p || '').replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 0x660)).replace(/\D/g, ''); return d.length >= 8 ? d.slice(-10) : ''; }
+function phashOf(p) { const d = last10(p); return d ? crypto.createHmac('sha256', SECRET).update('ph:' + d).digest('base64url').slice(0, 32) : null; }
+function pubOf(site) { if (site.pub) return site.pub; let p; do { p = rnd(8, true); } while (db.prepare('SELECT 1 FROM case_site WHERE pub = ?').get(p)); db.prepare('UPDATE case_site SET pub = ? WHERE customer_id = ?').run(p, site.customer_id); site.pub = p; return p; }
+function maskName(n) { return String(n || '').trim().split(/\s+/).slice(0, 3).map(w => w.charAt(0) + '•••').join(' '); }
 
 /* ── center session cookie: code.exp.ver.sig (logs out everywhere when the password changes) ── */
 const SESSION_DAYS = 30;
@@ -85,18 +100,20 @@ function send(res, code, o, h) { res.writeHead(code, Object.assign({ 'Content-Ty
 function readJson(req, max) {
   return new Promise((ok, no) => { const ch = []; let n = 0; req.on('data', c => { n += c.length; if (n > max) { no(Object.assign(new Error('كبير'), { status: 413 })); req.destroy(); } else ch.push(c); }); req.on('end', () => { try { ok(JSON.parse(Buffer.concat(ch).toString('utf8') || '{}')); } catch (e) { no(Object.assign(new Error('bad'), { status: 400 })); } }); req.on('error', no); });
 }
-function itemOut(r) { return { id: r.id, token: r.token, patient: r.patient, phone: r.phone, exam: r.exam, name: r.file_name, size: r.size, pages: r.pages, at: r.created_at, views: r.views, last_view: r.last_view, active: !!r.active, cached: !!r.cached && r.cache_until > Date.now(), cache_until: r.cache_until }; }
+function itemOut(r) { return { id: r.id, token: r.token, patient: r.patient, phone: r.phone, exam: r.exam, name: r.file_name, size: r.size, pages: r.pages, at: r.created_at, views: r.views, last_view: r.last_view, active: !!r.active, cached: !!r.cached && r.cache_until > Date.now(), cache_until: r.cache_until, wrapped: !!r.wrap }; }
 
 function page(title, body, css, js) {
   return '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><meta name="theme-color" content="#0E9F9A">' +
-    '<title>' + esc(title) + '</title><link rel="icon" href="/icons/favicon-32.png"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/cases.css?v=490"></head><body class="' + css + '">' + body + js + '</body></html>';
+    '<title>' + esc(title) + '</title><link rel="icon" href="/icons/favicon-32.png"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/cases.css?v=491"></head><body class="' + css + '">' + body + js + '</body></html>';
 }
 function html(res, code, s) { res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' }); res.end(s); }
 
 /* ════════ public routes ════════ */
 async function handle(req, res, pathname) {
-  let m = /^\/k\/([A-Za-z0-9]{8})(\/(login|logout|list|live|case|relay|item)(\/[A-Za-z0-9]{6,20})?(\/(stop|start|delete))?)?\/?$/.exec(pathname);
+  let m = /^\/k\/([A-Za-z0-9]{8})(\/(login|logout|list|live|case|relay|item|fixed)(\/[A-Za-z0-9]{6,20})?(\/(stop|start|delete|wrap))?)?\/?$/.exec(pathname);
   if (m) return centerRoute(req, res, m);
+  m = /^\/h\/([A-Za-z0-9]{8})(\/find)?\/?$/.exec(pathname);
+  if (m) return findRoute(req, res, m[1], !!m[2]);
   m = /^\/v\/([A-Za-z0-9]{12})(\/file)?\/?$/.exec(pathname);
   if (m) return viewRoute(req, res, m[1], !!m[2]);
   return false;
@@ -110,9 +127,9 @@ async function centerRoute(req, res, m) {
   const me = authed(req, site);
   if (!sub) {
     if (req.method !== 'GET') return false;
-    const CD = { code, center: site.center_name || '', auth: me, cacheDays: CACHE_DAYS, maxMb: MAX_MB };
+    const CD = { code, center: site.center_name || '', auth: me, cacheDays: CACHE_DAYS, maxMb: MAX_MB, pub: me ? pubOf(site) : '', fixedOn: !!site.fixed_on };
     if (me) db.prepare('UPDATE case_site SET last_seen = ? WHERE customer_id = ?').run(nowTs(), site.customer_id);
-    html(res, 200, page('حالات المرضى — ' + (site.center_name || ''), '<div id="app"></div>', 'k', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/qrcode.js"></script><script src="/cases-center.js?v=490"></script>'));
+    html(res, 200, page('حالات المرضى — ' + (site.center_name || ''), '<div id="app"></div>', 'k', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/qrcode.js"></script><script src="/cases-kit.js?v=491"></script><script src="/cases-center.js?v=491"></script>'));
     return true;
   }
   if (sub === 'login' && req.method === 'POST') {
@@ -144,8 +161,9 @@ async function centerRoute(req, res, m) {
     let token; do { token = rnd(12); } while (db.prepare('SELECT 1 FROM case_item WHERE token = ?').get(token));
     const keep = cacheBytes() + len < CACHE_CAP, tmp = fileOf(token) + '.part';
     const done = n => {
-      const r = db.prepare('INSERT INTO case_item (customer_id, token, patient, phone, exam, file_name, size, pages, created_at, cache_until, cached) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-        .run(cid, token, patient, clean(meta.phone, 20), clean(meta.exam, 80), clean(meta.name, 120), n, Math.max(0, Math.min(5000, Number(meta.pages) || 0)) || null, nowTs(), Date.now() + CACHE_DAYS * 864e5, keep ? 1 : 0);
+      const wrap = meta.wrap && typeof meta.wrap === 'object' ? JSON.stringify({ s: clean(meta.wrap.s, 40), i: clean(meta.wrap.i, 40), k: clean(meta.wrap.k, 120) }) : null;
+      const r = db.prepare('INSERT INTO case_item (customer_id, token, patient, phone, exam, file_name, size, pages, created_at, cache_until, cached, phash, wrap) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        .run(cid, token, patient, clean(meta.phone, 20), clean(meta.exam, 80), clean(meta.name, 120), n, Math.max(0, Math.min(5000, Number(meta.pages) || 0)) || null, nowTs(), Date.now() + CACHE_DAYS * 864e5, keep ? 1 : 0, phashOf(meta.phone), wrap);
       send(res, 200, { ok: true, item: itemOut(db.prepare('SELECT * FROM case_item WHERE id = ?').get(Number(r.lastInsertRowid))) });
     };
     if (!keep) { let n = 0; req.on('data', c => { n += c.length; }); req.on('end', () => done(n)); return true; }
@@ -158,9 +176,20 @@ async function centerRoute(req, res, m) {
   }
   if (sub === 'item' && arg && act && req.method === 'POST') {
     const it = db.prepare('SELECT * FROM case_item WHERE token = ? AND customer_id = ?').get(arg, cid); if (!it) { send(res, 404, { message: 'مش موجودة' }); return true; }
+    if (act === 'wrap') {   /* a case saved before 4.91 gets its wrapped key later, from the computer that holds it */
+      let b = {}; try { b = await readJson(req, 2000); } catch (e) { send(res, 400, { message: 'محصلش' }); return true; }
+      if (!b.s || !b.i || !b.k) { send(res, 400, { message: 'ناقص' }); return true; }
+      db.prepare('UPDATE case_item SET wrap = ?, phash = COALESCE(phash, ?) WHERE id = ?').run(JSON.stringify({ s: clean(b.s, 40), i: clean(b.i, 40), k: clean(b.k, 120) }), phashOf(it.phone), it.id);
+      send(res, 200, { ok: true }); return true;
+    }
     if (act === 'delete') { try { fs.unlinkSync(fileOf(it.token)); } catch (e) {} db.prepare('DELETE FROM case_item WHERE id = ?').run(it.id); }
     else db.prepare('UPDATE case_item SET active = ? WHERE id = ?').run(act === 'start' ? 1 : 0, it.id);
     send(res, 200, { ok: true }); return true;
+  }
+  if (sub === 'fixed' && req.method === 'POST') {
+    let b = {}; try { b = await readJson(req, 500); } catch (e) {}
+    db.prepare('UPDATE case_site SET fixed_on = ? WHERE customer_id = ?').run(b.on ? 1 : 0, cid);
+    send(res, 200, { ok: true, on: !!b.on }); return true;
   }
   if (sub === 'relay' && arg && req.method === 'POST') {     /* the center's page answering a patient who is waiting right now */
     const t = TICKETS.get(arg);
@@ -197,7 +226,7 @@ async function viewRoute(req, res, token, file) {
   if (!file) {
     if (!it) { if (limited('vx:' + ip, 40, 600e3)) { send(res, 429, { message: 'حاولت كتير' }); return true; } }
     const CD = it ? { token, center: it.center_name || '', patient: it.patient, exam: it.exam || '', at: it.created_at, pages: it.pages || 0, size: it.size, name: it.file_name || '', active: !!(it.active && it.site_on), ready: !!(it.cached && it.cache_until > Date.now()) || online(it.customer_id) } : { missing: true };
-    html(res, it ? 200 : 404, page(it ? 'نتيجة الفحص — ' + (it.center_name || '') : 'الحالة مش موجودة', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/pdfjs/pdf.min.js"></script><script src="/cases-view.js?v=490"></script>'));
+    html(res, it ? 200 : 404, page(it ? 'نتيجة الفحص — ' + (it.center_name || '') : 'الحالة مش موجودة', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/pdfjs/pdf.min.js"></script><script src="/cases-view.js?v=491"></script>'));
     return true;
   }
   if (!it) { send(res, 404, { message: 'الحالة مش موجودة' }); return true; }
@@ -223,10 +252,32 @@ async function viewRoute(req, res, token, file) {
   return true;
 }
 
+/* ════════ 4.91 · the fixed barcode printed on every report: /h/<pub> → the patient types his mobile + first name ════════ */
+async function findRoute(req, res, pub, find) {
+  const ip = ipOf(req);
+  const site = db.prepare('SELECT * FROM case_site WHERE pub = ? AND active = 1').get(pub);
+  if (!find) {
+    if (req.method !== 'GET') return false;
+    if (!site) { if (limited('hx:' + ip, 30, 600e3)) { send(res, 429, { message: 'حاولت كتير' }); return true; } }
+    const CD = site ? { pub, center: site.center_name || '', on: !!site.fixed_on } : { missing: true };
+    html(res, site ? 200 : 404, page(site ? 'نتيجتك — ' + (site.center_name || '') : 'اللينك مش شغال', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/cases-kit.js?v=491"></script><script src="/cases-find.js?v=491"></script>'));
+    return true;
+  }
+  if (req.method !== 'POST') return false;
+  if (!site || !site.fixed_on) { send(res, 404, { message: 'البحث مقفول في المركز ده' }); return true; }
+  if (limited('hf:' + ip, 12, 600e3)) { send(res, 429, { message: 'حاولت كتير — جرّب بعد 10 دقايق' }); return true; }
+  let b = {}; try { b = await readJson(req, 1000); } catch (e) { send(res, 400, { message: 'محصلش' }); return true; }
+  const ph = phashOf(b.phone); if (!ph) { send(res, 400, { message: 'اكتب رقم الموبايل صح' }); return true; }
+  if (limited('hp:' + pub + ':' + ph, 25, 864e5)) { send(res, 429, { message: 'الرقم ده اتدوّر عليه كتير النهارده — كلّم المركز' }); return true; }
+  const rows = db.prepare('SELECT token, patient, exam, created_at, pages, wrap FROM case_item WHERE customer_id = ? AND phash = ? AND active = 1 AND wrap IS NOT NULL ORDER BY id DESC LIMIT 30').all(site.customer_id, ph);
+  send(res, 200, { list: rows.map(r => { let w = null; try { w = JSON.parse(r.wrap); } catch (e) {} return { token: r.token, hint: maskName(r.patient), exam: r.exam || '', at: r.created_at, pages: r.pages || 0, w }; }).filter(x => x.w) });
+  return true;
+}
+
 /* ════════ the admin side: /api/portal/cases* (server.js checks admin) ════════ */
 async function adminApi(req, res, pathname, me) {
   const q = new URL(req.url, 'http://x').searchParams;
-  const siteOut = s => s ? { code: s.code, active: !!s.active, created_at: s.created_at, last_seen: s.last_seen, online: online(s.customer_id), cases: db.prepare('SELECT COUNT(*) AS n FROM case_item WHERE customer_id = ?').get(s.customer_id).n, views: db.prepare('SELECT COALESCE(SUM(views),0) AS n FROM case_item WHERE customer_id = ?').get(s.customer_id).n } : null;
+  const siteOut = s => s ? { code: s.code, pub: pubOf(s), fixed: !!s.fixed_on, active: !!s.active, created_at: s.created_at, last_seen: s.last_seen, online: online(s.customer_id), cases: db.prepare('SELECT COUNT(*) AS n FROM case_item WHERE customer_id = ?').get(s.customer_id).n, views: db.prepare('SELECT COALESCE(SUM(views),0) AS n FROM case_item WHERE customer_id = ?').get(s.customer_id).n } : null;
   if (req.method === 'GET' && pathname === '/api/portal/cases') {
     const cid = String(q.get('cid') || '');
     if (cid) return send(res, 200, { site: siteOut(db.prepare('SELECT * FROM case_site WHERE customer_id = ?').get(cid)) });
