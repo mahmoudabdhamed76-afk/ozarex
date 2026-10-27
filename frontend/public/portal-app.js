@@ -228,44 +228,82 @@
     var el = $('v-help'), L = maints(), am = activeMaint(), ur = unrated(), c = P.company || {};
     var ph = String(c.phone || '').replace(/\D/g, ''), wa = ph ? (ph.indexOf('0') === 0 ? '2' + ph : ph) : '';
     var h = '';
-    if (am) h += '<div class="card" id="trkc"><h3>' + (am.urgent ? '🚨' : '🛠') + ' طلب الصيانة الحالي<em>' + dmy(am.at) + ' ' + hm(am.at) + '</em></h3><p class="mt"><b style="color:var(--ink)">' + esc(am.device || '') + '</b> ' + esc(am.note || '') + '</p><div id="trkb"><div class="emp"><i>⏳</i>' + (am.status === 'new' ? 'بندوّر على أقرب فني…' : 'بنجيب مكان الفني…') + '</div></div></div>';
+    if (am) h += '<div class="card" id="trkc"><h3><span id="trkh">' + (am.urgent ? '🚨' : '🛠') + ' طلب الصيانة الحالي</span><em>' + dmy(am.at) + ' ' + hm(am.at) + '</em></h3><p class="mt"><b style="color:var(--ink)">' + esc(am.device || '') + '</b> ' + esc(am.note || '') + '</p><div id="trkb"><div class="emp"><i>⏳</i>' + (am.status === 'new' ? 'بندوّر على أقرب فني…' : 'بنجيب مكان الفني…') + '</div></div></div>';
     if (ur) h += rateCard(ur);
     h += '<button class="btn big o w" style="margin-top:12px" data-q="maint">🛠 اطلب صيانة جديدة</button>';
     if (ph) h += '<div class="card"><h3>📞 كلّمونا</h3><div style="display:flex;gap:8px"><a class="btn g" style="flex:1;text-decoration:none" href="tel:' + esc(ph) + '">📞 اتصال</a><a class="btn" style="flex:1;background:#16A34A;text-decoration:none" href="https://wa.me/' + esc(wa) + '" target="_blank">واتساب</a></div></div>';
     h += '<div class="card"><h3>🧰 طلبات الصيانة<em>' + L.length + '</em></h3>' + (L.length ? L.map(function (o) { return '<div class="or"><div class="dt"><b>' + esc(o.device || 'صيانة') + (o.note ? ': ' + esc(String(o.note).slice(0, 60)) : '') + '</b><small>' + dmy(o.at) + ' ' + hm(o.at) + (o.reply ? ' · ' + esc(o.reply) : '') + (o.rating ? ' · ' + '⭐'.repeat(o.rating) : '') + '</small></div>' + tag(o) + '</div>'; }).join('') : '<div class="emp"><i>✨</i>مفيش طلبات صيانة</div>') + '</div>';
     el.innerHTML = h; wire(el); if (ur) wireRate(ur);
-    if (am) { track(am.id); clearInterval(ui.tt); ui.tt = setInterval(function () { if (ui.tab === 'help' && document.visibilityState === 'visible') track(am.id); }, 20000); }
+    if (am) { LV.id = am.id; LV.map = null; clearTimeout(ui.tt); track(am.id); }
   }
+  /* ── 4.89 · live tracking: one map that stays, the technician glides to each new spot, his trail, ETA and "مباشر" ── */
+  var LV = { id: 0, map: null, me: null, ctr: null, line: null, trail: null, pts: [], at: '', fit: false, last: null };
+  function ago(ts) { var m = /(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):?(\d{2})?/.exec(String(ts || '')); if (!m) return ''; var t = new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0)).getTime(), s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 15 ? 'دلوقتي' : s < 60 ? 'من ' + s + ' ثانية' : s < 3600 ? 'من ' + Math.round(s / 60) + ' دقيقة' : 'من ' + Math.round(s / 3600) + ' ساعة'; }
+  function km(d) { return d == null ? '' : d >= 1000 ? (d / 1000).toFixed(1) + ' كم' : d + ' م'; }
   function track(id) {
     fetch(SELF + '/track?id=' + id, { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
-      var box = $('trkb'); if (!box || !d) return;
-      var t = d.task;
+      var box = $('trkb'); if (!box || !d || LV.id !== id) return;
+      var t = d.task, going = t && t.status === 'going';
+      clearTimeout(ui.tt); ui.tt = setTimeout(function () { if (ui.tab === 'help' && document.visibilityState === 'visible') track(id); else ui.tt = setTimeout(function () { track(id); }, 4000); }, going ? 8000 : 20000);
+      var hd = $('trkh');
       if (!t) { box.innerHTML = '<div class="emp"><i>📣</i>الطلب اتبعت لكل الفنيين — أول واحد يقبل هيتحرك ليكم</div>'; return; }
       if (d.status === 'sent' || t.status === 'done') { location.reload(); return; }
-      var steps = [['📝', 'اتبعت'], ['👷', 'اتقبل'], ['🚗', 'في الطريق'], ['📍', 'وصل'], ['🔧', 'بيصلّح']], k = { new: 1, going: 2, arrived: 3, working: 4 }[t.status] || 1;
-      var eta = t.status === 'going' && t.eta ? '<div class="eta">' + t.eta + '<small>دقيقة</small></div>' : t.status === 'going' && t.dist != null ? '<div class="eta" style="font-size:13px">' + (t.dist >= 1000 ? (t.dist / 1000).toFixed(1) + ' كم' : t.dist + ' م') + '</div>' : '';
-      var av = t.has_photo ? '<img src="' + SELF + '/tech?id=' + id + '" alt="">' : esc(String(t.emp || '?').charAt(0));
-      var showMap = t.last_lat != null && (t.status === 'going' || t.status === 'new');
-      box.innerHTML = (showMap ? '<div class="map" id="tmap"></div>' : '') + '<div class="tech"><span class="av">' + av + '</span><div><b>' + esc(t.emp) + '</b><small>' + esc(t.job || 'فني صيانة') + ' · ' + ({ new: 'قبل الطلب', going: 'في الطريق ليكم', arrived: 'وصل عندكم', working: 'بيصلّح دلوقتي' }[t.status] || '') + '</small></div>' + eta + '</div>' +
-        '<div class="trk"><span class="ln" data-w="' + (k / 4 * 100) + '"></span>' + steps.map(function (s, i) { return '<div class="' + (i < k ? 'ok' : i === k ? 'cur' : '') + '"><i>' + s[0] + '</i>' + s[1] + '</div>'; }).join('') + '</div>';
-      setTimeout(function () { grow(box); }, 40);
-      if (showMap) drawMap(t);
-    }).catch(function () {});
+      if (hd) hd.innerHTML = { new: '👷 الفني قبل الطلب', going: '📍 الفني في الطريق ليكم', arrived: '📍 الفني وصل عندكم', working: '🔧 الفني بيصلّح دلوقتي' }[t.status] || 'طلب الصيانة';
+      var hasLoc = t.last_lat != null && (t.status === 'going' || t.status === 'arrived');
+      if (!box.querySelector('.lvw') || !!box.querySelector('.map') !== hasLoc) {
+        LV.map = null; LV.pts = []; LV.fit = false;
+        var av = t.has_photo ? '<img src="' + SELF + '/tech?id=' + id + '" alt="">' : esc(String(t.emp || '?').charAt(0));
+        box.innerHTML = '<div class="lvw">' + (hasLoc ? '<div class="map" id="tmap"><span class="live"><i></i>مباشر · <em id="lvago"></em></span></div>' : '') +
+          '<div class="tech' + (hasLoc ? ' ov' : '') + '"><span class="av">' + av + '</span><div style="min-width:0"><b>' + esc(t.emp) + ' · ' + esc(t.job || 'فني صيانة') + '</b><small id="lvst"></small></div><div class="eta" id="lveta"></div></div>' +
+          '<div class="trk"><span class="ln" id="lvln"></span>' + [['📝', 'اتبعت'], ['👷', 'اتقبل'], ['🚗', 'في الطريق'], ['📍', 'وصل'], ['🔧', 'بيصلّح']].map(function (s2, i) { return '<div data-k="' + i + '"><i>' + s2[0] + '</i>' + s2[1] + '</div>'; }).join('') + '</div>' +
+          (!hasLoc ? '<p class="mt" style="text-align:center;margin-top:6px">' + (t.status === 'new' ? '🗺 هيظهر على الخريطة لايف أول ما يتحرك ليكم' : '') + '</p>' : '') + '</div>';
+      }
+      var k = { new: 1, going: 2, arrived: 3, working: 4 }[t.status] || 1;
+      [].forEach.call(box.querySelectorAll('.trk [data-k]'), function (x) { var i = +x.dataset.k; x.className = i < k ? 'ok' : i === k ? 'cur' : ''; });
+      setTimeout(function () { var ln = $('lvln'); if (ln) ln.style.width = (k / 4 * 100) + '%'; }, 40);
+      var st = $('lvst'); if (st) st.innerHTML = (t.stars ? '⭐ ' + t.stars + ' · ' : '') + (t.jobs ? n0(t.jobs) + ' مهمة خلّصها' : 'فني صيانة') + (going && t.dist != null ? ' · باقي ' + km(t.dist) : '');
+      var et = $('lveta');
+      if (et) { if (going && t.eta) { et.innerHTML = t.eta + '<small>دقيقة</small>'; et.style.display = ''; } else if (going && t.dist != null) { et.innerHTML = km(t.dist); et.style.display = ''; } else if (t.status === 'arrived') { et.innerHTML = '📍<small>وصل</small>'; et.style.display = ''; } else et.style.display = 'none'; }
+      LV.at = t.last_at; var ag = $('lvago'); if (ag) ag.textContent = ago(t.last_at);
+      if (hasLoc) drawMap(t);
+    }).catch(function () { clearTimeout(ui.tt); ui.tt = setTimeout(function () { track(id); }, 15000); });
   }
+  setInterval(function () { var ag = $('lvago'); if (ag && LV.at) ag.textContent = ago(LV.at); }, 5000);
   function leaflet(cb) {
     if (window.L && L.map) return cb();
+    if (leaflet.q) return leaflet.q.push(cb); leaflet.q = [cb];
     var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = '/vendor/leaflet/leaflet.css'; document.head.appendChild(l);
-    var s = document.createElement('script'); s.src = '/vendor/leaflet/leaflet.js'; s.onload = cb; document.head.appendChild(s);
+    var s = document.createElement('script'); s.src = '/vendor/leaflet/leaflet.js'; s.onload = function () { var q = leaflet.q; leaflet.q = null; q.forEach(function (f) { f(); }); }; document.head.appendChild(s);
+  }
+  function glide(mk, to, ms) {   /* move the marker smoothly instead of jumping */
+    var fr = mk.getLatLng(), t0 = performance.now();
+    if (Math.abs(fr.lat - to[0]) + Math.abs(fr.lng - to[1]) < 1e-7) return;
+    (function f(n) { var k = Math.min(1, (n - t0) / ms), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2; mk.setLatLng([fr.lat + (to[0] - fr.lat) * e, fr.lng + (to[1] - fr.lng) * e]); if (LV.line && LV.ctr) LV.line.setLatLngs([mk.getLatLng(), LV.ctr.getLatLng()]); if (k < 1) requestAnimationFrame(f); })(t0);
+  }
+  function fitLive(here, t, anim) {   /* keep the technician and the center in view, clear of the «مباشر» chip and the card over the map */
+    var o = { paddingTopLeft: [34, 58], paddingBottomRight: [34, 86], maxZoom: 16, animate: !!anim, duration: 1 };
+    if (LV.ctr) LV.map.fitBounds([here, [t.c_lat, t.c_lng]], o); else LV.map.setView(here, 15, { animate: !!anim });
   }
   function drawMap(t) {
     leaflet(function () {
       var el = $('tmap'); if (!el) return;
-      var m = L.map(el, { zoomControl: false, attributionControl: true, dragging: true, scrollWheelZoom: false }); m.attributionControl.setPrefix(false);
-      L.tileLayer('/tiles/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m);
-      var me = L.marker([t.last_lat, t.last_lng], { icon: L.divIcon({ className: '', html: '<div class="dot"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }) }).addTo(m), pts = [[t.last_lat, t.last_lng]];
-      if (t.c_lat != null) { L.marker([t.c_lat, t.c_lng], { icon: L.divIcon({ className: '', html: '<div class="cdot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(m); pts.push([t.c_lat, t.c_lng]); L.polyline(pts, { color: '#0E9F9A', weight: 4, dashArray: '8 8', opacity: .85 }).addTo(m); }
-      if (pts.length > 1) m.fitBounds(pts, { padding: [36, 36], maxZoom: 16 }); else m.setView(pts[0], 15);
-      void me;
+      var here = [t.last_lat, t.last_lng];
+      if (!LV.map || LV.map.getContainer() !== el) {
+        var m = L.map(el, { zoomControl: false, attributionControl: false, scrollWheelZoom: false, tap: true }); L.control.attribution({ position: 'topleft', prefix: false }).addTo(m);
+        L.tileLayer('/tiles/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(m);
+        LV.map = m; LV.pts = [here];
+        LV.trail = L.polyline([here], { color: '#F97316', weight: 4, opacity: .45 }).addTo(m);
+        LV.ctr = t.c_lat != null ? L.marker([t.c_lat, t.c_lng], { icon: L.divIcon({ className: '', html: '<div class="cdot"><span>🏥</span></div>', iconSize: [30, 30], iconAnchor: [15, 15] }) }).addTo(m) : null;
+        LV.line = LV.ctr ? L.polyline([here, [t.c_lat, t.c_lng]], { color: '#0E9F9A', weight: 4, dashArray: '8 9', opacity: .85, className: 'ant' }).addTo(m) : null;
+        LV.me = L.marker(here, { zIndexOffset: 500, icon: L.divIcon({ className: '', html: '<div class="dot"><span>🚗</span></div>', iconSize: [34, 34], iconAnchor: [17, 17] }) }).addTo(m);
+        fitLive(here, t, false);
+        m.on('dragstart zoomstart', function () { LV.fit = true; });
+        setTimeout(function () { m.invalidateSize(); }, 200);
+        return;
+      }
+      var lp = LV.pts[LV.pts.length - 1];
+      if (!lp || lp[0] !== here[0] || lp[1] !== here[1]) { LV.pts.push(here); LV.trail.addLatLng(here); glide(LV.me, here, 1600); }
+      if (!LV.fit) fitLive(here, t, true);
     });
   }
   function rateCard(o) {

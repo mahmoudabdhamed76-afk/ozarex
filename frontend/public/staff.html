@@ -612,7 +612,7 @@ h2 .sp{margin-inline-start:auto;display:flex;gap:6px;align-items:center}
   function goingTask() { return (H && H.state === 'in' && ((H.tasks || []).filter(function (t) { return t.status === 'going'; })[0] || (H.tasks || [])[0])) || null; }
   var taskEvery = 0;
   function startTaskPings() {
-    var t0 = goingTask(), every = t0 ? (t0.status === 'going' ? 30000 : 60000) : 0;     /* on the road every 30 s, otherwise every minute — until the job is finished */
+    var t0 = goingTask(), every = t0 ? (t0.status === 'going' ? 12000 : 60000) : 0;     /* 4.89: on the road every 12 s (the center watches him live), otherwise every minute — until the job is finished */
     if (every === taskEvery && taskTimer) return;
     clearInterval(taskTimer); taskTimer = 0; taskEvery = every;
     if (!t0) return;

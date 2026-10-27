@@ -197,7 +197,10 @@ module.exports = function init(H) {
     const t = db.prepare('SELECT * FROM staff_task WHERE portal_req = ? ORDER BY id DESC LIMIT 1').get(Number(rid)); if (!t) return null;
     const e = db.prepare('SELECT id, name, job, photo FROM staff_emp WHERE id = ?').get(t.emp_id) || {};
     const o = taskOut(t);
-    return { status: o.status, emp: e.name || '', job: e.job || '', has_photo: !!e.photo, emp_id: e.photo ? e.id : null, dist: o.dist, eta: o.eta, pct: o.pct, last_lat: o.last_lat, last_lng: o.last_lng, last_at: o.last_at, c_lat: o.c_lat, c_lng: o.c_lng, created_at: o.created_at, started_at: o.started_at, arrived_at: o.arrived_at, working_at: o.working_at, done_at: o.done_at };
+    let rate = null, jobs = 0;
+    try { rate = db.prepare('SELECT AVG(r.rating) AS a, COUNT(r.rating) AS n FROM portal_req r JOIN staff_task k ON k.portal_req = r.id WHERE k.emp_id = ? AND r.rating > 0').get(t.emp_id); } catch (er) {}
+    try { jobs = db.prepare("SELECT COUNT(*) AS n FROM staff_task WHERE emp_id = ? AND status = 'done'").get(t.emp_id).n; } catch (er) {}
+    return { stars: rate && rate.n ? Math.round(rate.a * 10) / 10 : null, rated: rate ? rate.n : 0, jobs, speed: t.speed || null, status: o.status, emp: e.name || '', job: e.job || '', has_photo: !!e.photo, emp_id: e.photo ? e.id : null, dist: o.dist, eta: o.eta, pct: o.pct, last_lat: o.last_lat, last_lng: o.last_lng, last_at: o.last_at, c_lat: o.c_lat, c_lng: o.c_lng, created_at: o.created_at, started_at: o.started_at, arrived_at: o.arrived_at, working_at: o.working_at, done_at: o.done_at };
   }
   const taskOut = t => {
     const c = centerByKey(t.center_key), known = !!(c && c.lat != null);
@@ -249,11 +252,11 @@ module.exports = function init(H) {
   }
   function pingTask(e, b) {
     const t = db.prepare("SELECT * FROM staff_task WHERE id = ? AND emp_id = ? AND status IN ('new','going','arrived','working')").get(Number(b.id), e.id); if (!t) return { ok: false, stop: true };
-    const now = nowLocal(), open = openRecord(e.id, now); if (!open) return { ok: false, closed: true };
+    const now = nowLocal(), open = openRecord(e.id, now);
+    if (!open && !(t.status === 'going' && t.portal_req)) return { ok: false, closed: true };        // 4.89: a center's maintenance job he chose to drive to is tracked for that trip even off-shift
     const lat = num(b.lat), lng = num(b.lng); if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) fail(400, 'موقع غير صالح');
-    const last = db.prepare('SELECT at FROM staff_loc WHERE emp_id = ? ORDER BY id DESC LIMIT 1').get(e.id);
-    if (last && tsMin(now.ts) - tsMin(last.at) < 0.25) return { ok: true, skipped: true };            // never twice inside 15 s
-    H.logLoc(e, open.id, now, lat, lng, num(b.acc), b.battery, 'route');
+    if (t.last_at && tsMin(now.ts) - tsMin(t.last_at) < 0.15) return { ok: true, skipped: true };     // never twice inside ~9 s
+    if (open) H.logLoc(e, open.id, now, lat, lng, num(b.acc), b.battery, 'route');
     const c = centerByKey(t.center_key);
     const dist = c && c.lat != null ? Math.round(haversine(lat, lng, c.lat, c.lng)) : null;
     let speed = t.speed;
