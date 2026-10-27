@@ -113,13 +113,11 @@
       '<p>باركود واحد للمركز تحطه في هيدر سيرفر الطباعة، فيتطبع على كل التقارير. المريض يمسحه ← يكتب <b>رقم موبايله</b> و<b>أول اسمه</b> ← يوصل لحالته.</p>' +
       '<div class="ob"><button class="btn sm" id="fh">⬇ صورة الهيدر</button><button class="btn g sm" id="fq">⬇ الباركود لوحده</button><button class="btn g sm" id="fp">🖨 اطبع</button><button class="btn g sm" id="fc">نسخ اللينك</button></div>' +
       '<p style="font-size:12px;margin-top:8px">' + (ui.fixed ? '✅ شغال — لازم تكتب موبايل المريض مع كل حالة عشان يلاقيها.' : '⏸ موقوف — المرضى مش هيقدروا يدوّروا.') + '</p>' +
-      '<div class="wa2"><span>💬 واتساب طلبات المرضى:</span><input class="fld n" id="fwa" maxlength="20" inputmode="tel" placeholder="' + esc(C.waDefault ? '0' + String(C.waDefault).slice(2) : '01xxxxxxxxx') + '" style="text-align:right" value="' + esc(ui.wa) + '"><button class="btn g sm" id="fws">حفظ</button></div>' +
-      '<p style="font-size:11.5px;color:var(--mut);margin-top:4px">' + (ui.wa ? 'المريض اللي مايلاقيش نتيجته بيلاقي زرار يبعتلكم على الرقم ده، والطلب بيظهر هنا.' : C.waDefault ? 'لحد ما تكتب رقم، طلبات المرضى بتروح على رقم المركز المتسجّل عند الشركة.' : '⚠ اكتب رقم واتساب المركز عشان المريض اللي مايلاقيش نتيجته يقدر يطلبها.') + '</p></div>';
+      '<p style="font-size:11.5px;color:var(--mut);margin-top:4px">📨 المريض اللي مايلاقيش نتيجته يقدر يبعت طلب من نفس الصفحة، والطلب بيظهر هنا لايف بصوت.</p></div>';
     $('fsw').onclick = function () { var on = !ui.fixed; api('POST', 'fixed', { on: on }).then(function () { ui.fixed = on; fixedCard(); toast(on ? '📌 الباركود الثابت اشتغل' : '⏸ الباركود الثابت اتوقف'); }).catch(function (e) { toast(e.message); }); };
     $('fh').onclick = function () { headerPng(function (u) { dl(u, 'هيدر-باركود-' + C.center + '.png'); }); };
     $('fq').onclick = function () { qrPng(function (u) { dl(u, 'باركود-' + C.center + '.png'); }); };
     $('fp').onclick = printFixed;
-    $('fws').onclick = function () { var v = $('fwa').value.trim(); api('POST', 'wa', { wa: v }).then(function (r) { ui.wa = r.wa || ''; fixedCard(); toast(ui.wa ? '💬 اتحفظ رقم الواتساب' : 'اتشال رقم الواتساب'); }).catch(function (e) { toast(e.message); }); };
     $('fc').onclick = function () { try { navigator.clipboard.writeText(fixedUrl()).then(function () { toast('اتنسخ ✓'); }); } catch (e) {} };
     $('fqm').onclick = function () { headerPng(function (u) { modal('<h3>📌 الباركود الثابت</h3><p>حط الصورة دي في هيدر التقارير على سيرفر الطباعة</p><div class="qbig">' + qrSvg(fixedUrl()) + '</div><img class="hdr" src="' + u + '" alt=""><div class="lk"><input readonly value="' + esc(fixedUrl()) + '"></div><div class="bt"><button class="btn" data-x="h">⬇ صورة الهيدر</button><button class="btn g" data-x="p">🖨 اطبع</button></div><button class="btn g w" data-x="cl" style="margin-top:8px">تمام</button>', function (k) { if (k === 'h') dl(u, 'هيدر-باركود-' + C.center + '.png'); if (k === 'p') printFixed(); }); }); };
   }

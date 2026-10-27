@@ -112,7 +112,7 @@ function itemOut(r) { return { id: r.id, token: r.token, patient: r.patient, pho
 
 function page(title, body, css, js) {
   return '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><meta name="theme-color" content="#0E9F9A">' +
-    '<title>' + esc(title) + '</title><link rel="icon" href="/icons/favicon-32.png"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/cases.css?v=494"></head><body class="' + css + '">' + body + js + '</body></html>';
+    '<title>' + esc(title) + '</title><link rel="icon" href="/icons/favicon-32.png"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/cases.css?v=495"></head><body class="' + css + '">' + body + js + '</body></html>';
 }
 function html(res, code, s) { res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' }); res.end(s); }
 
@@ -122,7 +122,8 @@ async function handle(req, res, pathname) {
   if (m) return centerRoute(req, res, m);
   m = /^\/h\/([A-Za-z0-9]{8})(\/(find|ask))?\/?$/.exec(pathname);
   if (m) return findRoute(req, res, m[1], m[3] || '');
-  m = /^\/v\/([A-Za-z0-9]{12})(\/file)?\/?$/.exec(pathname);
+  m = /^\/v\/([A-Za-z0-9]{12})(\/(file|ask))?\/?$/.exec(pathname);
+  if (m && m[3] === 'ask') return viewAsk(req, res, m[1]);
   if (m) return viewRoute(req, res, m[1], !!m[2]);
   return false;
 }
@@ -137,7 +138,7 @@ async function centerRoute(req, res, m) {
     if (req.method !== 'GET') return false;
     const CD = { code, center: site.center_name || '', auth: me, cacheDays: CACHE_DAYS, maxMb: MAX_MB, pub: me ? pubOf(site) : '', fixedOn: !!site.fixed_on, wa: me ? (site.wa || '') : '', waDefault: me && !site.wa ? waFor(cid0(site), '') : '' };
     if (me) db.prepare('UPDATE case_site SET last_seen = ? WHERE customer_id = ?').run(nowTs(), site.customer_id);
-    html(res, 200, page('حالات المرضى — ' + (site.center_name || ''), '<div id="app"></div>', 'k', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/qrcode.js"></script><script src="/cases-kit.js?v=494"></script><script src="/cases-dicom.js?v=494"></script><script src="/cases-center.js?v=494"></script>'));
+    html(res, 200, page('حالات المرضى — ' + (site.center_name || ''), '<div id="app"></div>', 'k', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/qrcode.js"></script><script src="/cases-kit.js?v=495"></script><script src="/cases-dicom.js?v=495"></script><script src="/cases-center.js?v=495"></script>'));
     return true;
   }
   if (sub === 'login' && req.method === 'POST') {
@@ -237,6 +238,20 @@ function countView(token, cid) {
   } catch (e) {}
 }
 
+/* 4.95 · the patient's case didn't open (center offline / file gone / stopped) → a request to the center, from the case itself */
+async function viewAsk(req, res, token) {
+  if (req.method !== 'POST') return false;
+  const ip = ipOf(req);
+  if (limited('va:' + ip, 6, 3600e3)) { send(res, 429, { message: 'طلبك وصل — المركز هيرد عليك' }); return true; }
+  const it = db.prepare('SELECT * FROM case_item WHERE token = ?').get(token); if (!it) { send(res, 404, { message: 'مش موجودة' }); return true; }
+  let b = {}; try { b = await readJson(req, 800); } catch (e) {}
+  const ph = phashOf(it.phone), note = clean(['مفتحتش', it.exam, String(it.created_at || '').slice(0, 10), b.note].filter(Boolean).join(' · '), 120);
+  const dup = ph ? db.prepare('SELECT id FROM case_ask WHERE customer_id = ? AND phash = ? AND done = 0').get(it.customer_id, ph) : null;
+  if (dup) db.prepare('UPDATE case_ask SET note = ?, at = ? WHERE id = ?').run(note, nowTs(), dup.id);
+  else db.prepare('INSERT INTO case_ask (customer_id, name, phone, phash, note, at) VALUES (?,?,?,?,?,?)').run(it.customer_id, it.patient, it.phone || '', ph, note, nowTs());
+  tell(it.customer_id, 'ask', { asks: asksOf(it.customer_id), name: it.patient, phone: it.phone || '' });
+  send(res, 200, { ok: true }); return true;
+}
 async function viewRoute(req, res, token, file) {
   if (req.method !== 'GET') return false;
   const ip = ipOf(req);
@@ -245,7 +260,7 @@ async function viewRoute(req, res, token, file) {
   if (!file) {
     if (!it) { if (limited('vx:' + ip, 40, 600e3)) { send(res, 429, { message: 'حاولت كتير' }); return true; } }
     const CD = it ? { token, center: it.center_name || '', patient: it.patient, exam: it.exam || '', at: it.created_at, pages: it.pages || 0, size: it.size, name: it.file_name || '', active: !!(it.active && it.site_on), ready: !!(it.cached && it.cache_until > Date.now()) || online(it.customer_id), wa: waFor(it.customer_id, it.site_wa), pub: it.site_pub || '' } : { missing: true };
-    html(res, it ? 200 : 404, page(it ? 'نتيجة الفحص — ' + (it.center_name || '') : 'الحالة مش موجودة', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/pdfjs/pdf.min.js"></script><script src="/cases-view.js?v=494"></script>'));
+    html(res, it ? 200 : 404, page(it ? 'نتيجة الفحص — ' + (it.center_name || '') : 'الحالة مش موجودة', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/pdfjs/pdf.min.js"></script><script src="/cases-view.js?v=495"></script>'));
     return true;
   }
   if (!it) { send(res, 404, { message: 'الحالة مش موجودة' }); return true; }
@@ -292,7 +307,7 @@ async function findRoute(req, res, pub, sub) {
     if (req.method !== 'GET') return false;
     if (!site) { if (limited('hx:' + ip, 30, 600e3)) { send(res, 429, { message: 'حاولت كتير' }); return true; } }
     const CD = site ? { pub, center: site.center_name || '', on: !!site.fixed_on, wa: waFor(site.customer_id, site.wa) } : { missing: true };
-    html(res, site ? 200 : 404, page(site ? 'نتيجتك — ' + (site.center_name || '') : 'اللينك مش شغال', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/cases-kit.js?v=494"></script><script src="/cases-find.js?v=494"></script>'));
+    html(res, site ? 200 : 404, page(site ? 'نتيجتك — ' + (site.center_name || '') : 'اللينك مش شغال', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/cases-kit.js?v=495"></script><script src="/cases-find.js?v=495"></script>'));
     return true;
   }
   if (req.method !== 'POST') return false;

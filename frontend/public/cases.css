@@ -229,3 +229,8 @@ label.l{display:block;font-size:12.5px;font-weight:700;color:var(--mut);margin:1
 .mwch{margin-top:12px}.mwch button.on{background:#312E81;border-color:#312E81}
 .mwa{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}.mwa .btn{padding:13px 20px;font-size:15px;background:linear-gradient(135deg,#6366F1,#0E9F9A)}
 .mwa .bar{margin:0}
+
+/* 4.95 · in-system «اطلب نتيجتك» */
+.btn.ask2{background:linear-gradient(135deg,#6366F1,#0E9F9A);box-shadow:0 8px 18px -10px rgba(99,102,241,.8);padding:13px;font-size:15px}
+.ld.ok2{border:1px solid #BBF7D0;background:linear-gradient(135deg,#F0FDF4,#fff)}
+@keyframes ld2{0%{transform:translateX(120%)}100%{transform:translateX(-320%)}}

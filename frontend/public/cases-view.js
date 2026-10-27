@@ -21,8 +21,18 @@
       '<div id="body"></div><p class="foot">الملف متشفّر — بيتفتح بس بالباركود ده. · ' + esc(C.center || '') + '</p></div>';
   }
   /* 4.92 · stuck (center offline / file missing / stopped) → ask the center on WhatsApp */
-  function waBtn() { if (!C.wa) return ''; var t = 'السلام عليكم ' + (C.center || '') + ' 🌿\nأنا ' + (C.patient || '') + '\nحاولت أفتح نتيجة ' + (C.exam || 'الأشعة') + ' بتاعتي' + (C.at ? ' (' + dmy(C.at) + ')' : '') + ' ومفتحتش، ممكن تبعتوهالي؟ 🙏'; return '<a class="btn wa" style="margin-top:10px" href="https://wa.me/' + C.wa + '?text=' + encodeURIComponent(t) + '">💬 اطلبها من المركز واتساب</a>'; }
-  function box(icon, title, sub, extra) { if (icon !== 'spin' && icon !== '🔑') extra = (extra || '') + waBtn(); $('body').innerHTML = '<div class="ld">' + (icon === 'spin' ? '<div class="spin"></div>' : '<i>' + icon + '</i>') + '<b>' + title + '</b>' + (sub ? '<p>' + sub + '</p>' : '') + (extra || '') + '</div>'; }
+  function waBtn() { return '<button class="btn ask2" id="askc" style="margin-top:10px;display:flex;width:100%">📨 اطلبها من المركز</button>'; }
+  function wireAsk() {
+    var b = $('askc'); if (!b) return;
+    b.onclick = function () {
+      b.disabled = true; b.textContent = 'بنبعت…';
+      fetch(location.pathname.replace(/\/$/, '') + '/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.message || 'محصلش'); }); })
+        .then(function () { b.outerHTML = '<p style="margin-top:10px;color:#15803D;font-weight:800">✅ طلبك وصل للمركز — هيرفعوا نتيجتك تاني</p>'; })
+        .catch(function (e) { b.disabled = false; b.textContent = '📨 اطلبها من المركز'; b.textContent = e.message; });
+    };
+  }
+  function box(icon, title, sub, extra) { if (icon !== 'spin' && icon !== '🔑') extra = (extra || '') + waBtn(); $('body').innerHTML = '<div class="ld">' + (icon === 'spin' ? '<div class="spin"></div>' : '<i>' + icon + '</i>') + '<b>' + title + '</b>' + (sub ? '<p>' + sub + '</p>' : '') + (extra || '') + '</div>';  wireAsk(); }
 
   function load() {
     if (!C.active) return box('⏸', 'الحالة دي اتوقفت', 'كلّم المركز لو محتاجها.');

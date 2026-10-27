@@ -17,15 +17,15 @@
       '<button class="btn w" id="go" style="margin-top:14px;padding:14px;font-size:16px">🔍 دوّر على نتيجتي</button><div class="err" id="er" style="color:var(--red);font-weight:700;text-align:center;margin-top:8px;min-height:20px"></div>'
       : '<div class="ld" style="box-shadow:none;padding:6px"><i>⏸</i><b>البحث مقفول دلوقتي</b><p>كلّم المركز يبعتلك لينك نتيجتك.</p></div>') + '</div>' +
     '<div class="res" id="res"></div>' +
-    (C.wa ? '<div class="miss" id="miss"><b>مش لاقي نتيجتك؟</b><p>اكتب موبايلك واسمك فوق، ودوس هنا — هيتفتح واتساب برسالة جاهزة للمركز وهم يبعتولك النتيجة.</p><button class="btn wa w" id="wa0">💬 اطلب نتيجتك من المركز واتساب</button></div>' : '<div class="miss" id="miss"><b>مش لاقي نتيجتك؟</b><p style="margin-bottom:0">كلّم المركز وهيبعتولك النتيجة.</p></div>') +
+    (C.on ? '<div class="miss" id="miss"><b>مش لاقي نتيجتك؟</b><p>اكتب موبايلك وأول اسمك فوق، ودوس هنا — طلبك بيوصل للمركز على طول وهم يرفعولك النتيجة.</p><input class="fld" id="nt0" maxlength="100" placeholder="نوع الفحص وتاريخه (اختياري) — مثلاً: مقطعية يوم 25/10" style="margin-bottom:8px"><button class="btn ask2 w" id="wa0">📨 اطلب نتيجتك من المركز</button></div>' : '') +
     '<div class="steps"><div><i>📷</i>مسحت الباركود</div><div><i>✍️</i>اكتب موبايلك واسمك</div><div><i>🩻</i>افتح نتيجتك</div></div>' +
     '<p class="foot">نتيجتك متشفّرة — محدش يقدر يفتحها غير بموبايلك واسمك.</p></div>';
-  /* 4.92 · always there: ask the center on WhatsApp (with the mobile + name typed above, when there are) */
+  /* 4.95 · «اطلب نتيجتك» → a request inside the system (the center sees it live on its cases page) — no WhatsApp */
   var wa0 = $('wa0');
   if (wa0) wa0.onclick = function () {
-    var ph = C.on ? $('ph').value.trim() : '', nm = C.on ? $('nm').value.trim() : '', er = $('er');
-    if (C.on && (!K.last10(ph) || !K.normName(nm))) { if (er) er.textContent = 'اكتب رقم موبايلك وأول اسمك الأول'; (K.last10(ph) ? $('nm') : $('ph')).focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
-    askWa(ph, nm, '', wa0);
+    var ph = $('ph').value.trim(), nm = $('nm').value.trim(), er = $('er');
+    if (!K.last10(ph) || !K.normName(nm)) { if (er) er.textContent = 'اكتب رقم موبايلك وأول اسمك الأول'; (K.last10(ph) ? $('nm') : $('ph')).focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    askIn(ph, nm, ($('nt0') || {}).value || '', wa0);
   };
   if (!C.on) return;
   try { var last = JSON.parse(sessionStorage.getItem('ozx_find') || 'null'); if (last) { $('ph').value = last.p || ''; $('nm').value = last.n || ''; } } catch (e) {}
@@ -50,20 +50,38 @@
       })
       .catch(function (e) { b.disabled = false; b.innerHTML = '🔍 دوّر على نتيجتي'; er.textContent = e.message; });
   };
-  /* 4.92 · not found → ask the center on WhatsApp (and the center sees the request live on its cases page) */
-  function waText(ph, nm, note) { return 'السلام عليكم ' + (C.center || '') + ' 🌿\nأنا ' + nm + ' — رقم موبايلي ' + ph + '\nدوّرت على نتيجة الأشعة بتاعتي ومالقيتهاش' + (note ? ' (' + note + ')' : '') + '، ممكن تبعتوهالي؟ 🙏'; }
-  function askWa(ph, name, note, b) {
-    if (ph && name) { try { fetch(location.pathname.replace(/\/$/, '') + '/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, phone: ph, note: note }), keepalive: true }).catch(function () {}); } catch (e) {} }
-    var t = ph && name ? waText(ph, name, note) : 'السلام عليكم ' + (C.center || '') + ' 🌿\nعايز نتيجة الأشعة بتاعتي، ممكن تبعتوهالي؟ 🙏';
-    location.href = 'https://wa.me/' + C.wa + '?text=' + encodeURIComponent(t);
-    if (b) b.innerHTML = '✅ اتفتح واتساب — ابعت الرسالة';
+  function askIn(ph, name, note, b) {
+    var t0 = b ? b.innerHTML : ''; if (b) { b.disabled = true; b.innerHTML = '<span class="spin" style="width:18px;height:18px;border-width:3px;margin:0"></span> بنبعت…'; }
+    fetch(location.pathname.replace(/\/$/, '') + '/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: String(name).trim(), phone: ph, note: String(note || '').trim() }) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.message || 'محصلش — جرّب تاني'); }); })
+      .then(function () {
+        var mi = $('miss'); if (mi) mi.style.display = 'none';
+        $('res').innerHTML = '<div class="ld ok2"><i>✅</i><b>طلبك وصل للمركز</b><p>أول ما يرفعوا نتيجتك هتلاقيها هنا بموبايلك وأول اسمك. سيب الصفحة مفتوحة وهنفتحهالك لوحدها أول ما تجهز.</p><p style="margin-top:10px;display:flex;gap:8px;align-items:center;justify-content:center;font-weight:700;color:#0F766E"><span class="spin" style="width:18px;height:18px;border-width:3px;margin:0"></span> مستنيين المركز يرفعها…</p></div>';
+        try { sessionStorage.setItem('ozx_find', JSON.stringify({ p: ph, n: name })); } catch (e) {}
+        watch(ph, name);
+      })
+      .catch(function (e) { if (b) { b.disabled = false; b.innerHTML = t0; } var er = $('er'); if (er) er.textContent = e.message; toastIn(e.message); });
+  }
+  function toastIn(t) { var r = $('res'); if (r && !r.innerHTML) r.innerHTML = '<p style="color:var(--red);font-weight:700;text-align:center">' + esc(t) + '</p>'; }
+  /* after asking: look again every 2 minutes (quietly) and open the result once it's uploaded */
+  function watch(ph, nm) {
+    var n = 0; clearInterval(watch.t);
+    watch.t = setInterval(function () {
+      if (++n > 15) return clearInterval(watch.t);
+      if (document.visibilityState !== 'visible') return;
+      fetch(location.pathname.replace(/\/$/, '') + '/find', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone: ph }) })
+        .then(function (r) { return r.ok ? r.json() : { list: [] }; })
+        .then(function (j) { return Promise.all((j.list || []).map(function (x) { return K.unwrap(x.w, nm, ph).then(function (k) { return k ? { x: x, k: k } : null; }); })); })
+        .then(function (M) { M = M.filter(Boolean); if (!M.length) return; clearInterval(watch.t); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} $('res').innerHTML = '<div class="ld"><i>🎉</i><b>نتيجتك جهزت!</b><p>بنفتحها…</p></div>'; try { sessionStorage.setItem('ozx_back', location.pathname.replace(/\/$/, '')); } catch (e) {} setTimeout(function () { location.href = '/v/' + M[0].x.token + '#' + M[0].k; }, 900); })
+        .catch(function () {});
+    }, 120000);
   }
   function notFound(ph, nm) {
     var mi = $('miss'); if (mi) mi.style.display = 'none';
     $('res').innerHTML = '<div class="ld"><i>🤔</i><b>ملقيناش نتيجة بالبيانات دي</b><p>اتأكد إن الرقم هو اللي اتسجّل في المركز، والاسم الأول مكتوب زي ما اتكتب هناك. لو النتيجة لسه طالعة النهارده جرّب بعد شوية.</p>' +
-      (C.wa ? '<div class="ask"><input class="fld" id="nt" maxlength="100" placeholder="نوع الفحص وتاريخه (اختياري) — مثلاً: مقطعية يوم 25/10"><button class="btn wa" id="wa">💬 اطلب نتيجتك من المركز واتساب</button><small>هيتفتح واتساب برسالة جاهزة للمركز، وهم هيبعتولك النتيجة.</small></div>' : '<p style="margin-top:10px;font-weight:700">كلّم المركز وهيبعتولك النتيجة.</p>') + '</div>';
+      '<div class="ask"><input class="fld" id="nt" maxlength="100" placeholder="نوع الفحص وتاريخه (اختياري) — مثلاً: مقطعية يوم 25/10"><button class="btn ask2" id="wa">📨 اطلب نتيجتك من المركز</button><small>طلبك بيوصل للمركز على طول، وهم يرفعولك النتيجة.</small></div></div>';
     var b = $('wa'); if (!b) return;
-    b.onclick = function () { askWa(ph, String(nm).trim(), ($('nt') || {}).value || '', b); };
+    b.onclick = function () { askIn(ph, String(nm).trim(), ($('nt') || {}).value || '', b); };
   }
   $('go').onclick = go; $('nm').onkeydown = $('ph').onkeydown = function (e) { if (e.key === 'Enter') go(); };
 })();
