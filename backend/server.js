@@ -25,6 +25,7 @@ const branches = require('./src/branches');
 const transfers = require('./src/transfers');
 try { transfers.recover(); } catch (e) { console.error('[transfers] recover:', e.message); }
 const portal = require('./src/portal');
+const cases = require('./src/cases');   // 4.90 · حالات المرضى (/k/ للمركز، /v/ للمريض)
 const tiles = require('./src/tiles');
 const webpush = require('./src/webpush');
 const staff = require('./src/staff');
@@ -330,6 +331,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (pathname.startsWith('/tiles/') && tiles.handle(req, res, pathname)) return;   // 4.81 · the map's tiles through our server
     if (pathname === '/api/version' && req.method === 'GET') { const vb = String(parsed.query.branch || 'main'); return sendJSON(res, 200, { version: branches.get(vb) ? verOf(vb) : verOf('main') }); }
+    if ((pathname.startsWith('/k/') || pathname.startsWith('/v/')) && await cases.handle(req, res, pathname)) return;   // 4.90 · حالات المرضى
     /* a center's own read-only page (token link) */
     if ((pathname.startsWith('/p/') || pathname.startsWith('/c/') || /^\/[A-Za-z0-9]{6}(\/[a-z.]+(\/[A-Za-z0-9_-]+)?)?\/?$/.test(pathname)) && portal.handle(req, res, pathname, () => branches.list().filter(b => b.active || b.main).map(b => { const st = branches.storeOf(b.id); return st ? { id: b.id, name: b.name, data: st.data() } : null; }).filter(Boolean))) return;   // 4.32 · a center's link works in any branch
 
@@ -391,6 +393,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       /* 4.60 · الموظفين: the manager's side (admin only) */
+      if (pathname === '/api/portal/cases' || pathname.startsWith('/api/portal/cases/')) { if (!admin) return adminOnly(); return await cases.adminApi(req, res, pathname, me); }
       if (pathname.startsWith('/api/portal/')) { if (!admin) return adminOnly(); return await portal.adminApi(req, res, pathname, me, { sendJSON, readBody }); }
       if (pathname === '/api/staff' || pathname.startsWith('/api/staff/')) { if (!admin) return adminOnly(); return await staff.handleAdmin(req, res, pathname, me, { sendJSON, readBody }); }
 
@@ -687,6 +690,6 @@ server.on('error', (e) => { console.error('Server error:', e); process.exit(1); 
 server.maxConnections = 3000;
 /* 4.20 · slow / half-open requests get dropped instead of piling up */
 server.headersTimeout = 15000;      // the request line + headers must arrive within 15 s
-server.requestTimeout = 120000;     // a whole request (even a big restore upload) within 2 min
+server.requestTimeout = 900000;     // a whole request within 15 min (4.90: a big case PDF from a center on a slow upload line)
 server.keepAliveTimeout = 10000;
 server.timeout = 0;                 // live streams (SSE) stay open; they have their own heartbeat

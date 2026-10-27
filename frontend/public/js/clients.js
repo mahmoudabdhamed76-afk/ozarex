@@ -104,9 +104,10 @@
           (ph ? '<button class="btn btn-secondary btn-sm cl-wa" onclick="AXClients.wa(\'' + c.id + '\')">واتساب</button>' : '') +
           '<button class="btn btn-secondary btn-sm" onclick="AXClients.qr(\'' + c.id + '\')">▦ باركود</button>' +
           '<button class="btn btn-secondary btn-sm" onclick="AXClients.reset(\'' + c.id + '\')" title="امسح طلبات الورق أو الصيانة من صفحة المركز">🧹 ريست</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="AXClients.cases(\'' + c.id + '\')" title="لينك منفصل بباسوورد يرفع منه المركز PDF الحالات ويطلع باركود للمريض">📁 حالات المرضى</button>' +
           '<button class="btn btn-ghost btn-sm" onclick="AXClients.rotate(\'' + c.id + '\')">↻ لينك جديد</button>' +
           '<button class="btn btn-ghost btn-sm" onclick="AXClients.stop(\'' + c.id + '\')">⏸ إيقاف</button></div>'
-        : '<div class="cl-a"><button class="btn btn-primary btn-sm" onclick="AXClients.make(\'' + c.id + '\')">🔗 اعمل لينك للمركز ده</button></div>') +
+        : '<div class="cl-a"><button class="btn btn-primary btn-sm" onclick="AXClients.make(\'' + c.id + '\')">🔗 اعمل لينك للمركز ده</button><button class="btn btn-secondary btn-sm" onclick="AXClients.cases(\'' + c.id + '\')">📁 حالات المرضى</button></div>') +
       '</div></div>';
   }
   function group(key, title, list, extra) {
@@ -552,6 +553,39 @@
     }).catch(function (e) { T(e.message, 'error'); });
   }
 
+  /* ── 4.90 · حالات المرضى: لينك منفصل بباسوورد لكل مركز (/k/xxxxxxxx) ── */
+  function casesUrl(code) { return base().replace(/\/$/, '') + '/k/' + code; }
+  function casesModal(cid, fresh) {
+    var c = A('customers').filter(function (x) { return x.id === cid; })[0]; if (!c) return;
+    api('GET', '/cases?cid=' + encodeURIComponent(cid)).then(function (r) {
+      var s = r.site, ph = phoneOf(c);
+      if (!s) {
+        openModal('📁 حالات المرضى — ' + esc(c.name),
+          '<p class="ax-modal-lead">لينك منفصل للمركز بباسوورد، يفتحه من الكمبيوتر بتاعه ويرفع PDF الحالة، ويطلعله باركود يتلزق للمريض. المريض يمسحه ويشوف حالته على موبايله.</p>' +
+          '<ul style="margin:8px 18px 12px;line-height:1.9;font-size:13.5px"><li>الملف بيتشفّر على جهاز المركز، والأصل بيفضل عنده.</li><li>نسخة مشفّرة مؤقتة على السيرفر أول 7 أيام بس — بعدها المريض بيفتح من جهاز المركز لايف (لو صفحته مفتوحة).</li><li>الباسوورد مختلف عن لينك الحسابات.</li></ul>' +
+          '<div class="form-group"><label>الباسوورد (سيبه فاضي ونعملك واحد 6 أرقام)</label><input class="form-control" id="cs-pw" maxlength="40" placeholder="مثلاً 482913"></div>',
+          '<button class="btn btn-primary" id="cs-go">📁 اعمل لينك الحالات</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+        document.getElementById('cs-go').onclick = function () {
+          api('POST', '/cases/make', { cid: cid, name: c.name, pass: (document.getElementById('cs-pw') || {}).value || '' }).then(function (x) { casesModal(cid, x.pass); }).catch(function (e) { T(e.message, 'error'); });
+        };
+        return;
+      }
+      var u = casesUrl(s.code), msg = 'السلام عليكم ' + c.name + ' 🌿\nده لينك «حالات المرضى» من *' + company() + '*:\n' + u + (fresh ? '\nالباسوورد: ' + fresh : '') + '\n\nافتحوه من كمبيوتر المركز، اسحبوا PDF الحالة، وهيطلعلكم باركود تلزقوه للمريض — المريض يمسحه ويشوف أشعته على موبايله.\nسيبوا الصفحة مفتوحة على الكمبيوتر عشان الحالات القديمة تفضل تفتح.';
+      openModal('📁 حالات المرضى — ' + esc(c.name),
+        (fresh ? '<div style="background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;border-radius:14px;padding:12px 14px;margin-bottom:12px;text-align:center"><div style="font-size:13px">الباسوورد (اكتبه دلوقتي — مش هيظهر تاني)</div><div style="font-size:30px;font-weight:900;letter-spacing:4px;direction:ltr">' + esc(fresh) + '</div></div>' : '') +
+        '<div class="cl-l"><input readonly value="' + esc(u) + '" onclick="this.select()"><button class="btn btn-secondary btn-sm" id="cs-cp">نسخ</button></div>' +
+        '<div class="cl-st" style="margin-top:12px"><div class="' + (s.online ? 'ok' : '') + '"><b>' + (s.online ? '🟢' : '⚪') + '</b><span>' + (s.online ? 'متصل دلوقتي' : (s.last_seen ? 'آخر دخول ' + esc(String(s.last_seen).slice(0, 16)) : 'لسه مدخلش')) + '</span></div><div><b>' + s.cases + '</b><span>حالة</span></div><div><b>' + s.views + '</b><span>مرة اتفتحت</span></div></div>' +
+        (!s.active ? '<p class="cl-note" style="color:#f87171;font-weight:700">⏸ اللينك موقوف — المركز مش هيقدر يدخل والمرضى مش هيفتحوا.</p>' : ''),
+        '<button class="btn btn-primary" id="cs-wa"' + (ph ? '' : ' disabled title="مفيش رقم للمركز"') + '>واتساب' + (fresh ? ' (اللينك + الباسوورد)' : '') + '</button><a class="btn btn-secondary" href="' + esc(u) + '" target="_blank" rel="noopener">👁 فتح</a><button class="btn btn-secondary" id="cs-pw2">🔑 باسوورد جديد</button><button class="btn btn-ghost" id="cs-st">' + (s.active ? '⏸ إيقاف' : '▶ تشغيل') + '</button><button class="btn btn-ghost" id="cs-rt">↻ لينك جديد</button>');
+      var g = function (id) { return document.getElementById(id); };
+      g('cs-cp').onclick = function () { try { navigator.clipboard.writeText(u).then(function () { T('اتنسخ ✓'); }); } catch (e) {} };
+      if (ph) g('cs-wa').onclick = function () { window.open('https://wa.me/' + ph + '?text=' + encodeURIComponent(msg), '_blank'); };
+      g('cs-pw2').onclick = function () { ask('تعمل باسوورد جديد؟ المركز هيخرج ولازم يدخل بالجديد.', function () { api('POST', '/cases/pass', { cid: cid }).then(function (x) { casesModal(cid, x.pass); }).catch(function (e) { T(e.message, 'error'); }); }); };
+      g('cs-st').onclick = function () { api('POST', '/cases/stop', { cid: cid, on: !s.active }).then(function () { T(s.active ? '⏸ لينك الحالات اتوقف' : '▶ لينك الحالات اشتغل', 'info'); casesModal(cid); }).catch(function (e) { T(e.message, 'error'); }); };
+      g('cs-rt').onclick = function () { ask('تعمل لينك جديد؟ اللينك القديم هيقف (الباركودات اللي اتطبعت للمرضى مش بتتأثر).', function () { api('POST', '/cases/rotate', { cid: cid }).then(function () { T('اتعمل لينك جديد — ابعته للمركز'); casesModal(cid); }).catch(function (e) { T(e.message, 'error'); }); }); };
+    }).catch(function (e) { T(e.message, 'error'); });
+  }
+
   /* ── actions ── */
   function save(p) { S()._portal = p; if (typeof DB !== 'undefined' && DB.save) DB.save(); }
   function make(cid) { var p = Object.assign({}, links()); p[cid] = newToken(); save(p); ui.open[cid] = true; T('اتعمل اللينك ✅ — والباركود بتاعه جاهز «▦ باركود»'); render(); }
@@ -605,7 +639,7 @@
   };
   window.AXClients = {
     render: render, make: make, makeAll: makeAll, shortAll: shortAll, rotate: rotate, stop: stop, copy: copy, wa: wa,
-    st: setSt, del: del, _pop: showPop, assign: assign, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, reset: resetModal, payReg: payReg, payInfo: payInfo, stockShow: stockShow, stockToggle: stockToggle, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
+    st: setSt, del: del, _pop: showPop, assign: assign, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, reset: resetModal, cases: casesModal, payReg: payReg, payInfo: payInfo, stockShow: stockShow, stockToggle: stockToggle, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
     tab: function (t) { ui.tab = t; if (t === 'req') ui.rq = null; render(); },
     rf: function (f) { ui.rf = f; render(); },
     grp: function (k) { ui.grp[k] = !ui.grp[k]; render(); },
