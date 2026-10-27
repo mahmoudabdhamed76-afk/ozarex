@@ -70,7 +70,7 @@
         '<div class="stats"><div><b id="s1">0</b><span>حالة النهارده</span></div><div><b id="s2">0</b><span>حالة الشهر ده</span></div><div><b id="s3">0</b><span>مرة المرضى فتحوا</span></div><div><b id="s4">0</b><span>محفوظة على الجهاز ده</span></div></div></div>' +
       '<div class="opts"><div class="opt"><span class="oi" style="background:#E0F2FE">▦</span><div><h3>باركود لكل حالة <span class="tg ok">شغال دايماً</span></h3><p>بعد ما تحفظ الحالة بيطلعلها باركود لوحدها — تطبعه استيكر على الظرف أو تبعته للمريض واتساب، والمريض يفتح على طول من غير ما يكتب حاجة.</p></div></div>' +
         '<div class="opt b" id="fx"></div></div>' +
-      '<div class="upz"><div class="drop" id="drop"><span class="ic">📄</span><div><b>اسحب ملفات PDF هنا</b><small>ملف واحد أو كذا ملف مرة واحدة · لحد ' + C.maxMb + ' ميجا للملف · بنحاول نقرا الاسم والموبايل من الملف</small></div><div class="db"><button class="btn" id="pk" type="button">＋ اختار ملفات</button></div><input type="file" id="fi" accept="application/pdf,.pdf" multiple hidden></div>' +
+      '<div id="mwda"></div><div class="upz"><div class="drop" id="drop"><span class="ic">📄</span><div><b>اسحب ملفات PDF هنا</b><small>ملف واحد أو كذا ملف مرة واحدة · لحد ' + C.maxMb + ' ميجا للملف · بنحاول نقرا الاسم والموبايل من الملف</small></div><div class="db"><button class="btn" id="pk" type="button">＋ اختار ملفات</button></div><input type="file" id="fi" accept="application/pdf,.pdf" multiple hidden></div>' +
         (dirOk ? '<div class="watch" id="wt"></div>' : '') + '</div>' +
       '<div id="asks"></div><div class="queue" id="qu"></div>' +
       '<div class="card list"><div class="ch"><h2>الحالات</h2><div class="chips" id="fl"></div><input class="fld q" id="q" placeholder="🔍 اسم المريض أو الموبايل أو الفحص"></div><div id="tbl"><div class="emp"><div class="spin"></div></div></div></div>' +
@@ -87,6 +87,17 @@
     document.addEventListener('dragover', function (e) { e.preventDefault(); }); document.addEventListener('drop', function (e) { e.preventDefault(); });
     $('q').oninput = function () { ui.q = this.value.trim(); table(); };
     fixedCard(); watchBar();
+    if (window.OZDicom) OZDicom.mount($('mwda'), { center: C.center, toast: toast, onPdf: addConverted });   /* 4.94 · مودة: DICOM → PDF right here */
+  }
+  function addConverted(L) {
+    if (!L.length) return;
+    L.forEach(function (x) {
+      var q = { id: ++QID, file: x.file, name: x.file.name, size: x.file.size, pages: x.pages || 0, thumb: '', patient: x.patient || '', phone: '', exam: x.exam || '', st: 'ready', af: '🩻 اتعمل من DICOM — ' + (/[a-zA-Z]/.test(x.patient || '') && ui.fixed ? 'الاسم إنجليزي من الجهاز: اكتبه عربي لو المريض هيدوّر بالباركود الثابت، واكتب الموبايل' : 'راجع الاسم واكتب الموبايل'), dir: false };
+      ui.queue.push(q); readPdf(q);
+    });
+    queue(); beep();
+    toast('🩻 اتعمل ' + L.length + (L.length === 1 ? ' PDF' : ' ملفات PDF') + ' — اكتب موبايل المريض واحفظ');
+    var qu = $('qu'); if (qu) setTimeout(function () { qu.scrollIntoView({ behavior: 'smooth', block: 'start' }); var i = qu.querySelector('[data-k=phone]'); if (i) i.focus(); }, 300);
   }
   function count(el, to) { var t0 = performance.now(); (function f(t) { var k = Math.min(1, (t - t0) / 900), e = 1 - Math.pow(1 - k, 3); el.textContent = n0(to * e); if (k < 1) requestAnimationFrame(f); })(t0); }
   function stats() {
