@@ -351,10 +351,26 @@
   var PAPER_MODES = [['daily', 'الحالي اليومي'], ['bars', 'أعمدة شهرية'], ['rank', 'ترتيب الأشهر'], ['trend', 'اتجاه شهري'], ['cards', 'بطاقات ملخص']];
   var PAPER_KEY = 'ax_paper_chart';
   function paperMode() {
-    try {
-      var v = localStorage.getItem(PAPER_KEY);
-      return PAPER_MODES.some(function (m) { return m[0] === v; }) ? v : 'daily';
-    } catch (e) { return 'daily'; }
+    var v = '';
+    try { v = (DB && DB.data && DB.data.settings && DB.data.settings.paperChart) || ''; } catch (e) {}
+    if (!v) { try { v = localStorage.getItem(PAPER_KEY) || ''; } catch (e2) {} }
+    return PAPER_MODES.some(function (m) { return m[0] === v; }) ? v : 'daily';
+  }
+  /* 50 ألف / 1.2 مليون, or the full count when it is under a thousand */
+  function qtyParts(n) {
+    n = Math.round(Number(n) || 0);
+    var a = Math.abs(n), sign = n < 0 ? '−' : '';
+    if (a >= 1000000) {
+      var m = a / 1000000;
+      var ms = (m >= 10 || Math.abs(m - Math.round(m)) < 0.05) ? String(Math.round(m)) : m.toFixed(1).replace(/\.0$/, '');
+      return { n: sign + ms, u: 'مليون' };
+    }
+    if (a >= 1000) {
+      var t = a / 1000;
+      var ts = Math.abs(t - Math.round(t)) < 0.05 ? String(Math.round(t)) : t.toFixed(1).replace(/\.0$/, '');
+      return { n: sign + ts, u: 'ألف' };
+    }
+    return { n: fmtN(n), u: '' };
   }
   function paperIds() {
     var prods = A('products');
@@ -402,7 +418,11 @@
       var host = document.createElement('div'); host.className = 'pxm pxm-bars';
       months.slice().reverse().forEach(function (m) {
         var col = document.createElement('div'); col.className = 'pxm-col' + (m.key === cmp.peak.key && m.qty ? ' peak' : '');
-        var num = document.createElement('b'); num.textContent = m.qty ? compact(m.qty) : '';
+        var parts = qtyParts(m.qty);
+        var num = document.createElement('b');
+        num.title = fmtN(m.qty);
+        num.appendChild(document.createTextNode(parts.n));
+        if (parts.u) { var unit = document.createElement('small'); unit.textContent = parts.u; num.appendChild(unit); }
         var grow = document.createElement('span'); grow.className = 'pxm-grow';
         var bar = document.createElement('i'); bar.style.height = Math.max(m.qty ? 8 : 3, Math.round(m.qty / max * 100)) + '%';
         grow.appendChild(bar);
@@ -612,16 +632,16 @@
         if (state.monthRun) { try { state.monthRun.kill(); } catch (e) {} state.monthRun = null; }
         if (k === 'paper' && paperMode() !== 'daily') {
           if (state.dayRun) state.dayRun.pause();
-          var months = paperMonths(), cmp = monthCompare(months);
-          tip.querySelector('.pxs-gname').textContent = 'صرف الورق · شهرياً';
-          tip.querySelector('.pxs-gval').textContent = fmtN(cmp.last.qty) + ' فرخ';
-          var mdl = tip.querySelector('.pxs-gdelta');
-          if (cmp.prev && cmp.prev.qty) {
-            var mch = (cmp.last.qty - cmp.prev.qty) / cmp.prev.qty * 100;
-            mdl.textContent = (mch >= 0 ? '+' : '') + mch.toFixed(0) + '% عن ' + cmp.prev.label;
-            mdl.className = 'pxs-gdelta ' + (mch >= 0 ? 'up' : 'down');
-          } else { mdl.textContent = cmp.last.label; mdl.className = 'pxs-gdelta'; }
-          showMonthly(G.plot, paperMode(), months, reduce, loops);
+          /* رصيد الورق stays in the same place as the daily chart */
+          tip.querySelector('.pxs-gname').textContent = m.graph + ' · آخر ' + DAYS + ' يوم';
+          tip.querySelector('.pxs-gval').textContent = c.value || '—';
+          var aM = raw[0], bM = raw[raw.length - 1], mdl = tip.querySelector('.pxs-gdelta');
+          if (aM) {
+            var chM = (bM - aM) / Math.abs(aM) * 100;
+            mdl.textContent = '‎' + (chM >= 0 ? '+' : '') + chM.toFixed(0) + '% من ' + DAYS + ' يوم';
+            mdl.className = 'pxs-gdelta ' + (chM >= 0 ? 'up' : 'down');
+          } else { mdl.textContent = ''; mdl.className = 'pxs-gdelta'; }
+          showMonthly(G.plot, paperMode(), paperMonths(), reduce, loops);
           G.onHover = function () {};
           return;
         }
@@ -781,6 +801,13 @@
     pick: function (v) {
       if (!PAPER_MODES.some(function (m) { return m[0] === v; })) return;
       try { localStorage.setItem(PAPER_KEY, v); } catch (e) {}
+      try {
+        if (typeof DB !== 'undefined' && DB && DB.data) {
+          if (!DB.data.settings) DB.data.settings = {};
+          DB.data.settings.paperChart = v;
+          if (typeof DB.save === 'function') DB.save();
+        }
+      } catch (e2) {}
       Array.prototype.forEach.call(document.querySelectorAll('[data-paper-mode]'), function (b) {
         var on = b.getAttribute('data-paper-mode') === v;
         b.classList.toggle('on', on);

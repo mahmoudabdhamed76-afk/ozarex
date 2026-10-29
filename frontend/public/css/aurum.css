@@ -1745,11 +1745,16 @@ html.aurum .ax-paper-modes button { flex: 1 1 140px; }
 html.aurum .pxm { position: absolute; inset: 0; min-height: 0; }
 html.aurum .pxm-bars { display: flex; align-items: flex-end; gap: 6px; height: 100%; direction: ltr; padding: 4px 0 2px; }
 html.aurum .pxm-col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; }
-html.aurum .pxm-col b { font: 700 10.5px/1 var(--ax-display); color: #fff; font-variant-numeric: tabular-nums; }
+html.aurum .pxm-col b {
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  color: #fff; font: 800 13px/1.05 var(--ax-display); font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .95), 0 0 8px rgba(0, 0, 0, .65);
+}
+html.aurum .pxm-col b small { font: 700 10px/1.1 var(--ax-font); color: #fff; letter-spacing: 0; }
 html.aurum .pxm-grow { flex: 1; width: 100%; min-height: 0; display: flex; align-items: flex-end; justify-content: center; }
 html.aurum .pxm-col i, html.aurum .pxm-grow i { display: block; width: min(100%, 26px); height: 4%; border-radius: 7px 7px 3px 3px; background: linear-gradient(180deg, #FF5A65, #C8161F); box-shadow: 0 0 14px rgba(255, 59, 71, .45); }
 html.aurum .pxm-col.peak i { background: linear-gradient(180deg, #FF8A92, #FF3B47); }
-html.aurum .pxm-col em { font-style: normal; font-size: 10px; color: rgba(255, 255, 255, .62); white-space: nowrap; }
+html.aurum .pxm-col em { font-style: normal; font-size: 11px; font-weight: 700; color: #fff; white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, .9); }
 html.aurum .pxm-rank { display: flex; flex-direction: column; gap: 5px; height: 100%; justify-content: center; overflow: auto; direction: rtl; padding: 2px 0; }
 html.aurum .pxm-row { display: grid; grid-template-columns: 68px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 html.aurum .pxm-row span { font-size: 12px; color: rgba(255, 255, 255, .82); }
