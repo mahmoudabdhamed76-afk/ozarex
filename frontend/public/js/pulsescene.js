@@ -408,28 +408,68 @@
     var pct = other && other.qty ? Math.round((last.qty - other.qty) / other.qty * 100) : null;
     return { last: last, prev: prev, peak: peak, other: other, pct: pct };
   }
+  function stopBars(loops) {
+    if (state.barVis) { document.removeEventListener('visibilitychange', state.barVis); state.barVis = null; }
+    if (state.barRun) {
+      try { state.barRun.kill(); } catch (e) {}
+      if (loops) { var i = loops.indexOf(state.barRun); if (i >= 0) loops.splice(i, 1); }
+      state.barRun = null;
+    }
+  }
+  /* columns grow from the floor, then again every 10s; the quantity pops in just after its bar */
+  function animateBars(host, reduce, loops) {
+    stopBars(loops);
+    if (reduce || typeof gsap === 'undefined' || !host) return;
+    var cols = host.querySelectorAll('.pxm-col');
+    var tl = gsap.timeline({ repeat: -1, repeatDelay: 10 });
+    cols.forEach(function (col, i) {
+      var bar = col.querySelector('i');
+      var lab = col.querySelector('b');
+      if (!bar) return;
+      gsap.set(bar, { scaleY: 0, transformOrigin: 'bottom center' });
+      tl.fromTo(bar, { scaleY: 0 }, { scaleY: 1, duration: 0.72, ease: 'power3.out' }, i * 0.05);
+      if (col.classList.contains('has-qty') && lab) {
+        gsap.set(lab, { scale: 0.62, opacity: 0, transformOrigin: 'center bottom' });
+        tl.fromTo(lab, { scale: 0.62, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.48, ease: 'back.out(1.7)' }, i * 0.05 + 0.34);
+      }
+    });
+    state.barRun = tl;
+    if (loops) loops.push(tl);
+    state.barVis = function () {
+      if (!state.barRun || !host.isConnected) return;
+      if (document.hidden) { state.barRun.pause(); return; }
+      var r = host.getBoundingClientRect();
+      var seen = r.width > 0 && r.bottom > 0 && r.top < (window.innerHeight || 800);
+      if (seen) state.barRun.resume();
+    };
+    document.addEventListener('visibilitychange', state.barVis);
+  }
   function showMonthly(plot, mode, months, reduce, loops) {
     if (state.monthRun) { try { state.monthRun.kill(); } catch (e) {} state.monthRun = null; }
+    stopBars(loops);
     var cmp = monthCompare(months);
     var max = Math.max.apply(null, months.map(function (m) { return m.qty; }).concat([1]));
     plot.innerHTML = '';
     plot.removeAttribute('tabIndex');
     if (mode === 'bars') {
-      var host = document.createElement('div'); host.className = 'pxm pxm-bars';
+      var host = document.createElement('div'); host.className = 'pxm pxm-bars pxm-bars-live';
       months.slice().reverse().forEach(function (m) {
-        var col = document.createElement('div'); col.className = 'pxm-col' + (m.key === cmp.peak.key && m.qty ? ' peak' : '');
+        var col = document.createElement('div'); col.className = 'pxm-col' + (m.qty ? ' has-qty' : '') + (m.key === cmp.peak.key && m.qty ? ' peak' : '');
         var parts = qtyParts(m.qty);
         var num = document.createElement('b');
         num.title = fmtN(m.qty);
         num.appendChild(document.createTextNode(parts.n));
         if (parts.u) { var unit = document.createElement('small'); unit.textContent = parts.u; num.appendChild(unit); }
+        if (!reduce && m.qty) { num.style.transform = 'scale(0.62)'; num.style.opacity = '0'; num.style.transformOrigin = 'center bottom'; }
         var grow = document.createElement('span'); grow.className = 'pxm-grow';
         var bar = document.createElement('i'); bar.style.height = Math.max(m.qty ? 8 : 3, Math.round(m.qty / max * 100)) + '%';
+        if (!reduce) { bar.style.transform = 'scaleY(0)'; bar.style.transformOrigin = 'bottom center'; }
         grow.appendChild(bar);
         var lab = document.createElement('em'); lab.textContent = m.label;
         col.appendChild(num); col.appendChild(grow); col.appendChild(lab); host.appendChild(col);
       });
       plot.appendChild(host);
+      animateBars(host, reduce, loops);
       return;
     }
     if (mode === 'rank') {
@@ -646,6 +686,7 @@
           return;
         }
         if (state.dayRun) state.dayRun.resume();
+        stopBars(loops);
         if (G.line && !G.line.isConnected) { G.draw(); G.color(m.color); }
         tip.querySelector('.pxs-gname').textContent = m.graph + ' · آخر ' + DAYS + ' يوم';
         tip.querySelector('.pxs-gval').textContent = c.value || '—';
@@ -770,6 +811,7 @@
     state.gc = setInterval(function () {
       if (!sec.isConnected) {
         clearInterval(state.gc);
+        stopBars(null);
         if (state.ctx) { try { state.ctx.revert(); } catch (e) {} state.ctx = null; }
         if (state.io) state.io.disconnect(); if (state.ro) state.ro.disconnect(); if (state.unscroll) state.unscroll();
       }
