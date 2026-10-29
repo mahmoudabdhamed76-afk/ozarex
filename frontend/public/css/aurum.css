@@ -6137,6 +6137,9 @@ html.aurum[data-theme="dark"] {
   --nav-rise-plate: #ffffff;
   --nav-rise-ink: #1a1214;
 }
+/* Phones and touch screens keep the pre-plate look. A wide screen with a
+   mouse still gets the rise exactly as shipped. */
+@media (min-width: 769px) and (hover: hover) and (pointer: fine) {
 html.aurum #sidebar-nav .nav-item:not(.active) {
   background: transparent !important;
   background-image: none !important;
@@ -6566,6 +6569,7 @@ html.aurum #page-content [role="tablist"]:not(.pxs-tiles):not(.fc-cal):not(.skh-
   html.aurum #page-content [role="tablist"]:not(.pxs-tiles):not(.fc-cal):not(.skh-sort) > button:not(.active):not(.on):not([aria-selected="true"])::before {
     transition: none !important;
   }
+}
 }
 
 /* §77 · 4.50 «🧪 مستهلكات» (js/consumables.js) + a transfer still «في الطريق» from before 4.50 */
