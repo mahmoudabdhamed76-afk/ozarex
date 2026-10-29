@@ -33,7 +33,7 @@
   var EDIT_KEYS = { monthlyTarget: 'هدف مبيعات الشهر' };
   /* settings keys a non-admin may write at all (the server refuses the rest) */
   var USER_KEYS = { monthlyTarget: 1, _debtPlan: 1, countBlind: 1, _approvals: 1, _custody: 1, _debts: 1, _stockCounts: 1, _cheques: 1, _po: 1,
-    tickerSpeed: 1, tickerEvents: 1, tickerPages: 1, soundEnabled: 1, reciterVolume: 1, reciterEnabled: 1, dailyBackupReminder: 1,
+    tickerSpeed: 1, tickerEvents: 1, tickerPages: 1, soundEnabled: 1, collectReminder: 1, reciterVolume: 1, reciterEnabled: 1, dailyBackupReminder: 1,
     lastBackupReminderDate: 1, _prospects: 1, _portal: 1, _stmtSent: 1, _poLead: 1, _requests: 1, _calls: 1, _stmtWeek: 1, _returns: 1, _cashCounts: 1 };
   /* how much needs the admin — set PER USER by the admin in «المستخدمين»:
        'sensitive' (default, like 4.6) · 'edits' (any edit / delete) · 'none'

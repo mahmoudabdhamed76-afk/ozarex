@@ -283,6 +283,7 @@
     document.head.appendChild(s);
   }
   function showPop(m) {
+    if (m && m.kind === 'due' && !dueOn()) { if (POPQ.length) showPop(POPQ.shift()); return; }
     popCss();
     var ov = document.querySelector('.clp-ov');
     if (ov) { POPQ.push(m); var mo = ov.querySelector('.clp-more'); if (mo) { mo.textContent = '+' + POPQ.length + ' إشعار كمان'; mo.style.display = ''; } return; }
@@ -321,7 +322,13 @@
   var DUE = { min: 7, from: 9 * 60 + 30, to: 21 * 60, gap: 4 };
   function lsGet(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-  function dueOn() { try { return localStorage.getItem('ax_due_on') !== '0'; } catch (e) { return true; } }
+  function dueOn() {
+    try {
+      var s = S();
+      if (s && typeof s.collectReminder === 'boolean') return s.collectReminder;
+    } catch (e) {}
+    try { return localStorage.getItem('ax_due_on') !== '0'; } catch (e2) { return true; }
+  }
   function canDue() { try { if (isAdmin()) return true; return typeof can === 'function' && can('payments'); } catch (e) { return false; } }
   function owing() {
     var X = window.AXCore; if (!X || !X.aging) return [];
@@ -417,7 +424,12 @@
     lsSet(k, p);
   }
   function dueTry() { var x = owing()[Math.floor(Math.random() * Math.max(1, owing().length))]; if (!x) return T('مفيش مراكز متأخرة أسبوع أو أكتر 🎉', 'info'); showPop(dueMsg(x)); }
-  function dueToggle() { try { localStorage.setItem('ax_due_on', dueOn() ? '0' : '1'); } catch (e) {} T(dueOn() ? '🔔 التذكير اليومي اشتغل' : 'التذكير اليومي اتوقف', 'info'); render(); }
+  function setDueOn(on) {
+    on = !!on;
+    try { if (!DB.data.settings) DB.data.settings = {}; DB.data.settings.collectReminder = on; if (DB.save) DB.save(); } catch (e) {}
+    try { localStorage.setItem('ax_due_on', on ? '1' : '0'); } catch (e2) {}
+  }
+  function dueToggle() { setDueOn(!dueOn()); T(dueOn() ? '🔔 التذكير اليومي اشتغل' : 'التذكير اليومي اتوقف', 'info'); render(); }
   (function dueBoot() { var n = 0; (function w() { if (typeof currentUser === 'undefined' || !currentUser || !window.AXCore || !A('customers').length) { if (++n < 120) setTimeout(w, 1000); return; } setTimeout(function () { dueTick(); }, 90e3); setInterval(function () { dueTick(); }, 60e3); })(); })();
 
   /* ── 4.81 · تقرير المخزن اليومي: الناقص واللي قرب يخلص والموجود — مرة كل يوم الصبح ── */
@@ -644,7 +656,7 @@
   };
   window.AXClients = {
     render: render, make: make, makeAll: makeAll, shortAll: shortAll, rotate: rotate, stop: stop, copy: copy, wa: wa,
-    st: setSt, del: del, _pop: showPop, assign: assign, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, reset: resetModal, cases: casesModal, payReg: payReg, payInfo: payInfo, stockShow: stockShow, stockToggle: stockToggle, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
+    st: setSt, del: del, _pop: showPop, assign: assign, dueOn: dueOn, setDueOn: setDueOn, dueTry: dueTry, dueToggle: dueToggle, dueTick: dueTick, qr: qrModal, qrPrint: qrPrint, qrPng: qrPng, reset: resetModal, cases: casesModal, payReg: payReg, payInfo: payInfo, stockShow: stockShow, stockToggle: stockToggle, waReq: waReq, issue: issue, count: function () { return ui.newCount; }, refresh: refreshCount,
     tab: function (t) { ui.tab = t; if (t === 'req') ui.rq = null; render(); },
     rf: function (f) { ui.rf = f; render(); },
     grp: function (k) { ui.grp[k] = !ui.grp[k]; render(); },

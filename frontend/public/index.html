@@ -11027,6 +11027,25 @@ function loadTheme() {
   updateThemeIcon(t);
 }
 
+function collectReminderOn() {
+  if (window.AXClients && typeof AXClients.dueOn === 'function') return AXClients.dueOn();
+  const s = (DB.data && DB.data.settings) || {};
+  if (typeof s.collectReminder === 'boolean') return s.collectReminder;
+  try { return localStorage.getItem('ax_due_on') !== '0'; } catch (e) { return true; }
+}
+function toggleCollectReminder() {
+  const next = !collectReminderOn();
+  if (window.AXClients && typeof AXClients.setDueOn === 'function') AXClients.setDueOn(next);
+  else {
+    if (!DB.data.settings) DB.data.settings = {};
+    DB.data.settings.collectReminder = next;
+    try { localStorage.setItem('ax_due_on', next ? '1' : '0'); } catch (e) {}
+    DB.save();
+  }
+  toast(next ? 'تذكير التحصيل شغّال' : 'تذكير التحصيل متوقف');
+  if (currentPage === 'settings') renderSettings();
+}
+
 function toggleSound() {
   DB.data.settings.soundEnabled = !(DB.data.settings.soundEnabled !== false);
   DB.save();
@@ -21912,6 +21931,11 @@ function renderSettings() {
           <button class="btn btn-ghost" onclick="playTone('save')">▶ صوت التسجيل</button>
           <button class="btn btn-ghost" onclick="playTone('collect')">▶ صوت التحصيل</button>
           <button class="btn btn-ghost" onclick="playTone('notify')">▶ صوت الإشعار</button>
+        </div>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border, rgba(255,255,255,.1))">
+          <p style="margin:0 0 6px;font-weight:800">تذكير التحصيل</p>
+          <p style="color:var(--text-muted);margin:0 0 12px;font-size:13px">نافذة «تذكير تحصيل» للمراكز المتأخرة: الاسم، المبلغ، وعدد الأيام. شغّالة تلقائياً، وتقدر توقفها من هنا.</p>
+          <button class="btn ${collectReminderOn()?'btn-success':'btn-secondary'}" onclick="toggleCollectReminder()">${collectReminderOn() ? '🔔 تذكير التحصيل شغّال' : '🔕 تذكير التحصيل متوقف'}</button>
         </div>
       </div>
     </div>
