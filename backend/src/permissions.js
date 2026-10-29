@@ -47,7 +47,7 @@ const PURCHASE_ROWS = { add: 'purchase', del: 'purchase', edit: { fields: true, 
 const g = (add, del, fields) => ({ add: !!add, del: !!del, edit: fields ? { fields, rows: true } : null });
 
 /* UI preferences any user may read and set (unchanged from before) */
-const PREF_KEYS = ['tickerSpeed', 'tickerEvents', 'tickerPages', 'soundEnabled', 'reciterVolume', 'reciterEnabled', 'dailyBackupReminder', 'lastBackupReminderDate'];
+const PREF_KEYS = ['tickerSpeed', 'tickerEvents', 'tickerPages', 'soundEnabled', 'collectReminder', 'reciterVolume', 'reciterEnabled', 'dailyBackupReminder', 'lastBackupReminderDate'];
 
 /* ═══ THE MATRIX ═══
    read:     collections sent to the browser          readRows: row limits on what is sent

@@ -20,7 +20,7 @@ const AX = require(process.env.PUBLIC_DIR ? path.join(process.env.PUBLIC_DIR, 'j
 const MASK_FIELDS = new Set(['password', 'passwordHash', 'token']);
 const MASK_KEYS = new Set(['_auditLock', '_portal']);
 /* settings that are personal screen preferences — not business changes */
-const QUIET_KEYS = new Set(['tickerSpeed', 'tickerEvents', 'tickerPages', 'soundEnabled', 'reciterVolume', 'reciterEnabled', 'dailyBackupReminder', 'lastBackupReminderDate']);
+const QUIET_KEYS = new Set(['tickerSpeed', 'tickerEvents', 'tickerPages', 'soundEnabled', 'collectReminder', 'reciterVolume', 'reciterEnabled', 'dailyBackupReminder', 'lastBackupReminderDate']);
 
 function isEmpty(w) {
   const has = g => Object.keys(g || {}).some(k => { const cd = g[k]; return cd && ((cd.added || []).length || (cd.removed || []).length || (cd.modified || []).length); });
