@@ -346,6 +346,154 @@
     return g;
   }
 
+  /* monthly paper-out (stock leaves for the same products the daily paper line uses) */
+  var MONTH_AR = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  var PAPER_MODES = [['daily', 'الحالي اليومي'], ['bars', 'أعمدة شهرية'], ['rank', 'ترتيب الأشهر'], ['trend', 'اتجاه شهري'], ['cards', 'بطاقات ملخص']];
+  var PAPER_KEY = 'ax_paper_chart';
+  function paperMode() {
+    try {
+      var v = localStorage.getItem(PAPER_KEY);
+      return PAPER_MODES.some(function (m) { return m[0] === v; }) ? v : 'daily';
+    } catch (e) { return 'daily'; }
+  }
+  function paperIds() {
+    var prods = A('products');
+    var hasPaper = prods.some(function (p) { return isPaper(p) && !isInk(p); });
+    var ids = {};
+    prods.forEach(function (p) { if (!isInk(p) && (!hasPaper || isPaper(p))) ids[p.id] = 1; });
+    return ids;
+  }
+  function paperMonths() {
+    var ids = paperIds(), known = Object.keys(ids).length > 0, by = {};
+    function add(date, qty) {
+      var k = String(date || '').slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(k)) return;
+      by[k] = (by[k] || 0) + Number(qty || 0);
+    }
+    if (known) {
+      A('stockMoves').forEach(function (m) {
+        if ((m.type === 'out' || m.type === 'صرف') && ids[m.productId]) add(m.date, m.quantity);
+      });
+    } else {
+      A('issuances').forEach(function (i) { add(i.date, i.quantity); });
+    }
+    var out = [], t = new Date();
+    for (var i = 11; i >= 0; i--) {
+      var d = new Date(t.getFullYear(), t.getMonth() - i, 1);
+      var key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      out.push({ key: key, label: MONTH_AR[d.getMonth()], qty: Math.round(by[key] || 0) });
+    }
+    return out;
+  }
+  function monthCompare(months) {
+    var last = months[months.length - 1], prev = months.length > 1 ? months[months.length - 2] : null;
+    var peak = months.reduce(function (a, m) { return m.qty > a.qty ? m : a; }, months[0]);
+    var other = peak && peak.key !== last.key ? peak : prev;
+    var pct = other && other.qty ? Math.round((last.qty - other.qty) / other.qty * 100) : null;
+    return { last: last, prev: prev, peak: peak, other: other, pct: pct };
+  }
+  function showMonthly(plot, mode, months, reduce, loops) {
+    if (state.monthRun) { try { state.monthRun.kill(); } catch (e) {} state.monthRun = null; }
+    var cmp = monthCompare(months);
+    var max = Math.max.apply(null, months.map(function (m) { return m.qty; }).concat([1]));
+    plot.innerHTML = '';
+    plot.removeAttribute('tabIndex');
+    if (mode === 'bars') {
+      var host = document.createElement('div'); host.className = 'pxm pxm-bars';
+      months.slice().reverse().forEach(function (m) {
+        var col = document.createElement('div'); col.className = 'pxm-col' + (m.key === cmp.peak.key && m.qty ? ' peak' : '');
+        var num = document.createElement('b'); num.textContent = m.qty ? compact(m.qty) : '';
+        var grow = document.createElement('span'); grow.className = 'pxm-grow';
+        var bar = document.createElement('i'); bar.style.height = Math.max(m.qty ? 8 : 3, Math.round(m.qty / max * 100)) + '%';
+        grow.appendChild(bar);
+        var lab = document.createElement('em'); lab.textContent = m.label;
+        col.appendChild(num); col.appendChild(grow); col.appendChild(lab); host.appendChild(col);
+      });
+      plot.appendChild(host);
+      return;
+    }
+    if (mode === 'rank') {
+      var rank = document.createElement('div'); rank.className = 'pxm pxm-rank';
+      months.slice().sort(function (a, b) { return b.qty - a.qty || b.key.localeCompare(a.key); }).forEach(function (m) {
+        var row = document.createElement('div'); row.className = 'pxm-row';
+        var name = document.createElement('span'); name.textContent = m.label;
+        var track = document.createElement('div'); track.className = 'pxm-track';
+        var fill = document.createElement('i'); fill.style.width = Math.max(m.qty ? 4 : 0, Math.round(m.qty / max * 100)) + '%';
+        track.appendChild(fill);
+        var num = document.createElement('b'); num.textContent = fmtN(m.qty);
+        row.appendChild(name); row.appendChild(track); row.appendChild(num); rank.appendChild(row);
+      });
+      plot.appendChild(rank);
+      return;
+    }
+    if (mode === 'cards') {
+      var wrap = document.createElement('div'); wrap.className = 'pxm pxm-cards';
+      var side = document.createElement('div'); side.className = 'pxm-side';
+      [cmp.last, cmp.prev, cmp.peak && cmp.peak.key !== cmp.last.key && cmp.peak.key !== (cmp.prev && cmp.prev.key) ? cmp.peak : null].forEach(function (m, idx) {
+        if (!m) return;
+        var card = document.createElement('div'); card.className = 'pxm-card';
+        var s = document.createElement('span'); s.textContent = idx === 0 ? m.label + ' · الشهر ده' : m === cmp.peak ? m.label + ' · الأعلى' : m.label;
+        var b = document.createElement('b'); b.textContent = compact(m.qty);
+        card.appendChild(s); card.appendChild(b); side.appendChild(card);
+      });
+      var mini = document.createElement('div'); mini.className = 'pxm-bars';
+      months.forEach(function (m) {
+        var col = document.createElement('div'); col.className = 'pxm-col' + (m.key === cmp.peak.key && m.qty ? ' peak' : '');
+        var grow = document.createElement('span'); grow.className = 'pxm-grow';
+        var bar = document.createElement('i'); bar.style.height = Math.max(m.qty ? 8 : 3, Math.round(m.qty / max * 100)) + '%';
+        grow.appendChild(bar);
+        var lab = document.createElement('em'); lab.textContent = m.label.slice(0, 3);
+        col.appendChild(grow); col.appendChild(lab); mini.appendChild(col);
+      });
+      wrap.appendChild(side); wrap.appendChild(mini); plot.appendChild(wrap);
+      return;
+    }
+    /* trend: same comet that already runs along the daily line */
+    var W = Math.max(280, plot.clientWidth), H = Math.max(120, plot.clientHeight || 160);
+    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, width: W, height: H, direction: 'ltr', class: 'pxm' }, plot);
+    var defs = svgEl('defs', {}, svg);
+    var f = svgEl('filter', { id: 'pxm-blur', x: '-20%', y: '-60%', width: '140%', height: '220%' }, defs);
+    svgEl('feGaussianBlur', { stdDeviation: 7 }, f);
+    var lg = svgEl('linearGradient', { id: 'pxm-area', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    svgEl('stop', { offset: 0, 'stop-color': '#FF3B47', 'stop-opacity': 0.34 }, lg);
+    svgEl('stop', { offset: 1, 'stop-color': '#FF3B47', 'stop-opacity': 0 }, lg);
+    var pl = 14, pr = 10, pt = 36, pb = 22, n = months.length;
+    function X(i) { return n < 2 ? W / 2 : (W - pr) - i * ((W - pr - pl) / (n - 1)); }
+    function Y(q) { return (H - pb) - (q / max) * (H - pb - pt); }
+    var pts = months.map(function (m, i) { return [X(i), Y(m.qty)]; }).reverse();
+    var d = smooth(pts);
+    var grp = svgEl('g', {}, svg);
+    svgEl('path', { class: 'pxs-area', fill: 'url(#pxm-area)', d: d + 'L' + pts[pts.length - 1][0].toFixed(1) + ',' + (H - pb) + 'L' + pts[0][0].toFixed(1) + ',' + (H - pb) + 'Z' }, grp);
+    svgEl('path', { class: 'pxs-lglow', filter: 'url(#pxm-blur)', d: d }, grp);
+    var line = svgEl('path', { class: 'pxs-line', d: d }, grp);
+    var runner = svgEl('path', { class: 'pxs-runner', d: d }, grp);
+    var head = svgEl('circle', { r: 4.5, class: 'pxs-head' }, svg);
+    var headGlow = svgEl('circle', { r: 14, class: 'pxs-headglow' }, svg);
+    months.forEach(function (m, i) {
+      var t = svgEl('text', { x: X(i), y: H - 6, class: 'pxs-ax pxs-axd', 'text-anchor': 'middle' }, svg);
+      t.textContent = m.label.slice(0, 3);
+    });
+    var call = document.createElement('div'); call.className = 'pxm-call';
+    var cb = document.createElement('b'); cb.textContent = cmp.last.label + ' ' + fmtN(cmp.last.qty) + ' فرخ';
+    var cs = document.createElement('span');
+    cs.textContent = cmp.other ? ('مقابل ' + cmp.other.label + ' ' + fmtN(cmp.other.qty) + (cmp.pct == null ? '' : ' · ' + (cmp.pct >= 0 ? 'أعلى ' : 'أقل ') + Math.abs(cmp.pct) + '%')) : '';
+    call.appendChild(cb); call.appendChild(cs); plot.appendChild(call);
+    var len = line.getTotalLength();
+    runner.style.strokeDasharray = '70 ' + (len + 80);
+    var run = { p: 0 };
+    function moveHead() {
+      var at = len * (1 - run.p);
+      var p = line.getPointAtLength(Math.max(0, at));
+      head.setAttribute('cx', p.x); head.setAttribute('cy', p.y);
+      headGlow.setAttribute('cx', p.x); headGlow.setAttribute('cy', p.y);
+      runner.style.strokeDashoffset = String(-(at - 70));
+    }
+    moveHead();
+    if (reduce || typeof gsap === 'undefined') { head.style.display = 'none'; headGlow.style.display = 'none'; runner.style.display = 'none'; return; }
+    state.monthRun = gsap.to(run, { p: 1, duration: 5.5, ease: 'none', repeat: -1, repeatDelay: .6, onUpdate: moveHead });
+    if (loops) loops.push(state.monthRun);
+  }
+
   /* ── mount ── */
   /* 4.44 · what rides with the pillars: red sparks rising, and a card with a real latest event every few seconds */
   function sceneFx(stage, host) {
@@ -461,6 +609,24 @@
         sec.querySelectorAll('.pxs-tile').forEach(function (t) { var on = t.dataset.k === k; t.classList.toggle('on', on); t.setAttribute('aria-selected', on); });
         sec.style.setProperty('--gc', m.color);
         G.color(m.color);
+        if (state.monthRun) { try { state.monthRun.kill(); } catch (e) {} state.monthRun = null; }
+        if (k === 'paper' && paperMode() !== 'daily') {
+          if (state.dayRun) state.dayRun.pause();
+          var months = paperMonths(), cmp = monthCompare(months);
+          tip.querySelector('.pxs-gname').textContent = 'صرف الورق · شهرياً';
+          tip.querySelector('.pxs-gval').textContent = fmtN(cmp.last.qty) + ' فرخ';
+          var mdl = tip.querySelector('.pxs-gdelta');
+          if (cmp.prev && cmp.prev.qty) {
+            var mch = (cmp.last.qty - cmp.prev.qty) / cmp.prev.qty * 100;
+            mdl.textContent = (mch >= 0 ? '+' : '') + mch.toFixed(0) + '% عن ' + cmp.prev.label;
+            mdl.className = 'pxs-gdelta ' + (mch >= 0 ? 'up' : 'down');
+          } else { mdl.textContent = cmp.last.label; mdl.className = 'pxs-gdelta'; }
+          showMonthly(G.plot, paperMode(), months, reduce, loops);
+          G.onHover = function () {};
+          return;
+        }
+        if (state.dayRun) state.dayRun.resume();
+        if (G.line && !G.line.isConnected) { G.draw(); G.color(m.color); }
         tip.querySelector('.pxs-gname').textContent = m.graph + ' · آخر ' + DAYS + ' يوم';
         tip.querySelector('.pxs-gval').textContent = c.value || '—';
         var a = raw[0], b = raw[raw.length - 1];
@@ -493,7 +659,9 @@
         gsap.from(G.now, { attr: { r: 0 }, duration: .6, delay: 2, ease: 'back.out(3)' });
       }
       if (!reduce) {
-        loops.push(gsap.to(G.run, { p: 1, duration: 5.5, ease: 'none', repeat: -1, repeatDelay: .6, onUpdate: G.moveHead, delay: intro ? 2 : 0 }));
+        state.dayRun = gsap.to(G.run, { p: 1, duration: 5.5, ease: 'none', repeat: -1, repeatDelay: .6, onUpdate: G.moveHead, delay: intro ? 2 : 0 });
+        loops.push(state.dayRun);
+        if (state.active === 'paper' && paperMode() !== 'daily') state.dayRun.pause();
         loops.push(gsap.to(G.now, { attr: { r: 8 }, opacity: .55, duration: 1.1, ease: 'sine.inOut', yoyo: true, repeat: -1 }));
         loops.push(gsap.to(G.area, { opacity: .7, duration: 2.6, ease: 'sine.inOut', yoyo: true, repeat: -1 }));
       } else { gsap.set([G.head, G.headGlow, G.runner], { autoAlpha: 0 }); }
@@ -600,7 +768,27 @@
     w._pxs = true; if (orig._ax) w._ax = true;
     window.renderDashboard = w;
   }
-  window.AXPulse = { mount: mount };
+  window.AXPulse = { mount: mount, paperMonths: paperMonths };
+  window.AXPaperChart = {
+    mode: paperMode,
+    modes: PAPER_MODES,
+    html: function () {
+      var cur = paperMode();
+      return PAPER_MODES.map(function (m) {
+        return '<button type="button" role="radio" data-paper-mode="' + m[0] + '" class="' + (cur === m[0] ? 'on' : '') + '" aria-checked="' + (cur === m[0]) + '" onclick="AXPaperChart.pick(\'' + m[0] + '\')">' + m[1] + '</button>';
+      }).join('');
+    },
+    pick: function (v) {
+      if (!PAPER_MODES.some(function (m) { return m[0] === v; })) return;
+      try { localStorage.setItem(PAPER_KEY, v); } catch (e) {}
+      Array.prototype.forEach.call(document.querySelectorAll('[data-paper-mode]'), function (b) {
+        var on = b.getAttribute('data-paper-mode') === v;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+      });
+      if (typeof currentPage !== 'undefined' && currentPage === 'dashboard' && state.select) state.select('paper', false);
+    }
+  };
   wrap();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wrap);
   window.addEventListener('load', function () {
