@@ -1570,7 +1570,7 @@
     else deliver(r);
     function deliver(ans) {
       if (!ans || !ans.title) ans = { icon: 'question', title: 'حصلت مشكلة وأنا بحسب', note: 'جرّب تاني، ولو اتكررت قول للمدير.', tone: 'bad', failed: true };
-      var wait = Math.max(0, 2000 - (Date.now() - askedAt));
+      var wait = Math.max(0, 3000 - (Date.now() - askedAt));
       setTimeout(function () {
         var th = document.getElementById('axa-thinking'); if (th) th.remove();
         var at = clock(), m = { who: 'bot', html: slip(ans, at), follow: ans.follow, q2: { q: q, f: force }, at: at };
