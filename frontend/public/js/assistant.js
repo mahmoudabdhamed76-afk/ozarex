@@ -1558,15 +1558,19 @@
     var start = box && box.querySelector('.axa-empty'); if (start) start.remove();
     if (st.msgs.length === 1) { var qh = document.querySelector('.axa-quick-h'); if (qh && !qh.querySelector('button')) qh.insertAdjacentHTML('beforeend', '<button type="button" onclick="AXA.clear()" aria-label="محادثة جديدة" title="محادثة جديدة">' + ic('new') + '<span>محادثة جديدة</span></button>'); }
     if (box) {
-      box.insertAdjacentHTML('beforeend', msgHtml({ who: 'me', q: q }) + '<div class="axa-msg bot axa-thinking" id="axa-thinking">' + mark('busy') + '<span>بحسبها…</span></div>');
+      box.insertAdjacentHTML('beforeend', msgHtml({ who: 'me', q: q }) +
+        '<div class="axa-msg bot axa-thinking" id="axa-thinking">' + mark('busy') +
+        '<span class="axa-dots" role="status" aria-label="بيكتب"><i></i><i></i><i></i><b>...</b></span></div>');
       scrollEnd();
     }
+    var askedAt = Date.now();
     var r;
     try { r = understand(q, force); } catch (e) { console.error(e); r = null; }
     if (r && typeof r.then === 'function') r.then(function (ans) { deliver(ans); }, function (e) { console.error(e); deliver(null); });
     else deliver(r);
     function deliver(ans) {
       if (!ans || !ans.title) ans = { icon: 'question', title: 'حصلت مشكلة وأنا بحسب', note: 'جرّب تاني، ولو اتكررت قول للمدير.', tone: 'bad', failed: true };
+      var wait = Math.max(0, 2000 - (Date.now() - askedAt));
       setTimeout(function () {
         var th = document.getElementById('axa-thinking'); if (th) th.remove();
         var at = clock(), m = { who: 'bot', html: slip(ans, at), follow: ans.follow, q2: { q: q, f: force }, at: at };
@@ -1580,7 +1584,7 @@
         }
         st.busy = false;
         faceMood(moodOf(ans));
-      }, 420 + Math.random() * 260);
+      }, wait);
     }
   }
   /* the answer types itself in fast — same typewriter + colors as «مساعدك الذكي» over the floating robot */

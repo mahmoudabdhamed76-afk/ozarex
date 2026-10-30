@@ -2836,6 +2836,22 @@ html.aurum .axa-msg { display: flex; gap: 12px; align-items: flex-start; scroll-
 html.aurum .axa-msg.me { justify-content: flex-end; }
 html.aurum .axa-bubble { max-width: min(78%, 520px); background: var(--ax-ink); color: var(--ax-on-ink); border-radius: 20px; border-end-end-radius: 6px; padding: 10px 16px; font: 600 15px/1.6 var(--ax-font); white-space: pre-wrap; overflow-wrap: anywhere; animation: axaIn .25s var(--ax-ease) both; }
 html.aurum .axa-thinking { align-items: center; color: var(--ax-faint); font-size: 13.5px; font-weight: 600; }
+html.aurum .axa-dots {
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  min-width: 62px; height: 40px; padding: 0 14px; border-radius: 18px; border-end-start-radius: 6px;
+  background: var(--ax-surface-2); border: 1px solid var(--ax-line); box-shadow: var(--ax-shadow);
+}
+html.aurum .axa-dots i {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--ax-muted);
+  animation: axaDot 1s ease-in-out infinite;
+}
+html.aurum .axa-dots i:nth-child(2) { animation-delay: .16s; }
+html.aurum .axa-dots i:nth-child(3) { animation-delay: .32s; }
+html.aurum .axa-dots b { display: none; font: 800 18px/1 var(--ax-font); letter-spacing: 1px; color: var(--ax-muted); }
+@keyframes axaDot {
+  0%, 70%, 100% { transform: translateY(0); opacity: .35; }
+  35% { transform: translateY(-5px); opacity: 1; }
+}
 @keyframes axaIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
 /* the slip */
@@ -2976,7 +2992,9 @@ html.aurum .axa-composer:focus-within { box-shadow: var(--ax-shadow-lift), 0 0 0
   html.aurum .axa-slip > footer button span { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  html.aurum .axa-mark.busy i, html.aurum .axa-mark.busy::after, html.aurum .axa-micb.on { animation: none !important; }
+  html.aurum .axa-mark.busy i, html.aurum .axa-mark.busy::after, html.aurum .axa-micb.on, html.aurum .axa-dots i { animation: none !important; opacity: 1 !important; }
+  html.aurum .axa-dots i { display: none; }
+  html.aurum .axa-dots b { display: block; }
   html.aurum .axa-slip, html.aurum .axa-bubble { animation: none !important; }
 }
 
