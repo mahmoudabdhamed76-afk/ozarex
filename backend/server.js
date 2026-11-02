@@ -28,6 +28,7 @@ const portal = require('./src/portal');
 const cases = require('./src/cases');   // 4.90 · حالات المرضى (/k/ للمركز، /v/ للمريض)
 const tiles = require('./src/tiles');
 const webpush = require('./src/webpush');
+const activity = require('./src/activity');
 const staff = require('./src/staff');
 /* 4.61 · the employees pick the center they're working at from the ERP's own customers (every branch) */
 staff.setSource({
@@ -419,13 +420,22 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 200, { ok: true, devices: webpush.countFor(me.id) });
       }
       if (pathname === '/api/push/test' && req.method === 'POST') {
-        const r = await webpush.send([me.id], { title: '🔔 الإشعارات شغّالة', body: 'هيوصلك هنا الملخص اليومي وأي عجز أو مصروف مستني موافقتك', url: './?go=fulus', tag: 'test' });
+        const r = await webpush.send([me.id], { title: '🔔 الإشعارات شغّالة', body: admin ? 'هيوصلك هنا أي مصروف أو توريد أو تحصيل جديد، والملخص اليومي وأي عجز أو مصروف مستني موافقتك' : 'هيوصلك هنا أي مصروف أو توريد أو تحصيل جديد', url: './', tag: 'test', noBadge: true });
         return sendJSON(res, 200, { ok: r.ok > 0, devices: r.devices, sent: r.ok });
+      }
+      /* 4.96 · the app was opened → the number on its icon goes back to 0 */
+      if (pathname === '/api/push/seen' && req.method === 'POST') return sendJSON(res, 200, { ok: true, badge: webpush.seen(me.id) });
+      /* 4.96 · which moves notify everyone (admin switches them) */
+      if (pathname === '/api/activity' && req.method === 'GET') return sendJSON(res, 200, { config: activity.config() });
+      if (pathname === '/api/activity' && req.method === 'PUT') {
+        if (!admin) return adminOnly();
+        const b = (await readBody(req, 0.02)) || {};
+        return sendJSON(res, 200, { config: activity.setConfig(b) });
       }
       /* 4.39 · الملخص اليومي (admin) */
       if (pathname === '/api/digest' && req.method === 'GET') {
         if (!admin) return adminOnly();
-        return sendJSON(res, 200, { config: digest.publicConfig(), devices: webpush.countFor(me.id), now: digest.local(), history: digest.history(40) });
+        return sendJSON(res, 200, { config: digest.publicConfig(), activity: activity.config(), devices: webpush.countFor(me.id), now: digest.local(), history: digest.history(40) });
       }
       if (pathname === '/api/digest' && req.method === 'PUT') {
         if (!admin) return adminOnly();
@@ -549,6 +559,8 @@ const server = http.createServer(async (req, res) => {
         if (out && out.noop && !sharedTouched) return sendJSON(res, 200, { ok: true, version: verOf(bid), prev, noop: true });   // e.g. only audit entries from an old client
         notifyDataChanged({ source: req.headers['x-client-id'] || b.cid || 'unknown', by: me.id }, bid);
         if (b.ops.sets && (b.ops.sets._cashCounts || b.ops.sets._approvals)) { const br = branches.get(bid) || {}; digest.onOps(digestCtx(), { id: bid, name: br.name || '', data: st.data() }, apBefore, b.ops, me); }
+        /* 4.96 · a new expense / supply / collection → a push to everyone in this branch + the number on the app icon */
+        if (b.ops.cols && (b.ops.cols.expenses || b.ops.cols.issuances || b.ops.cols.payments)) { const br = branches.get(bid) || {}; activity.onOps({ mainData: store.data(), canUse: branches.canUse }, { id: bid, name: br.name || '', data: st.data() }, b.ops, me); }
         /* «renumbered»: numbers the server changed to keep them unique (extra field — old clients ignore it
            and still get the new number, because the version jump makes them pull the latest data) */
         return sendJSON(res, 200, Object.assign({ ok: true, version: verOf(bid), prev }, out && out.renumbered && out.renumbered.length ? { renumbered: out.renumbered } : {}));

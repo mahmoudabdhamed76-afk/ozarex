@@ -60,8 +60,9 @@
 
   /* the strip in the notification centre + the row in «الملخص اليومي» */
   function strip() {
-    if (!admin()) return '';
-    return '<div class="axp-strip ax-hl-off" data-axp><span class="axp-ic">🔔</span><div><b>إشعارات الموبايل</b><small>' + (state.on ? 'شغّالة على الجهاز ده — الملخص اليومي والعجز والموافقات' : 'توصلك والبرنامج مقفول: الملخص اليومي، أي عجز، أي مصروف مستني موافقتك') + '</small></div>' +
+    if (typeof currentUser === 'undefined' || !currentUser) return '';
+    var what = admin() ? 'أي مصروف أو توريد أو تحصيل جديد، والملخص اليومي والعجز والموافقات' : 'أي مصروف أو توريد أو تحصيل جديد (اللي صلاحياتك بتوريهولك)';
+    return '<div class="axp-strip ax-hl-off" data-axp><span class="axp-ic">🔔</span><div><b>إشعارات الموبايل</b><small>' + (state.on ? 'شغّالة على الجهاز ده — ' + what : 'توصلك والبرنامج مقفول، والرقم بيظهر على أيقونة البرنامج: ' + what) + '</small></div>' +
       '<button type="button" class="axp-btn' + (state.on ? ' on' : '') + '" onclick="AXPush.toggle()"' + (state.busy ? ' disabled' : '') + '>' + (state.busy ? '…' : state.on ? 'إيقاف' : 'تفعيل') + '</button></div>';
   }
   function paint() { document.querySelectorAll('[data-axp]').forEach(function (el) { var t = document.createElement('div'); t.innerHTML = strip(); if (t.firstChild) el.replaceWith(t.firstChild); }); }
@@ -76,14 +77,31 @@
       if (p === 'staff') navigate('staff');
       else if (p === 'clients') navigate('clients');
       else if (p === 'approvals') navigate('approvals');
+      else if (p === 'expenses' || p === 'issuances' || p === 'payments') navigate(p);
       else if (p === 'fulus') { navigate('profit'); if (window.AXProfit && AXProfit.view) AXProfit.view('cash'); setTimeout(function () { if (window.AXFulus && AXFulus.digests) AXFulus.digests(); }, 300); }
     })();
   }
-  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', function (e) { if (e.data && e.data.type === 'ax-go') go(e.data.url); });
+  /* 4.96 · the number on the app icon: back to 0 when the app is open in front of the user */
+  var lastSeen = 0;
+  function seen(force) {
+    if (typeof currentUser === 'undefined' || !currentUser || document.visibilityState !== 'visible') return;
+    try { if (navigator.clearAppBadge) navigator.clearAppBadge().catch(function () {}); } catch (e) {}
+    if (!force && Date.now() - lastSeen < 5000) return;
+    lastSeen = Date.now();
+    api('/api/push/seen', {}).catch(function () {});
+  }
+  document.addEventListener('visibilitychange', function () { seen(); });
+  window.addEventListener('focus', function () { seen(); });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', function (e) {
+    if (!e.data) return;
+    if (e.data.type === 'ax-go') go(e.data.url);
+    if (e.data.type === 'ax-push') setTimeout(function () { seen(true); }, 400);   // it came while the app is open → no number on the icon
+  });
+  (function waitUser(n) { if (typeof currentUser !== 'undefined' && currentUser) return seen(true); if (n < 120) setTimeout(function () { waitUser(n + 1); }, 500); })(0);
   try {
     if (/[?&]go=/.test(location.search)) { var u0 = location.href; history.replaceState(null, '', location.pathname + location.search.replace(/[?&]go=[^&]*/, '').replace(/^&/, '?') + location.hash); go(u0); }
   } catch (e) {}
   setTimeout(check, 1500);
 
-  window.AXPush = { strip: strip, toggle: toggle, enable: enable, disable: disable, check: check, state: function () { return { on: state.on, why: why() }; } };
+  window.AXPush = { seen: seen, strip: strip, toggle: toggle, enable: enable, disable: disable, check: check, state: function () { return { on: state.on, why: why() }; } };
 })();

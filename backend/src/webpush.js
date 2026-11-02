@@ -14,6 +14,8 @@ const { db } = require('../db');
 db.exec(`CREATE TABLE IF NOT EXISTS app_meta (k TEXT PRIMARY KEY, v TEXT)`);
 db.exec(`CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, user_id TEXT NOT NULL, data TEXT NOT NULL, ua TEXT, created_at TEXT NOT NULL, last_ok TEXT, fails INTEGER DEFAULT 0)`);
 db.exec('CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subs(user_id)');
+/* 4.96 · the number on the app icon: notifications this user got since they last opened the app */
+db.exec('CREATE TABLE IF NOT EXISTS push_badge (user_id TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0, at TEXT)');
 
 const b64u = b => Buffer.from(b).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 const unb64u = s => Buffer.from(String(s || '').replace(/-/g, '+').replace(/_/g, '/'), 'base64');
@@ -109,11 +111,20 @@ async function sendOne(sub, msg) {
     return { ok: false, error: e.message };
   }
 }
-/* msg: { title, body, url, tag, urgent } → every device of these users */
+function badgeOf(userId) { const r = db.prepare('SELECT n FROM push_badge WHERE user_id = ?').get(String(userId)); return r ? r.n : 0; }
+function bump(userId) {
+  db.prepare(`INSERT INTO push_badge (user_id, n, at) VALUES (?, 1, ?) ON CONFLICT(user_id) DO UPDATE SET n = MIN(n + 1, 999), at = excluded.at`).run(String(userId), new Date().toISOString());
+  return badgeOf(userId);
+}
+function seen(userId) { db.prepare('UPDATE push_badge SET n = 0, at = ? WHERE user_id = ?').run(new Date().toISOString(), String(userId)); return 0; }
+/* msg: { title, body, url, tag, urgent, noBadge } → every device of these users.
+   Each user's devices get that user's own icon number (msg.badge), counted once per message. */
 async function send(userIds, msg) {
   const subs = subsOf(userIds);
-  const res = await Promise.all(subs.map(s => sendOne(s, msg)));
+  const nOf = {};
+  if (!msg.noBadge) [...new Set(subs.map(s => String(s._user)))].forEach(u => { nOf[u] = bump(u); });
+  const res = await Promise.all(subs.map(s => { const m = Object.assign({}, msg); delete m.noBadge; if (nOf[s._user]) m.badge = nOf[s._user]; return sendOne(s, m); }));
   return { devices: subs.length, ok: res.filter(r => r.ok).length, results: res };
 }
 
-module.exports = { publicKey, subscribe, unsubscribe, send, countFor, meta, encrypt, vapid, _keys: keys };
+module.exports = { publicKey, subscribe, unsubscribe, send, countFor, badgeOf, seen, meta, encrypt, vapid, _keys: keys };

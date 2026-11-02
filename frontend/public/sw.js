@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE      = 'erp-v3.69';   // bump on every release that changes a cached file (assistant typing pause is 3s)
+const CACHE      = 'erp-v3.70';   // bump on every release that changes a cached file (4.96 activity push to every user + app icon number)
 // relative to the SW scope, so it also works when the app lives under APP_PATH
 const APP_SHELL  = ['./', './index.html', './manifest.json', './css/aurum.css', './css/ads.css', './js/aurum.js', './js/glowchart.js', './js/stockhub.js', './js/stockcount.js', './js/debts.js', './js/business.js', './js/custody.js', './js/axcore.js', './js/rules.js', './js/forecast.js', './js/purchases.js', './js/xlsx.js', './js/credit.js', './js/monthly.js', './js/notify.js', './js/approvals.js', './js/security.js', './js/aging.js', './js/cheques.js', './js/profit.js', './js/purchase.js', './js/requests.js', './js/isscards.js', './js/users.js', './js/assistant.js', './js/papermeter.js', './js/ticker.js', './js/cabfig.js', './js/pulsescene.js', './js/mhome.js', './js/marker.js', './js/picker.js', './js/auditx.js', './js/fxtape.js', './js/forcepw.js', './js/centerstmt.js', './js/navsmart.js', './js/deskmore.js', './js/aibot.js', './js/adscore.js', './js/adsadmin.js', './js/settingsx.js', './js/sales.js', './js/glassnav.js', './js/branchstats.js', './js/branches.js', './js/returns.js', './js/cashbook.js', './js/fulusi.js', './js/pushx.js', './js/consumables.js', './js/staffadmin.js', './js/clients.js', './vendor/qrcode.js', './vendor/leaflet/leaflet.js', './vendor/leaflet/leaflet.css', './vendor/gsap.min.js', './vendor/hairline.js',
                     './fonts/fonts.css', './vendor/chart.umd.js', './vendor/modern-screenshot.js',
@@ -181,10 +181,13 @@ self.addEventListener('push', e => {
   let m;
   try { m = e.data ? e.data.json() : {}; } catch (_) { m = { title: 'Ozarex', body: e.data ? e.data.text() : '' }; }
   const title = m.title || 'Ozarex';
-  e.waitUntil(self.registration.showNotification(title, {
+  /* 4.96 · the number on the app icon (home screen): how many came since the app was last opened */
+  const badge = (m.badge > 0 && self.navigator && self.navigator.setAppBadge) ? self.navigator.setAppBadge(m.badge).catch(() => {}) : Promise.resolve();
+  const tell = self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => list.forEach(c => c.postMessage({ type: 'ax-push', badge: m.badge || 0 }))).catch(() => {});
+  e.waitUntil(Promise.all([badge, tell, self.registration.showNotification(title, {
     body: m.body || '', icon: './icons/icon-192.png', badge: './icons/favicon-32.png', tag: m.tag || undefined, renotify: !!m.tag,
     dir: 'rtl', lang: 'ar', vibrate: [120, 60, 120], requireInteraction: !!m.urgent, data: { url: m.url || './' }
-  }));
+  })]));
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();

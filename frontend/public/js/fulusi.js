@@ -266,12 +266,14 @@
     if (!admin()) return;
     openModal('📲 الملخص اليومي', '<div class="pfx-empty">بيحمّل…</div>', '');
     api('/api/digest').then(function (r) {
-      var c = r.config, last = (r.history || []).filter(function (h) { return h.kind === 'digest'; })[0];
+      var c = r.config, a = r.activity || { actExpense: true, actIssue: true, actPay: true }, last = (r.history || []).filter(function (h) { return h.kind === 'digest'; })[0];
       openModal('📲 الملخص اليومي', '<div class="fx-dgf ax-hl-off">' +
         '<p class="pfx-note" style="margin-top:0">كل يوم في الساعة اللي تختارها يوصلك ملخص كل الفروع: اتحصّل كام، اتصرف كام وفي إيه، التقفيل والعجز، المصاريف المستنية موافقتك، والربح. وأي عجز أو مصروف مستني موافقتك يوصلك على طول.</p>' +
         sw('dg-on', c.on, 'الملخص اليومي شغّال') +
         '<div class="fx-form"><label><span>الساعة (بتوقيت القاهرة)</span><input class="form-control" id="dg-time" type="time" value="' + esc(c.time) + '"></label></div>' +
         '<h4 class="fx-h4">🔔 إشعار على الموبايل</h4>' + (window.AXPush ? AXPush.strip() : '') + sw('dg-push', c.push, 'ابعت الملخص والتنبيهات كإشعار') +
+        '<h4 class="fx-h4">📣 إشعار لكل المستخدمين</h4><p class="pfx-note" style="margin-top:0">أي حد يضيف حاجة من دول، كل المستخدمين اللي فعّلوا الإشعارات على موبايلهم يوصلهم إشعار، والرقم يظهر على أيقونة البرنامج. شغّال حتى لو الملخص اليومي مقفول.</p>' +
+        sw('dg-aexp', a.actExpense, 'مصروف جديد') + sw('dg-aiss', a.actIssue, 'توريد جديد لمركز') + sw('dg-apay', a.actPay, 'تحصيل من مركز') +
         '<h4 class="fx-h4">✈️ تليجرام</h4>' + tgBlock(c) +
         '<h4 class="fx-h4">💬 واتساب</h4>' + sw('dg-wa', c.wa, 'ابعت على الواتساب كمان') +
         '<div class="fx-form"><label><span>رقم الواتساب بتاعك</span><input class="form-control" id="dg-phone" inputmode="tel" dir="ltr" placeholder="01xxxxxxxxx" value="' + esc(c.phone) + '"></label>' +
@@ -328,7 +330,9 @@
   function saveDigest(silent) {
     var b = digestBody();
     if (b.wa && b.on && b.phone && !/^(\+|0)\d{9,14}$/.test(String(b.phone).replace(/\s/g, ''))) { T('اكتب رقم الواتساب صح (مثلاً 01012345678)', 'error'); return Promise.reject(new Error('phone')); }
-    return api('/api/digest', 'PUT', b).then(function (r) { if (!silent) { T(r.config.on ? 'الملخص اليومي هيوصلك الساعة ' + r.config.time + ' ✓' : 'اتحفظ'); closeModal(); } return r; })
+    var ck = function (i) { var e = document.getElementById(i); return e ? !!e.checked : undefined; };
+    var act = { actExpense: ck('dg-aexp'), actIssue: ck('dg-aiss'), actPay: ck('dg-apay') };
+    return api('/api/digest', 'PUT', b).then(function (r) { return (act.actExpense === undefined ? Promise.resolve() : api('/api/activity', 'PUT', act)).then(function () { return r; }); }).then(function (r) { if (!silent) { T(r.config.on ? 'الملخص اليومي هيوصلك الساعة ' + r.config.time + ' ✓' : 'اتحفظ'); closeModal(); } return r; })
       .catch(function (e) { if (e.message !== 'phone') T(e.message, 'error'); throw e; });
   }
   function testDigest() {
