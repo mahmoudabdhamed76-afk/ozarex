@@ -32,5 +32,22 @@
     return kek(name, phone, unb64u(w.s)).then(function (k) { return crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(w.i) }, k, unb64u(w.k)); })
       .then(function (raw) { return b64u(raw); }, function () { return null; });
   }
-  window.OZK = { b64u: b64u, unb64u: unb64u, last10: last10, digits: digits, normName: normName, wrap: wrap, unwrap: unwrap };
+  /* 4.99 · the same, by the mobile alone — the fixed barcode asks for the mobile only */
+  function kek2(phone, salt) {
+    var pw = new TextEncoder().encode('ozx2|' + last10(phone));
+    return crypto.subtle.importKey('raw', pw, 'PBKDF2', false, ['deriveKey']).then(function (k) {
+      return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salt, iterations: 120000, hash: 'SHA-256' }, k, { name: 'AES-GCM', length: 128 }, false, ['encrypt', 'decrypt']);
+    });
+  }
+  function wrap2(rawKey, phone) {
+    if (!last10(phone)) return Promise.resolve(null);
+    var salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    return kek2(phone, salt).then(function (k) { return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, k, unb64u(rawKey)); })
+      .then(function (ct) { return { s: b64u(salt), i: b64u(iv), k: b64u(ct) }; });
+  }
+  function unwrap2(w, phone) {
+    return kek2(phone, unb64u(w.s)).then(function (k) { return crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64u(w.i) }, k, unb64u(w.k)); })
+      .then(function (raw) { return b64u(raw); }, function () { return null; });
+  }
+  window.OZK = { b64u: b64u, unb64u: unb64u, last10: last10, digits: digits, normName: normName, wrap: wrap, unwrap: unwrap, wrap2: wrap2, unwrap2: unwrap2 };
 })();

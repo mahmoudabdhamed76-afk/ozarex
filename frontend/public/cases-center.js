@@ -3,7 +3,7 @@
    4.90 · يرفع PDF الحالة ← بيتشفّر هنا في المتصفح ← الأصل يتحفظ على الجهاز ده
           (IndexedDB)، ونسخة مشفّرة مؤقتة على السيرفر 7 أيام، وبعدها لايف من هنا.
    4.91 · شكل جديد + اختيار تاني: باركود ثابت على كل الورق (هيدر سيرفر الطباعة)
-          المريض يمسحه ← يكتب موبايله وأول اسمه ← يوصل لحالته.
+          المريض يمسحه ← يكتب موبايله ← يوصل لحالته (4.99: الموبايل بس).
           + رفع كذا ملف مرة واحدة، قراءة الاسم والموبايل من الـ PDF، مراقبة فولدر
           سيرفر الطباعة، فلاتر، ونسخة احتياطية تتنقل لكمبيوتر تاني.
 ════════════════════════════════════════════════════════════════════ */
@@ -158,7 +158,7 @@
   function addConverted(L) {
     if (!L.length) return;
     L.forEach(function (x) {
-      var q = { id: ++QID, file: x.file, name: x.file.name, size: x.file.size, pages: x.pages || 0, thumb: '', patient: x.patient || '', phone: '', exam: x.exam || '', st: 'ready', af: '🩻 اتعمل من DICOM — ' + (/[a-zA-Z]/.test(x.patient || '') && ui.fixed ? 'الاسم إنجليزي من الجهاز: اكتبه عربي لو المريض هيدوّر بالباركود الثابت، واكتب الموبايل' : 'راجع الاسم واكتب الموبايل'), dir: false };
+      var q = { id: ++QID, file: x.file, name: x.file.name, size: x.file.size, pages: x.pages || 0, thumb: '', patient: x.patient || '', phone: '', exam: x.exam || '', st: 'ready', af: '🩻 اتعمل من DICOM — ' + 'راجع الاسم واكتب موبايل المريض', dir: false };
       ui.queue.push(q); readPdf(q);
     });
     queue(); beep();
@@ -176,7 +176,7 @@
   function fixedCard() {
     var el = $('fx'); if (!el) return;
     el.innerHTML = '<h3>📌 باركود ثابت على كل الورق <button class="sw' + (ui.fixed ? ' on' : '') + '" id="fsw" type="button" aria-label="تشغيل/إيقاف"></button></h3>' +
-      '<p>باركود واحد للمركز في هيدر سيرفر الطباعة — المريض يمسحه ويكتب <b>موبايله</b> و<b>أول اسمه</b> ويوصل لحالته.</p>' +
+      '<p>باركود واحد للمركز في هيدر سيرفر الطباعة — المريض يمسحه ويكتب <b>رقم موبايله</b> بس ويوصل لحالته.</p>' +
       '<div class="fq' + (ui.fixed ? '' : ' off') + '" id="fqm" title="كبّر"><span class="corner a"></span><span class="corner b"></span>' + qrSvg(fixedUrl()) + '</div>' +
       '<div class="ob"><button class="btn sm" id="fh">' + ic('down') + ' صورة الهيدر</button><button class="btn g sm" id="fq">' + ic('qr') + ' الباركود لوحده</button><button class="btn g sm" id="fp">' + ic('print') + ' اطبع</button><button class="btn g sm" id="fc">نسخ اللينك</button></div>' +
       '<div class="st2 ' + (ui.fixed ? 'on' : 'of') + '"><i></i>' + (ui.fixed ? 'شغال — اكتب موبايل المريض مع كل حالة عشان يلاقيها' : 'موقوف — المرضى مش هيقدروا يدوّروا') + '</div>' +
@@ -200,7 +200,7 @@
       var F = "'IBM Plex Sans Arabic', Tahoma, Arial, sans-serif";
       x.font = '800 92px ' + F; x.fillText(C.center || '', W - 70, 150);
       x.fillStyle = '#0B7F7B'; x.font = '700 62px ' + F; x.fillText('نتيجة الأشعة على موبايلك 📱', W - 70, 255);
-      x.fillStyle = '#475569'; x.font = '500 46px ' + F; x.fillText('امسح الباركود ← اكتب رقم موبايلك وأول اسمك ← افتح نتيجتك', W - 70, 345);
+      x.fillStyle = '#475569'; x.font = '500 46px ' + F; x.fillText('امسح الباركود ← اكتب رقم موبايلك ← افتح نتيجتك', W - 70, 345);
       x.textAlign = 'center'; x.fillStyle = '#64748B'; x.font = '600 30px ' + F; x.fillText('امسح هنا', 240, 412);
       cb(cv.toDataURL('image/png'));
     });
@@ -218,7 +218,7 @@
   function printFixed() {
     headerPng(function (u) {
       var w = window.open('', '_blank', 'width=900,height=700'); if (!w) return toast('اسمح بالنوافذ المنبثقة');
-      w.document.write('<!doctype html><html dir="rtl" lang="ar"><meta charset="utf-8"><title>الباركود الثابت</title><style>@page{size:A4;margin:12mm}body{margin:0;font-family:Tahoma,Arial,sans-serif;text-align:center;color:#0F172A}img{width:100%}.q{width:120mm;margin:14mm auto 4mm}.q svg{width:100%}p{font-size:15px;color:#334155}</style><img src="' + u + '"><div class="q">' + qrSvg(fixedUrl()) + '</div><p><b>' + esc(C.center) + '</b> — امسح الباركود، اكتب رقم موبايلك وأول اسمك، وشوف نتيجتك.</p><script>setTimeout(function(){print()},400)<\/script></html>');
+      w.document.write('<!doctype html><html dir="rtl" lang="ar"><meta charset="utf-8"><title>الباركود الثابت</title><style>@page{size:A4;margin:12mm}body{margin:0;font-family:Tahoma,Arial,sans-serif;text-align:center;color:#0F172A}img{width:100%}.q{width:120mm;margin:14mm auto 4mm}.q svg{width:100%}p{font-size:15px;color:#334155}</style><img src="' + u + '"><div class="q">' + qrSvg(fixedUrl()) + '</div><p><b>' + esc(C.center) + '</b> — امسح الباركود، اكتب رقم موبايلك، وشوف نتيجتك.</p><script>setTimeout(function(){print()},400)<\/script></html>');
       w.document.close();
     });
   }
@@ -315,14 +315,15 @@
     if (ui.fixed && !K.last10(q.phone) && !q.noPhoneOk) { q.msg = 'اكتب موبايل المريض عشان يلاقي حالته بالباركود الثابت (أو دوس احفظ تاني لو مش موجود)'; q.noPhoneOk = true; paintQ(q); return Promise.reject(); }
     if (!(window.crypto && crypto.subtle)) { toast('المتصفح ده مش بيدعم التشفير — استخدم Chrome أو Edge'); return Promise.reject(); }
     q.st = 'saving'; q.msg = ''; paintQ(q);
-    var iv = crypto.getRandomValues(new Uint8Array(12)), key, rawKey, wrapped = null;
+    var iv = crypto.getRandomValues(new Uint8Array(12)), key, rawKey, wrapped = null, wrapped2 = null;
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
     return crypto.subtle.generateKey({ name: 'AES-GCM', length: 128 }, true, ['encrypt'])   /* 128-bit: a shorter link → a lighter barcode */
       .then(function (k) { key = k; return crypto.subtle.exportKey('raw', k); }).then(function (r) { rawKey = K.b64u(r); return K.wrap(rawKey, q.patient, q.phone); })
-      .then(function (w) { wrapped = w; return q.file.arrayBuffer(); })
+      .then(function (w) { wrapped = w; return K.wrap2(rawKey, q.phone); })
+      .then(function (w2) { wrapped2 = w2; return q.file.arrayBuffer(); })
       .then(function (buf) { return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, buf); })
       .then(function (ct) {
-        var blob = new Blob([iv, ct], { type: 'application/octet-stream' }), meta = { patient: q.patient, phone: q.phone, exam: String(q.exam || '').trim(), name: q.name, pages: q.pages, wrap: wrapped };
+        var blob = new Blob([iv, ct], { type: 'application/octet-stream' }), meta = { patient: q.patient, phone: q.phone, exam: String(q.exam || '').trim(), name: q.name, pages: q.pages, wrap: wrapped, wrap2: wrapped2 };
         return new Promise(function (ok, no) {
           var x = new XMLHttpRequest(); x.open('POST', BASE + '/case'); x.withCredentials = true;
           x.setRequestHeader('Content-Type', 'application/octet-stream');
@@ -336,7 +337,7 @@
       .then(function (r) { return put({ token: r.item.token, code: C.code, key: rawKey, blob: r.blob, size: r.blob.size, thumb: q.thumb, name: q.name, at: Date.now() }).then(function () { return r; }); })
       .then(function (r) {
         ui.local[r.item.token] = { key: rawKey, size: r.blob.size, thumb: q.thumb };
-        ui.list.unshift(r.item); q.st = 'done'; q.token = r.item.token; q.wrapped = !!wrapped; q.file = null;
+        ui.list.unshift(r.item); q.st = 'done'; q.token = r.item.token; q.wrapped = !!(wrapped || wrapped2); q.file = null;
         if (K.last10(q.phone) && ui.asks.some(function (a) { return K.last10(a.phone) === K.last10(q.phone); })) api('POST', 'ask', { phone: q.phone }).then(function (x) { ui.asks = x.asks || []; asks(); toast('✅ ' + q.patient + ' اتحفظت — وطلبه اتقفل'); }).catch(function () {});
         queue(); table(); stats(); disk();
         var open = ui.queue.filter(function (x) { return x.st !== 'gone' && x.st !== 'done'; }).length;
@@ -401,7 +402,7 @@
     [].forEach.call(el.querySelectorAll('[data-k]'), function (b) {
       b.onclick = function () {
         var id = +b.closest('.ar').dataset.id, a = L.filter(function (x) { return x.id === id; })[0]; if (!a) return; var k = b.dataset.k;
-        if (k === 'up') { ui.prefill = { patient: a.name, phone: a.phone }; clearTimeout(ui.pfT); ui.pfT = setTimeout(function () { ui.prefill = null; }, 120000); $('fi').click(); }
+        if (k === 'up') { ui.prefill = { patient: a.name === 'مريض' ? '' : a.name, phone: a.phone }; clearTimeout(ui.pfT); ui.pfT = setTimeout(function () { ui.prefill = null; }, 120000); $('fi').click(); }
         if (k === 'wa') { var ph = phoneWa(a.phone); if (ph) window.open('https://wa.me/' + ph + '?text=' + encodeURIComponent('أهلاً ' + a.name + ' 🌿\nطلبك وصل ' + C.center + '، وبنجهّز نتيجتك وهنبعتهالك حالاً 🙏'), '_blank'); }
         if (k === 'ok') api('POST', 'ask/' + id + '/done').then(function (x) { ui.asks = x.asks || []; asks(); }).catch(function (e) { toast(e.message); });
       };
@@ -496,7 +497,7 @@
   }
   function showQr(tok, fresh) {
     var r = itemOf(tok), u = linkOf(tok); if (!r || !u) return;
-    modal((fresh ? '<div class="okb">' + ic('check') + '</div><h3>اتحفظت — ده الباركود</h3>' : '<h3>▦ باركود الحالة</h3>') + '<p>' + esc(r.patient) + (r.exam ? ' · ' + esc(r.exam) : '') + '</p><div class="qbig">' + qrSvg(u) + '</div><p>المريض يمسحه بكاميرا الموبايل ويشوف حالته على طول' + (r.wrapped ? ' — أو يلاقيها بالباركود الثابت بموبايله وأول اسمه' : '') + '</p>' +
+    modal((fresh ? '<div class="okb">' + ic('check') + '</div><h3>اتحفظت — ده الباركود</h3>' : '<h3>▦ باركود الحالة</h3>') + '<p>' + esc(r.patient) + (r.exam ? ' · ' + esc(r.exam) : '') + '</p><div class="qbig">' + qrSvg(u) + '</div><p>المريض يمسحه بكاميرا الموبايل ويشوف حالته على طول' + (r.wrapped ? ' — أو يلاقيها بالباركود الثابت برقم موبايله' : '') + '</p>' +
       '<div class="lk"><input readonly value="' + esc(u) + '"><button class="btn g sm" data-x="cp">نسخ</button></div><div class="bt"><button class="btn" data-x="pr">🖨 اطبع استيكر</button>' + (r.phone ? '<button class="btn" data-x="wa" style="background:#16A34A">واتساب للمريض</button>' : '<button class="btn g" data-x="op">👁 افتح</button>') + '</div><button class="btn g w" data-x="cl" style="margin-top:8px">تمام</button>',
       function (k, close, x) { if (k === 'pr') printSticker(tok); if (k === 'wa') wa(tok); if (k === 'op') window.open(u, '_blank', 'noopener'); if (k === 'cp') { try { navigator.clipboard.writeText(u).then(function () { toast('اتنسخ ✓'); }); } catch (er) { x.previousElementSibling.select(); } } });
   }
@@ -540,10 +541,11 @@
 
   /* ── cases saved before 4.91 → wrap their key so the fixed barcode finds them ── */
   function backfill() {
-    var L = ui.list.filter(function (r) { return !r.wrapped && r.phone && K.last10(r.phone) && ui.local[r.token]; }), i = 0;
+    /* 4.99 · and every case with a mobile gets the mobile-only key, so the patient finds it by his mobile alone */
+    var L = ui.list.filter(function (r) { return !r.wrapped2 && r.phone && K.last10(r.phone) && ui.local[r.token]; }), i = 0;
     (function nx() {
       if (i >= L.length) { if (L.length) table(); return; } var r = L[i++];
-      K.wrap(ui.local[r.token].key, r.patient, r.phone).then(function (w) { return w ? api('POST', 'item/' + r.token + '/wrap', w).then(function () { r.wrapped = true; }) : null; }).catch(function () {}).then(nx);
+      K.wrap2(ui.local[r.token].key, r.phone).then(function (w) { return w ? api('POST', 'item/' + r.token + '/wrap', { p: w }).then(function () { r.wrapped = r.wrapped2 = true; }) : null; }).catch(function () {}).then(nx);
     })();
   }
 
