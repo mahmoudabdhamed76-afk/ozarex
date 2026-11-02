@@ -27,6 +27,30 @@
   function phoneWa(p) { var d = K.digits(p); if (!d) return ''; if (d.indexOf('00') === 0) d = d.slice(2); else if (d.indexOf('0') === 0) d = '2' + d; else if (d.length === 10 && d.charAt(0) === '1') d = '20' + d; return d; }
   function beep() { try { var Ac = window.AudioContext || window.webkitAudioContext; if (!Ac) return; var a = beep.a = beep.a || new Ac(), t = a.currentTime; [[880, 0], [1320, .12]].forEach(function (n) { var o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.frequency.value = n[0]; g.gain.setValueAtTime(.0001, t + n[1]); g.gain.exponentialRampToValueAtTime(.15, t + n[1] + .02); g.gain.exponentialRampToValueAtTime(.0001, t + n[1] + .25); o.start(t + n[1]); o.stop(t + n[1] + .26); }); } catch (e) {} }
 
+  /* 4.97 · line icons + a colour per exam type */
+  var ICO = {
+    today: '<rect x="3" y="4.5" width="18" height="16" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><circle cx="12" cy="15" r="1.6"/>',
+    month: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    disk: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 14h18M7 17h.01M11 17h.01"/>',
+    down: '<path d="M12 4v11M7 10l5 5 5-5M4 20h16"/>', up: '<path d="M12 20V9M7 14l5-5 5 5M4 4h16"/>',
+    out: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11"/>',
+    qr: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/>',
+    print: '<path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/>',
+    wa: '<path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.5L3 21l2-5.5A8.4 8.4 0 1 1 21 11.5z"/>',
+    pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>', play: '<path d="M7 4l13 8-13 8z"/>',
+    trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+    file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>', shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
+    bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'
+  };
+  function ic(n, c) { return '<svg class="i' + (c ? ' ' + c : '') + '" viewBox="0 0 24 24">' + (ICO[n] || '') + '</svg>'; }
+  var EXC = [[/مقطع|ct/i, '#4F46E5'], [/رنين|mri/i, '#8B5CF6'], [/سونار|موجات|ultra/i, '#06B6D4'], [/ماموجرا|mammo/i, '#EC4899'], [/دوبلر|doppler/i, '#F43F5E'], [/بانوراما|panor/i, '#F59E0B'], [/كثافة|dexa/i, '#10B981'], [/عادية|x-?ray/i, '#64748B']];
+  function exColor(e) { for (var i = 0; i < EXC.length; i++) if (EXC[i][0].test(String(e || ''))) return EXC[i][1]; return '#6366F1'; }
+  function dayOf(ts) { var m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(ts || '')); if (!m) return 'من غير تاريخ'; var d = new Date(+m[1], m[2] - 1, +m[3]), t = new Date(); t.setHours(0, 0, 0, 0); var dd = Math.round((t - d) / 864e5); if (dd === 0) return 'النهارده'; if (dd === 1) return 'إمبارح'; var W = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت']; return (dd < 7 ? W[d.getDay()] + ' · ' : '') + (+m[3]) + '/' + (+m[2]) + '/' + m[1]; }
+  function hmOf(ts) { var m = / (\d{2}):(\d{2})/.exec(String(ts || '')); if (!m) return ''; var h = +m[1]; return ((h % 12) || 12) + ':' + m[2] + (h < 12 ? ' ص' : ' م'); }
+
   /* ── the files on THIS computer (IndexedDB): store f = cases, store h = settings (watched folder, seen files) ── */
   var IDB = null;
   function idb() {
@@ -52,7 +76,7 @@
 
   /* ════ login ════ */
   function login() {
-    document.body.innerHTML = '<div class="gate"><div class="box"><i>🔐</i><h1>حالات المرضى</h1><p>' + esc(C.center) + '</p><input class="fld" id="pw" type="password" autocomplete="current-password" placeholder="الباسوورد" autofocus><div class="err" id="er"></div><button class="btn w" id="go" style="margin-top:6px;padding:13px">دخول</button><p style="margin-top:14px;font-size:12px">الباسوورد من الشركة — مختلف عن لينك الحسابات.</p></div></div><div class="toast" id="toast"></div>';
+    document.body.innerHTML = '<div class="gate"><div class="box"><i>🩻</i><h1>حالات المرضى</h1><p>' + esc(C.center) + '</p><input class="fld" id="pw" type="password" autocomplete="current-password" placeholder="الباسوورد" autofocus><div class="err" id="er"></div><button class="btn w" id="go" style="margin-top:6px;padding:13px">دخول</button><p style="margin-top:14px;font-size:12px">الباسوورد من الشركة — مختلف عن لينك الحسابات.</p></div></div><div class="toast" id="toast"></div>';
     var go = function () {
       var p = $('pw').value; if (!p) return; $('go').disabled = true;
       fetch(BASE + '/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pass: p }) }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || 'محصلش'); location.reload(); }); })
@@ -64,17 +88,27 @@
   /* ════ the page ════ */
   function shell() {
     var dirOk = 'showDirectoryPicker' in window;
-    document.body.innerHTML = '<div class="wrap">' +
-      '<div class="hero"><div class="top"><span class="lg">' + esc(String(C.center || 'م').trim().charAt(0)) + '</span><div><h1>📁 حالات المرضى</h1><small>' + esc(C.center) + '</small></div>' +
-        '<div class="sp"><span class="pill" id="st"><i></i><span>بيتصل…</span></span><button class="hb" id="bk" title="نسخة احتياطية من حالات الجهاز ده — تنقلها لكمبيوتر تاني">⬇ نسخة احتياطية</button><button class="hb" id="rs" title="رجّع نسخة احتياطية">⬆ استرجاع</button><input type="file" id="rsf" accept=".ozxcases" hidden><button class="hb" id="out">خروج</button></div></div>' +
-        '<div class="stats"><div><b id="s1">0</b><span>حالة النهارده</span></div><div><b id="s2">0</b><span>حالة الشهر ده</span></div><div><b id="s3">0</b><span>مرة المرضى فتحوا</span></div><div><b id="s4">0</b><span>محفوظة على الجهاز ده</span></div></div></div>' +
-      '<div class="opts"><div class="opt"><span class="oi" style="background:#E0F2FE">▦</span><div><h3>باركود لكل حالة <span class="tg ok">شغال دايماً</span></h3><p>بعد ما تحفظ الحالة بيطلعلها باركود لوحدها — تطبعه استيكر على الظرف أو تبعته للمريض واتساب، والمريض يفتح على طول من غير ما يكتب حاجة.</p></div></div>' +
-        '<div class="opt b" id="fx"></div></div>' +
-      '<div id="mwda"></div><div class="upz"><div class="drop" id="drop"><span class="ic">📄</span><div><b>اسحب ملفات PDF هنا</b><small>ملف واحد أو كذا ملف مرة واحدة · لحد ' + C.maxMb + ' ميجا للملف · بنحاول نقرا الاسم والموبايل من الملف</small></div><div class="db"><button class="btn" id="pk" type="button">＋ اختار ملفات</button></div><input type="file" id="fi" accept="application/pdf,.pdf" multiple hidden></div>' +
-        (dirOk ? '<div class="watch" id="wt"></div>' : '') + '</div>' +
-      '<div id="asks"></div><div class="queue" id="qu"></div>' +
-      '<div class="card list"><div class="ch"><h2>الحالات</h2><div class="chips" id="fl"></div><input class="fld q" id="q" placeholder="🔍 اسم المريض أو الموبايل أو الفحص"></div><div id="tbl"><div class="emp"><div class="spin"></div></div></div></div>' +
-      '<div class="disk" id="disk">💾 <span>بنحسب المساحة…</span></div></div><div class="toast" id="toast"></div>';
+    document.body.innerHTML =
+      '<header class="tbar"><div class="tb-in"><span class="lg">' + esc(String(C.center || 'م').trim().charAt(0)) + '</span><div class="tt"><b>حالات المرضى</b><small>' + esc(C.center) + '</small></div>' +
+        '<div class="sp"><span class="pill" id="st"><i></i><span>بيتصل…</span></span><button class="ib" id="bk" title="نسخة احتياطية من حالات الجهاز ده — تنقلها لكمبيوتر تاني">' + ic('down') + '<span>نسخة احتياطية</span></button><button class="ib" id="rs" title="رجّع نسخة احتياطية">' + ic('up') + '<span>استرجاع</span></button><input type="file" id="rsf" accept=".ozxcases" hidden><button class="ib x" id="out" title="خروج">' + ic('out') + '<span>خروج</span></button></div></div></header>' +
+      '<div class="wrap">' +
+      '<section class="hero"><div class="aur"><i></i><i></i><i></i></div>' +
+        '<div class="hx"><div><h1>نتايج المرضى <em>في ثانية</em></h1><p>اسحب PDF الحالة، يطلعلها باركود متشفّر، والمريض يفتح أشعته على موبايله — والملف الأصلي فاضل على الجهاز ده.</p>' +
+          '<div class="tags"><span>' + ic('shield') + ' متشفّر من الجهاز</span><span>' + ic('qr') + ' باركود لكل حالة</span><span>' + ic('bolt') + ' لايف</span></div></div>' +
+          '<div class="orb" aria-hidden="true"><svg viewBox="0 0 200 200"><defs><linearGradient id="og" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#A5B4FC"/><stop offset="1" stop-color="#67E8F9"/></linearGradient><radialGradient id="ow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#67E8F9" stop-opacity=".55"/><stop offset="1" stop-color="#67E8F9" stop-opacity="0"/></radialGradient></defs>' +
+            '<circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.08)"/><circle class="r1" cx="100" cy="100" r="80" fill="none" stroke="url(#og)" stroke-width="1.5" stroke-dasharray="4 10"/><circle class="r2" cx="100" cy="100" r="62" fill="none" stroke="rgba(165,180,252,.5)" stroke-width="1" stroke-dasharray="40 14 4 14"/>' +
+            '<g class="sw"><path d="M100 100 L100 20 A80 80 0 0 1 169 60 Z" fill="url(#ow)"/></g><circle cx="100" cy="100" r="44" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.18)"/>' +
+            '<path class="ecg" d="M64 100h16l6-14 8 30 7-24 5 8h30" fill="none" stroke="#67E8F9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<circle class="dot" cx="150" cy="56" r="3" fill="#A5B4FC"/><circle class="dot" cx="44" cy="132" r="3" fill="#67E8F9"/><circle class="dot" cx="138" cy="160" r="3" fill="#C4B5FD"/></svg></div></div>' +
+        '<div class="stats"><div class="sc" style="--c:#818CF8"><span class="si">' + ic('today') + '</span><div><b id="s1">0</b><span>حالة النهارده</span></div></div><div class="sc" style="--c:#67E8F9"><span class="si">' + ic('month') + '</span><div><b id="s2">0</b><span>حالة الشهر ده</span></div></div><div class="sc" style="--c:#6EE7B7"><span class="si">' + ic('eye') + '</span><div><b id="s3">0</b><span>مرة المرضى فتحوا</span></div></div><div class="sc" style="--c:#FCD34D"><span class="si">' + ic('disk') + '</span><div><b id="s4">0</b><span>محفوظة على الجهاز ده</span></div></div></div></section>' +
+      '<div class="kgrid"><div class="kmain">' +
+        '<div id="mwda"></div><div class="upz"><div class="drop" id="drop"><span class="beam"></span><span class="ic">' + ic('file') + '</span><div><b>اسحب ملفات PDF هنا</b><small>ملف واحد أو كذا ملف مرة واحدة · لحد ' + C.maxMb + ' ميجا للملف · بنحاول نقرا الاسم والموبايل من الملف</small></div><div class="db"><button class="btn" id="pk" type="button">＋ اختار ملفات</button></div><input type="file" id="fi" accept="application/pdf,.pdf" multiple hidden></div>' +
+          (dirOk ? '<div class="watch" id="wt"></div>' : '') + '</div>' +
+        '<div class="queue" id="qu"></div>' +
+        '<section class="card list"><div class="ch"><div class="h"><h2>الحالات</h2><small id="lc"></small></div><div class="srch">' + ic('search') + '<input class="fld q" id="q" placeholder="اسم المريض أو الموبايل أو الفحص"></div></div><div class="seg" id="fl"></div><div id="tbl"><div class="sk"></div><div class="sk" style="opacity:.7"></div><div class="sk" style="opacity:.45"></div></div></section>' +
+      '</div><aside class="kside"><div id="asks"></div><div class="opt fxc" id="fx"></div>' +
+        '<div class="opt"><h3>' + ic('qr') + ' باركود لكل حالة <span class="tg ok">شغال دايماً</span></h3><div class="how"><div><span>1</span>اسحب PDF الحالة واكتب اسم المريض</div><div><span>2</span>اطبع الاستيكر أو ابعته واتساب</div><div><span>3</span>المريض يمسحه ويشوف أشعته على طول</div></div></div>' +
+        '<div class="disk" id="disk"><div class="sk" style="height:40px;margin:0"></div></div></aside></div></div><div class="toast" id="toast"></div>';
     $('out').onclick = function () { api('POST', 'logout').then(function () { location.reload(); }).catch(function () { location.reload(); }); };
     $('bk').onclick = backup; $('rs').onclick = function () { $('rsf').click(); }; $('rsf').onchange = function () { if (this.files[0]) restore(this.files[0]); this.value = ''; };
     var dr = $('drop'), fi = $('fi');
@@ -109,11 +143,12 @@
   /* ── option 2: the fixed barcode on every report ── */
   function fixedCard() {
     var el = $('fx'); if (!el) return;
-    el.innerHTML = '<span class="qm' + (ui.fixed ? '' : ' off') + '" id="fqm" title="كبّر">' + qrSvg(fixedUrl()) + '</span><div style="flex:1;min-width:0"><h3>📌 باركود ثابت على كل الورق <span class="tg pn">جديد</span><button class="sw' + (ui.fixed ? ' on' : '') + '" id="fsw" type="button" aria-label="تشغيل/إيقاف"></button></h3>' +
-      '<p>باركود واحد للمركز تحطه في هيدر سيرفر الطباعة، فيتطبع على كل التقارير. المريض يمسحه ← يكتب <b>رقم موبايله</b> و<b>أول اسمه</b> ← يوصل لحالته.</p>' +
-      '<div class="ob"><button class="btn sm" id="fh">⬇ صورة الهيدر</button><button class="btn g sm" id="fq">⬇ الباركود لوحده</button><button class="btn g sm" id="fp">🖨 اطبع</button><button class="btn g sm" id="fc">نسخ اللينك</button></div>' +
-      '<p style="font-size:12px;margin-top:8px">' + (ui.fixed ? '✅ شغال — لازم تكتب موبايل المريض مع كل حالة عشان يلاقيها.' : '⏸ موقوف — المرضى مش هيقدروا يدوّروا.') + '</p>' +
-      '<p style="font-size:11.5px;color:var(--mut);margin-top:4px">📨 المريض اللي مايلاقيش نتيجته يقدر يبعت طلب من نفس الصفحة، والطلب بيظهر هنا لايف بصوت.</p></div>';
+    el.innerHTML = '<h3>📌 باركود ثابت على كل الورق <button class="sw' + (ui.fixed ? ' on' : '') + '" id="fsw" type="button" aria-label="تشغيل/إيقاف"></button></h3>' +
+      '<p>باركود واحد للمركز في هيدر سيرفر الطباعة — المريض يمسحه ويكتب <b>موبايله</b> و<b>أول اسمه</b> ويوصل لحالته.</p>' +
+      '<div class="fq' + (ui.fixed ? '' : ' off') + '" id="fqm" title="كبّر"><span class="corner a"></span><span class="corner b"></span>' + qrSvg(fixedUrl()) + '</div>' +
+      '<div class="ob"><button class="btn sm" id="fh">' + ic('down') + ' صورة الهيدر</button><button class="btn g sm" id="fq">' + ic('qr') + ' الباركود لوحده</button><button class="btn g sm" id="fp">' + ic('print') + ' اطبع</button><button class="btn g sm" id="fc">نسخ اللينك</button></div>' +
+      '<div class="st2 ' + (ui.fixed ? 'on' : 'of') + '"><i></i>' + (ui.fixed ? 'شغال — اكتب موبايل المريض مع كل حالة عشان يلاقيها' : 'موقوف — المرضى مش هيقدروا يدوّروا') + '</div>' +
+      '<p style="font-size:11.5px;margin-top:8px">📨 اللي مايلاقيش نتيجته يبعت طلب، ويظهرلك هنا لايف بصوت.</p>';
     $('fsw').onclick = function () { var on = !ui.fixed; api('POST', 'fixed', { on: on }).then(function () { ui.fixed = on; fixedCard(); toast(on ? '📌 الباركود الثابت اشتغل' : '⏸ الباركود الثابت اتوقف'); }).catch(function (e) { toast(e.message); }); };
     $('fh').onclick = function () { headerPng(function (u) { dl(u, 'هيدر-باركود-' + C.center + '.png'); }); };
     $('fq').onclick = function () { qrPng(function (u) { dl(u, 'باركود-' + C.center + '.png'); }); };
@@ -328,8 +363,8 @@
   function asks() {
     var el = $('asks'); if (!el) return; var L = ui.asks || [];
     if (!L.length) { el.innerHTML = ''; return; }
-    el.innerHTML = '<div class="asks"><div class="ah"><span style="font-size:20px">📨</span><b>مرضى بيطلبوا نتايجهم</b><em>' + L.length + '</em><small style="color:var(--mut);margin-inline-start:auto">دوّروا بالباركود الثابت ومالقوش نتيجتهم</small></div>' +
-      L.map(function (a) { return '<div class="ar' + (ui.newAsk && K.last10(a.phone) === ui.newAsk ? ' new' : '') + '" data-id="' + a.id + '"><span class="ai">🙋</span><div><b>' + esc(a.name) + ' <span class="n" style="font-weight:600;color:var(--mut)">' + esc(a.phone) + '</span></b><small>' + when(a.at) + (a.note ? ' · ' + esc(a.note) : '') + '</small></div><div class="acts"><button class="btn sm" data-k="up">📂 ارفع حالته</button><button class="btn g sm" data-k="wa" style="color:#15803D">واتساب</button><button class="btn g sm" data-k="ok" title="خلصت">✓</button></div></div>'; }).join('') + '</div>';
+    el.innerHTML = '<div class="asks"><div class="ah"><span class="ping">📨</span><div><b>مرضى بيطلبوا نتايجهم</b><small>دوّروا بالباركود الثابت ومالقوش نتيجتهم</small></div><em>' + L.length + '</em></div>' +
+      L.map(function (a, i) { return '<div style="animation-delay:' + (i * 60) + 'ms" class="ar' + (ui.newAsk && K.last10(a.phone) === ui.newAsk ? ' new' : '') + '" data-id="' + a.id + '"><span class="ai">🙋</span><div><b>' + esc(a.name) + ' <span class="n" style="font-weight:600;color:var(--mut)">' + esc(a.phone) + '</span></b><small>' + when(a.at) + (a.note ? ' · ' + esc(a.note) : '') + '</small></div><div class="acts"><button class="btn sm" data-k="up">📂 ارفع حالته</button><button class="ic2 wa" data-k="wa" data-tip="واتساب">' + ic('wa') + '</button><button class="ic2" data-k="ok" data-tip="خلصت">' + ic('check') + '</button></div></div>'; }).join('') + '</div>';
     ui.newAsk = null;
     [].forEach.call(el.querySelectorAll('[data-k]'), function (b) {
       b.onclick = function () {
@@ -351,27 +386,38 @@
     return true;
   }
   function chips() {
-    var F = [['all', 'الكل'], ['today', 'النهارده'], ['week', 'الأسبوع'], ['new', 'لسه متفتحتش'], ['off', 'موقوفة']], save = ui.f;
-    $('fl').innerHTML = F.map(function (x) { ui.f = x[0]; var n = ui.list.filter(inF).length; return '<button data-f="' + x[0] + '" class="' + (save === x[0] ? 'on' : '') + '">' + x[1] + '<em>' + n + '</em></button>'; }).join('');
+    var F = [['all', 'الكل'], ['today', 'النهارده'], ['week', 'الأسبوع'], ['new', 'لسه متفتحتش'], ['off', 'موقوفة']], save = ui.f, fl = $('fl');
+    fl.innerHTML = '<i class="ind"></i>' + F.map(function (x) { ui.f = x[0]; var n = ui.list.filter(inF).length; return '<button data-f="' + x[0] + '" class="' + (save === x[0] ? 'on' : '') + '">' + x[1] + '<em>' + n + '</em></button>'; }).join('');
     ui.f = save;
-    [].forEach.call($('fl').querySelectorAll('button'), function (b) { b.onclick = function () { ui.f = b.dataset.f; table(); }; });
+    var ind = fl.querySelector('.ind'), on = fl.querySelector('button.on');
+    if (ui.ind) { ind.style.transition = 'none'; ind.style.left = ui.ind[0] + 'px'; ind.style.width = ui.ind[1] + 'px'; }
+    if (on) requestAnimationFrame(function () { ind.style.transition = ''; ind.style.left = on.offsetLeft + 'px'; ind.style.width = on.offsetWidth + 'px'; ui.ind = [on.offsetLeft, on.offsetWidth]; });
+    [].forEach.call(fl.querySelectorAll('button'), function (b) { b.onclick = function () { ui.f = b.dataset.f; table(); }; });
   }
   function table() {
     chips();
     var q = ui.q.toLowerCase(), L = ui.list.filter(inF).filter(function (r) { return !q || String(r.patient).toLowerCase().indexOf(q) > -1 || String(r.phone || '').indexOf(q) > -1 || String(r.exam || '').toLowerCase().indexOf(q) > -1; });
-    if (!L.length) { $('tbl').innerHTML = '<div class="emp"><i>' + (q || ui.f !== 'all' ? '🔍' : '📭') + '</i>' + (q || ui.f !== 'all' ? 'مفيش حالات هنا' : 'لسه مفيش حالات — اسحب أول PDF فوق') + '</div>'; return; }
-    $('tbl').innerHTML = '<table class="tb"><thead><tr><th style="width:64px"></th><th style="width:48px"></th><th>المريض</th><th>الفحص</th><th>اتحفظت</th><th>متاحة منين</th><th>اتفتحت</th><th></th></tr></thead><tbody>' + L.slice(0, 300).map(function (r, i) {
-      var loc = ui.local[r.token], days = r.cached ? Math.max(1, Math.ceil((r.cache_until - Date.now()) / 864e5)) : 0;
-      var src = !r.active ? '<span class="tg of">⏸ موقوفة</span>' : (loc ? '<span class="tg lc">💾 الجهاز ده</span> ' : '') + (r.cached ? '<span class="tg nw">☁ ' + days + ' يوم</span> ' : '') + (!loc && !r.cached ? '<span class="tg wr">⚠ على جهاز تاني</span> ' : '') + (r.wrapped ? '<span class="tg pn" title="المريض يلاقيها بالباركود الثابت">📌</span>' : (r.phone ? '' : '<span class="tg of" title="من غير موبايل — مش هتتلاقى بالباركود الثابت">📵</span>'));
-      return '<tr style="animation-delay:' + Math.min(i * 25, 400) + 'ms" data-t="' + r.token + '"><td>' + (loc ? '<span class="qr" data-qr="' + r.token + '" title="كبّر الباركود">' + qrSvg(linkOf(r.token)) + '</span>' : '<span class="qr na" title="الباركود متاح على الجهاز اللي اترفعت منه">▦</span>') + '</td>' +
-        '<td>' + (loc && loc.thumb ? '<img class="th2" src="' + loc.thumb + '" alt="">' : '') + '</td>' +
-        '<td><b>' + esc(r.patient) + '</b><small class="n">' + esc(r.phone || '') + '</small></td><td>' + esc(r.exam || '—') + (r.pages ? '<small style="display:block">' + r.pages + ' صفحة · ' + mb(r.size) + '</small>' : '') + '</td><td>' + when(r.at) + '</td><td>' + src + '</td>' +
-        '<td><span class="tg ' + (r.views ? 'ok' : 'of') + '" id="vw-' + r.token + '">' + (r.views ? '👁 ' + r.views : 'لسه') + '</span><small style="display:block" id="lv-' + r.token + '">' + (r.last_view ? when(r.last_view) : '') + '</small></td>' +
-        '<td><div class="acts">' + (loc && r.active ? '<button class="btn g sm" data-a="qr">▦</button><button class="btn g sm" data-a="print" title="استيكر">🖨</button>' + (r.phone ? '<button class="btn g sm" data-a="wa" style="color:#15803D">واتساب</button>' : '') : '') +
-        (r.active ? '<button class="btn g sm" data-a="stop" title="وقّف — الباركود مش هيفتح">وقّف</button>' : '<button class="btn g sm" data-a="start">▶ شغّل</button>') + '<button class="btn d sm" data-a="del" title="امسح">🗑</button></div></td></tr>';
-    }).join('') + '</tbody></table>';
+    var lc = $('lc'); if (lc) lc.textContent = L.length ? L.length + ' حالة' : '';
+    if (!L.length) { var srch = q || ui.f !== 'all'; $('tbl').innerHTML = '<div class="emp"><svg class="ill" viewBox="0 0 120 96" fill="none"><rect x="26" y="14" width="56" height="70" rx="10" fill="#EEF2FF" stroke="#C7CAF7" stroke-width="2"/><path d="M38 34h32M38 46h24M38 58h28" stroke="#A5B4FC" stroke-width="4" stroke-linecap="round"/>' + (srch ? '<circle cx="84" cy="62" r="16" fill="#fff" stroke="#6366F1" stroke-width="4"/><path d="M96 74l10 10" stroke="#6366F1" stroke-width="5" stroke-linecap="round"/>' : '<circle cx="88" cy="66" r="16" fill="url(#eg)"/><path d="M88 58v16M80 66h16" stroke="#fff" stroke-width="4" stroke-linecap="round"/><defs><linearGradient id="eg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#4F46E5"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs>') + '</svg><b>' + (srch ? 'مفيش حالات هنا' : 'لسه مفيش حالات') + '</b>' + (srch ? 'غيّر البحث أو الفلتر' : 'اسحب أول PDF فوق وهيطلعله باركود على طول') + '</div>'; return; }
+    var G = [], cur = null;
+    L.slice(0, 300).forEach(function (r) { var d = dayOf(r.at); if (!cur || cur.d !== d) { cur = { d: d, L: [] }; G.push(cur); } cur.L.push(r); });
+    var idx = 0;
+    $('tbl').innerHTML = G.map(function (g) {
+      return '<div class="dg"><div class="dh"><span>' + esc(g.d) + '</span><em>' + g.L.length + '</em></div>' + g.L.map(function (r) {
+        var i = idx++, loc = ui.local[r.token], days = r.cached ? Math.max(1, Math.ceil((r.cache_until - Date.now()) / 864e5)) : 0;
+        var src = !r.active ? '<span class="tg of">⏸ موقوفة</span>' : (loc ? '<span class="tg lc" title="الملف الأصلي على الكمبيوتر ده">💾 الجهاز ده</span>' : '') + (r.cached ? '<span class="tg nw" title="نسخة مشفّرة مؤقتة على السيرفر">☁ ' + days + ' يوم</span>' : '') + (!loc && !r.cached ? '<span class="tg wr">⚠ على جهاز تاني</span>' : '') + (r.wrapped ? '<span class="tg pn" title="المريض يلاقيها بالباركود الثابت">📌</span>' : (r.phone ? '' : '<span class="tg of" title="من غير موبايل — مش هتتلاقى بالباركود الثابت">📵</span>'));
+        var qr = loc ? '<div class="cq" data-qr="' + r.token + '" title="كبّر الباركود"><div class="fx' + (loc.thumb ? ' two' : '') + '"><div class="fa">' + qrSvg(linkOf(r.token)) + '</div>' + (loc.thumb ? '<div class="fb"><img src="' + loc.thumb + '" alt=""></div>' : '') + '</div></div>' : '<div class="cq na" title="الباركود متاح على الجهاز اللي اترفعت منه"><div class="fx"><div class="fa">▦</div></div></div>';
+        return '<div class="cr' + (r.active ? '' : ' off') + '" style="--i:' + Math.min(i, 14) + ';--x:' + exColor(r.exam) + '" data-t="' + r.token + '">' + qr +
+          '<div class="cm"><span class="av">' + esc(String(r.patient || '؟').trim().charAt(0)) + '</span><div><b title="' + esc(r.patient) + '">' + esc(r.patient) + '</b><span class="n">' + esc(r.phone || '—') + '</span></div></div>' +
+          '<div class="ce"><span class="ex"><i></i>' + esc(r.exam || 'فحص') + '</span>' + (r.pages ? '<small>' + r.pages + ' صفحة · ' + mb(r.size) + '</small>' : '') + '</div>' +
+          '<div class="ct">' + hmOf(r.at) + '<small>اتحفظت</small></div><div class="cs">' + src + '</div>' +
+          '<div class="cv"><span class="vw' + (r.views ? ' on' : '') + '" id="vw-' + r.token + '">' + ic('eye') + (r.views ? r.views : 'لسه') + '</span><small id="lv-' + r.token + '">' + (r.last_view ? when(r.last_view) : '') + '</small></div>' +
+          '<div class="ca">' + (loc && r.active ? '<button class="ic2" data-a="qr" data-tip="الباركود">' + ic('qr') + '</button><button class="ic2" data-a="print" data-tip="اطبع استيكر">' + ic('print') + '</button>' + (r.phone ? '<button class="ic2 wa" data-a="wa" data-tip="واتساب للمريض">' + ic('wa') + '</button>' : '') : '') +
+          (r.active ? '<button class="ic2" data-a="stop" data-tip="وقّف — الباركود مش هيفتح">' + ic('pause') + '</button>' : '<button class="ic2 go" data-a="start">' + ic('play') + ' شغّل</button>') + '<button class="ic2 dl" data-a="del" data-tip="امسح">' + ic('trash') + '</button></div></div>';
+      }).join('') + '</div>';
+    }).join('');
     [].forEach.call($('tbl').querySelectorAll('[data-qr]'), function (x) { x.onclick = function () { showQr(x.dataset.qr); }; });
-    [].forEach.call($('tbl').querySelectorAll('[data-a]'), function (b) { b.onclick = function () { act(b.closest('tr').dataset.t, b.dataset.a, b); }; });
+    [].forEach.call($('tbl').querySelectorAll('[data-a]'), function (b) { b.onclick = function () { act(b.closest('[data-t]').dataset.t, b.dataset.a, b); }; });
   }
   function itemOf(tok) { return ui.list.filter(function (r) { return r.token === tok; })[0]; }
   function act(tok, a, b) {
@@ -396,7 +442,7 @@
   }
   function showQr(tok, fresh) {
     var r = itemOf(tok), u = linkOf(tok); if (!r || !u) return;
-    modal((fresh ? '<div style="font-size:34px">✅</div><h3>اتحفظت — ده الباركود</h3>' : '<h3>▦ باركود الحالة</h3>') + '<p>' + esc(r.patient) + (r.exam ? ' · ' + esc(r.exam) : '') + '</p><div class="qbig">' + qrSvg(u) + '</div><p>المريض يمسحه بكاميرا الموبايل ويشوف حالته على طول' + (r.wrapped ? ' — أو يلاقيها بالباركود الثابت بموبايله وأول اسمه' : '') + '</p>' +
+    modal((fresh ? '<div class="okb">' + ic('check') + '</div><h3>اتحفظت — ده الباركود</h3>' : '<h3>▦ باركود الحالة</h3>') + '<p>' + esc(r.patient) + (r.exam ? ' · ' + esc(r.exam) : '') + '</p><div class="qbig">' + qrSvg(u) + '</div><p>المريض يمسحه بكاميرا الموبايل ويشوف حالته على طول' + (r.wrapped ? ' — أو يلاقيها بالباركود الثابت بموبايله وأول اسمه' : '') + '</p>' +
       '<div class="lk"><input readonly value="' + esc(u) + '"><button class="btn g sm" data-x="cp">نسخ</button></div><div class="bt"><button class="btn" data-x="pr">🖨 اطبع استيكر</button>' + (r.phone ? '<button class="btn" data-x="wa" style="background:#16A34A">واتساب للمريض</button>' : '<button class="btn g" data-x="op">👁 افتح</button>') + '</div><button class="btn g w" data-x="cl" style="margin-top:8px">تمام</button>',
       function (k, close, x) { if (k === 'pr') printSticker(tok); if (k === 'wa') wa(tok); if (k === 'op') window.open(u, '_blank', 'noopener'); if (k === 'cp') { try { navigator.clipboard.writeText(u).then(function () { toast('اتنسخ ✓'); }); } catch (er) { x.previousElementSibling.select(); } } });
   }
@@ -468,7 +514,7 @@
     es.addEventListener('view', function (ev) {
       var m = {}; try { m = JSON.parse(ev.data); } catch (e) { return; }
       var r = itemOf(m.token); if (r) { r.views = m.views; r.last_view = m.last_view; }
-      var t = $('vw-' + m.token); if (t) { t.className = 'tg ok pop'; t.textContent = '👁 ' + m.views; }
+      var t = $('vw-' + m.token); if (t) { t.className = 'vw on'; void t.offsetWidth; t.className = 'vw on pop'; t.innerHTML = ic('eye') + m.views; }
       var lv = $('lv-' + m.token); if (lv) lv.textContent = when(m.last_view);
       if (r) { toast('👁 ' + r.patient + ' فتح حالته دلوقتي'); stats(); }
     });
@@ -477,8 +523,11 @@
     var n = 0, sz = 0; Object.keys(ui.local).forEach(function (k) { n++; sz += ui.local[k].size || 0; });
     var est = navigator.storage && navigator.storage.estimate ? navigator.storage.estimate() : Promise.resolve(null);
     est.then(function (e) {
-      $('disk').innerHTML = '💾 <span>على الكمبيوتر ده: <b>' + n + ' حالة · ' + mb(sz) + '</b>' + (e && e.quota ? ' (المساحة المتاحة للمتصفح حوالي ' + mb(Math.max(0, e.quota - e.usage)) + ')' : '') + '.<br>' +
-        'كل حالة ليها نسخة مشفّرة على السيرفر أول ' + C.cacheDays + ' أيام، وبعدها بتفتح للمريض من الجهاز ده — <b>سيب الصفحة مفتوحة والكمبيوتر شغال</b>. متمسحش بيانات المتصفح، واعمل «⬇ نسخة احتياطية» كل أسبوع.</span>';
+      var pct = e && e.quota ? Math.max(2, Math.min(100, Math.round(e.usage / e.quota * 100))) : 0;
+      $('disk').innerHTML = '<div class="dt"><span>💾</span><div><b>' + n + ' حالة · ' + mb(sz) + '</b><small>محفوظة على الكمبيوتر ده' + (e && e.quota ? ' · متاح حوالي ' + mb(Math.max(0, e.quota - e.usage)) : '') + '</small></div></div>' +
+        (e && e.quota ? '<div class="du"><i style="width:0" data-w="' + pct + '%"></i></div>' : '<div style="height:10px"></div>') +
+        '<p>كل حالة ليها نسخة مشفّرة على السيرفر أول ' + C.cacheDays + ' أيام، وبعدها بتفتح للمريض من الجهاز ده — <b>سيب الصفحة مفتوحة والكمبيوتر شغال</b>. متمسحش بيانات المتصفح، واعمل «نسخة احتياطية» كل أسبوع.</p>';
+      var du = $('disk').querySelector('.du i'); if (du) requestAnimationFrame(function () { requestAnimationFrame(function () { du.style.width = du.dataset.w; }); });
     });
   }
   function boot() {
