@@ -10,7 +10,7 @@
   function dmy(ts) { var m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(ts || '')); return m ? (+m[3]) + '/' + (+m[2]) + '/' + m[1] : ''; }
   document.body.className = 'v f';
   if (C.missing) { document.body.innerHTML = '<div class="w"><div class="ld" style="margin-top:30vh"><i>🔍</i><b>الباركود ده مش شغال</b><p>كلّم المركز.</p></div></div>'; return; }
-  document.body.innerHTML = '<div class="w"><div class="hero"><span class="lg" style="width:58px;height:58px;font-size:26px">' + esc(String(C.center || 'م').trim().charAt(0)) + '</span><h1>' + esc(C.center) + '</h1><p>شوف نتيجة الأشعة بتاعتك على موبايلك 📱</p></div>' +
+  document.body.innerHTML = '<div class="w"><div class="hero"><span class="lg' + (C.logo ? ' img' : '') + '" style="width:58px;height:58px;font-size:26px">' + (C.logo ? '<img src="' + C.logo + '" alt="">' : esc(String(C.center || 'م').trim().charAt(0))) + '</span><h1>' + esc(C.center) + '</h1><p>شوف نتيجة الأشعة بتاعتك على موبايلك 📱</p></div>' +
     '<div class="srch" id="sr">' + (C.on ?
       '<label class="l">رقم موبايلك (اللي اتسجّل في المركز)</label><input class="fld n" id="ph" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="01xxxxxxxxx" style="text-align:right">' +
       '<label class="l">أول اسمك</label><input class="fld" id="nm" autocomplete="given-name" maxlength="40" placeholder="مثلاً: محمد"><p class="hint">زي ما اتكتب في المركز — الاسم الأول بس.</p>' +

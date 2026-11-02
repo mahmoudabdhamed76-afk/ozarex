@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   var C = window.CD || {}, BASE = '/k/' + C.code, $ = function (id) { return document.getElementById(id); }, K = window.OZK;
-  var ui = { asks: [], wa: C.wa || '', prefill: null, list: [], local: {}, q: '', f: 'all', queue: [], live: false, es: null, fixed: !!C.fixedOn, dir: null, dirName: '', seen: {}, watchT: 0, pend: {}, auto: false, lastScan: 0 };
+  var ui = { logo: C.logo || '', logoImg: null, recent: [], vwOpen: '', asks: [], wa: C.wa || '', prefill: null, list: [], local: {}, q: '', f: 'all', queue: [], live: false, es: null, fixed: !!C.fixedOn, dir: null, dirName: '', seen: {}, watchT: 0, pend: {}, auto: false, lastScan: 0 };
   var QID = 0;
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function toast(t) { var el = $('toast'); if (!el) return; el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function () { el.classList.remove('on'); }, 3000); }
@@ -66,17 +66,53 @@
   function hSet(k, v) { return idb().then(function (d) { return new Promise(function (ok) { var t = d.transaction('h', 'readwrite'); if (v === undefined) t.objectStore('h').delete(k); else t.objectStore('h').put(v, k); t.oncomplete = ok; t.onerror = ok; }); }).catch(function () {}); }
 
   /* ── QR (vendor/qrcode.js) ── */
-  function qrM(text) { var q = qrcode(0, 'M'); q.addData(text); q.make(); return q; }
+  /* 4.98 · the center's logo sits in the middle of every QR (level H keeps it readable) */
+  function qrM(text) { var q = qrcode(0, ui.logo ? 'H' : 'M'); q.addData(text); q.make(); return q; }
+  function hole(n) { if (!ui.logo) return null; var k = Math.max(5, Math.round(n * 0.24)); if (k % 2 !== n % 2) k++; var a = (n - k) / 2; return { a: a, b: a + k, k: k }; }
   function qrSvg(text) {
-    var q = qrM(text), n = q.getModuleCount(), m = 2, sz = n + m * 2, d = '';
-    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) d += 'M' + (c + m) + ' ' + (r + m) + 'h1v1h-1z';
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + sz + ' ' + sz + '" shape-rendering="crispEdges"><rect width="' + sz + '" height="' + sz + '" fill="#fff"/><path d="' + d + '" fill="#0F172A"/></svg>';
+    var q = qrM(text), n = q.getModuleCount(), m = 2, sz = n + m * 2, d = '', h = hole(n);
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c) && !(h && r >= h.a && r < h.b && c >= h.a && c < h.b)) d += 'M' + (c + m) + ' ' + (r + m) + 'h1v1h-1z';
+    var lg = h ? '<rect x="' + (h.a + m + 0.3) + '" y="' + (h.a + m + 0.3) + '" width="' + (h.k - 0.6) + '" height="' + (h.k - 0.6) + '" rx="' + (h.k * 0.22) + '" fill="#fff" stroke="#E4E7F2" stroke-width=".25"/><image href="' + ui.logo + '" x="' + (h.a + m + 0.9) + '" y="' + (h.a + m + 0.9) + '" width="' + (h.k - 1.8) + '" height="' + (h.k - 1.8) + '" preserveAspectRatio="xMidYMid meet"/>' : '';
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + sz + ' ' + sz + '" shape-rendering="crispEdges"><rect width="' + sz + '" height="' + sz + '" fill="#fff"/><path d="' + d + '" fill="#0F172A"/>' + lg + '</svg>';
   }
-  function qrDraw(ctx, text, x, y, size) { var q = qrM(text), n = q.getModuleCount(), cell = size / (n + 4); ctx.fillStyle = '#fff'; ctx.fillRect(x, y, size, size); ctx.fillStyle = '#0F172A'; for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) ctx.fillRect(Math.floor(x + (c + 2) * cell), Math.floor(y + (r + 2) * cell), Math.ceil(cell), Math.ceil(cell)); }
+  function qrDraw(ctx, text, x, y, size) {
+    var q = qrM(text), n = q.getModuleCount(), cell = size / (n + 4), h = hole(n); ctx.fillStyle = '#fff'; ctx.fillRect(x, y, size, size); ctx.fillStyle = '#0F172A';
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c) && !(h && r >= h.a && r < h.b && c >= h.a && c < h.b)) ctx.fillRect(Math.floor(x + (c + 2) * cell), Math.floor(y + (r + 2) * cell), Math.ceil(cell), Math.ceil(cell));
+    if (h && ui.logoImg && ui.logoImg.complete && ui.logoImg.naturalWidth) {
+      var lx = x + (h.a + 2) * cell, w = h.k * cell, I = ui.logoImg, p = w * 0.08, k = Math.min((w - 2 * p) / I.naturalWidth, (w - 2 * p) / I.naturalHeight), iw = I.naturalWidth * k, ih = I.naturalHeight * k;
+      ctx.fillStyle = '#fff'; ctx.fillRect(lx, y + (h.a + 2) * cell, w, w); ctx.drawImage(I, lx + (w - iw) / 2, y + (h.a + 2) * cell + (w - ih) / 2, iw, ih);
+    }
+  }
+  function logoTag(cls) { return ui.logo ? '<img class="' + (cls || '') + '" src="' + ui.logo + '" alt="">' : esc(String(C.center || 'م').trim().charAt(0)); }
+  function loadLogoImg() { ui.logoImg = null; if (!ui.logo) return; var I = new Image(); I.src = ui.logo; ui.logoImg = I; }
+  loadLogoImg();
+  function pickLogo() {
+    modal('<h3>لوجو المركز</h3><p>بيظهر فوق في الصفحة، وفي نص كل باركود (باركود كل حالة والباركود الثابت والاستيكر)، وفي صفحة المريض.</p><div class="lgpv">' + (ui.logo ? '<img src="' + ui.logo + '" alt="">' : '<span>' + esc(String(C.center || 'م').trim().charAt(0)) + '</span>') + '</div>' +
+      '<div class="bt"><button class="btn" data-x="pick">اختار صورة</button>' + (ui.logo ? '<button class="btn d" data-x="rm">شيل اللوجو</button>' : '<button class="btn g" data-x="cl">إلغاء</button>') + '</div><p style="font-size:11.5px;margin-top:10px">أحسن حاجة صورة مربعة بخلفية بيضا أو شفافة (PNG).</p>',
+      function (k, close) {
+        if (k === 'rm') { saveLogo('').then(close); }
+        if (k === 'pick') { var f = document.createElement('input'); f.type = 'file'; f.accept = 'image/png,image/jpeg,image/webp'; f.onchange = function () { if (f.files[0]) shrink(f.files[0]).then(saveLogo).then(close).catch(function (e) { toast(e.message || 'مش قادر أقرا الصورة'); }); }; f.click(); }
+      });
+  }
+  function shrink(file) {
+    return new Promise(function (ok, no) {
+      var u = URL.createObjectURL(file), I = new Image();
+      I.onload = function () { var S = 256, k = Math.min(1, S / Math.max(I.width, I.height)), w = Math.round(I.width * k), h = Math.round(I.height * k), cv = document.createElement('canvas'); cv.width = w; cv.height = h; cv.getContext('2d').drawImage(I, 0, 0, w, h); URL.revokeObjectURL(u); var d = cv.toDataURL('image/png'); if (d.length > 280000) d = cv.toDataURL('image/webp', 0.9); ok(d); };
+      I.onerror = function () { no(new Error('الملف ده مش صورة')); }; I.src = u;
+    });
+  }
+  function saveLogo(d) {
+    return api('POST', 'logo', { data: d }).then(function () {
+      ui.logo = d; loadLogoImg();
+      var paint = function () { brand(); fixedCard(); table(); toast(d ? 'اتحفظ اللوجو ✓ — هيظهر في نص كل باركود' : 'اتشال اللوجو'); };
+      if (ui.logoImg) { ui.logoImg.onload = paint; ui.logoImg.onerror = paint; } else paint();
+    }).catch(function (e) { toast(e.message); });
+  }
+  function brand() { [].forEach.call(document.querySelectorAll('[data-logo]'), function (el) { el.innerHTML = logoTag(); el.classList.toggle('img', !!ui.logo); }); }
 
   /* ════ login ════ */
   function login() {
-    document.body.innerHTML = '<div class="gate"><div class="box"><i>🩻</i><h1>حالات المرضى</h1><p>' + esc(C.center) + '</p><input class="fld" id="pw" type="password" autocomplete="current-password" placeholder="الباسوورد" autofocus><div class="err" id="er"></div><button class="btn w" id="go" style="margin-top:6px;padding:13px">دخول</button><p style="margin-top:14px;font-size:12px">الباسوورد من الشركة — مختلف عن لينك الحسابات.</p></div></div><div class="toast" id="toast"></div>';
+    document.body.innerHTML = '<div class="gate"><div class="box"><i class="glg' + (ui.logo ? ' img' : '') + '">' + (ui.logo ? '<img src="' + ui.logo + '" alt="">' : '▦') + '</i><h1>QR Patient</h1><p>' + esc(C.center) + '</p><input class="fld" id="pw" type="password" autocomplete="current-password" placeholder="الباسوورد" autofocus><div class="err" id="er"></div><button class="btn w" id="go" style="margin-top:6px;padding:13px">دخول</button><p style="margin-top:14px;font-size:12px">الباسوورد من الشركة — مختلف عن لينك الحسابات.</p></div></div><div class="toast" id="toast"></div>';
     var go = function () {
       var p = $('pw').value; if (!p) return; $('go').disabled = true;
       fetch(BASE + '/login', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pass: p }) }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.message || 'محصلش'); location.reload(); }); })
@@ -89,18 +125,12 @@
   function shell() {
     var dirOk = 'showDirectoryPicker' in window;
     document.body.innerHTML =
-      '<header class="tbar"><div class="tb-in"><span class="lg">' + esc(String(C.center || 'م').trim().charAt(0)) + '</span><div class="tt"><b>حالات المرضى</b><small>' + esc(C.center) + '</small></div>' +
+      '<header class="tbar"><div class="tb-in"><span class="lg' + (ui.logo ? ' img' : '') + '" data-logo>' + logoTag() + '</span><div class="tt"><b>QR Patient</b><small>' + esc(C.center) + '</small></div>' +
         '<div class="sp"><span class="pill" id="st"><i></i><span>بيتصل…</span></span><button class="ib" id="bk" title="نسخة احتياطية من حالات الجهاز ده — تنقلها لكمبيوتر تاني">' + ic('down') + '<span>نسخة احتياطية</span></button><button class="ib" id="rs" title="رجّع نسخة احتياطية">' + ic('up') + '<span>استرجاع</span></button><input type="file" id="rsf" accept=".ozxcases" hidden><button class="ib x" id="out" title="خروج">' + ic('out') + '<span>خروج</span></button></div></div></header>' +
       '<div class="wrap">' +
-      '<section class="hero"><div class="aur"><i></i><i></i><i></i></div>' +
-        '<div class="hx"><div><h1>نتايج المرضى <em>في ثانية</em></h1><p>اسحب PDF الحالة، يطلعلها باركود متشفّر، والمريض يفتح أشعته على موبايله — والملف الأصلي فاضل على الجهاز ده.</p>' +
-          '<div class="tags"><span>' + ic('shield') + ' متشفّر من الجهاز</span><span>' + ic('qr') + ' باركود لكل حالة</span><span>' + ic('bolt') + ' لايف</span></div></div>' +
-          '<div class="orb" aria-hidden="true"><svg viewBox="0 0 200 200"><defs><linearGradient id="og" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#A5B4FC"/><stop offset="1" stop-color="#67E8F9"/></linearGradient><radialGradient id="ow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#67E8F9" stop-opacity=".55"/><stop offset="1" stop-color="#67E8F9" stop-opacity="0"/></radialGradient></defs>' +
-            '<circle cx="100" cy="100" r="92" fill="none" stroke="rgba(255,255,255,.08)"/><circle class="r1" cx="100" cy="100" r="80" fill="none" stroke="url(#og)" stroke-width="1.5" stroke-dasharray="4 10"/><circle class="r2" cx="100" cy="100" r="62" fill="none" stroke="rgba(165,180,252,.5)" stroke-width="1" stroke-dasharray="40 14 4 14"/>' +
-            '<g class="sw"><path d="M100 100 L100 20 A80 80 0 0 1 169 60 Z" fill="url(#ow)"/></g><circle cx="100" cy="100" r="44" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.18)"/>' +
-            '<path class="ecg" d="M64 100h16l6-14 8 30 7-24 5 8h30" fill="none" stroke="#67E8F9" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
-            '<circle class="dot" cx="150" cy="56" r="3" fill="#A5B4FC"/><circle class="dot" cx="44" cy="132" r="3" fill="#67E8F9"/><circle class="dot" cx="138" cy="160" r="3" fill="#C4B5FD"/></svg></div></div>' +
-        '<div class="stats"><div class="sc" style="--c:#818CF8"><span class="si">' + ic('today') + '</span><div><b id="s1">0</b><span>حالة النهارده</span></div></div><div class="sc" style="--c:#67E8F9"><span class="si">' + ic('month') + '</span><div><b id="s2">0</b><span>حالة الشهر ده</span></div></div><div class="sc" style="--c:#6EE7B7"><span class="si">' + ic('eye') + '</span><div><b id="s3">0</b><span>مرة المرضى فتحوا</span></div></div><div class="sc" style="--c:#FCD34D"><span class="si">' + ic('disk') + '</span><div><b id="s4">0</b><span>محفوظة على الجهاز ده</span></div></div></div></section>' +
+      '<section class="hero2"><div class="hl"><button class="clogo' + (ui.logo ? ' img' : '') + '" id="lgo" type="button" title="لوجو المركز"><span data-logo>' + logoTag() + '</span><em>' + (ui.logo ? 'غيّر' : '+ لوجو') + '</em></button>' +
+          '<div><small>QR Patient</small><h1>' + esc(C.center) + '</h1><p>ارفع PDF الحالة واطبع الباركود — والمريض يفتح نتيجته من موبايله.</p></div></div>' +
+        '<div class="hs"><div><b id="s1">0</b><span>النهارده</span></div><div><b id="s2">0</b><span>الشهر ده</span></div><div><b id="s3">0</b><span>مرة اتفتحت</span></div><div><b id="s4">0</b><span>على الجهاز ده</span></div></div></section>' +
       '<div class="kgrid"><div class="kmain">' +
         '<div id="mwda"></div><div class="upz"><div class="drop" id="drop"><span class="beam"></span><span class="ic">' + ic('file') + '</span><div><b>اسحب ملفات PDF هنا</b><small>ملف واحد أو كذا ملف مرة واحدة · لحد ' + C.maxMb + ' ميجا للملف · بنحاول نقرا الاسم والموبايل من الملف</small></div><div class="db"><button class="btn" id="pk" type="button">＋ اختار ملفات</button></div><input type="file" id="fi" accept="application/pdf,.pdf" multiple hidden></div>' +
           (dirOk ? '<div class="watch" id="wt"></div>' : '') + '</div>' +
@@ -108,7 +138,9 @@
         '<section class="card list"><div class="ch"><div class="h"><h2>الحالات</h2><small id="lc"></small></div><div class="srch">' + ic('search') + '<input class="fld q" id="q" placeholder="اسم المريض أو الموبايل أو الفحص"></div></div><div class="seg" id="fl"></div><div id="tbl"><div class="sk"></div><div class="sk" style="opacity:.7"></div><div class="sk" style="opacity:.45"></div></div></section>' +
       '</div><aside class="kside"><div id="asks"></div><div class="opt fxc" id="fx"></div>' +
         '<div class="opt"><h3>' + ic('qr') + ' باركود لكل حالة <span class="tg ok">شغال دايماً</span></h3><div class="how"><div><span>1</span>اسحب PDF الحالة واكتب اسم المريض</div><div><span>2</span>اطبع الاستيكر أو ابعته واتساب</div><div><span>3</span>المريض يمسحه ويشوف أشعته على طول</div></div></div>' +
+        '<div class="opt rec"><h3>' + ic('eye') + ' آخر مرات الفتح</h3><div id="rec"></div></div>' +
         '<div class="disk" id="disk"><div class="sk" style="height:40px;margin:0"></div></div></aside></div></div><div class="toast" id="toast"></div>';
+    $('lgo').onclick = pickLogo;
     $('out').onclick = function () { api('POST', 'logout').then(function () { location.reload(); }).catch(function () { location.reload(); }); };
     $('bk').onclick = backup; $('rs').onclick = function () { $('rsf').click(); }; $('rsf').onchange = function () { if (this.files[0]) restore(this.files[0]); this.value = ''; };
     var dr = $('drop'), fi = $('fi');
@@ -411,13 +443,35 @@
           '<div class="cm"><span class="av">' + esc(String(r.patient || '؟').trim().charAt(0)) + '</span><div><b title="' + esc(r.patient) + '">' + esc(r.patient) + '</b><span class="n">' + esc(r.phone || '—') + '</span></div></div>' +
           '<div class="ce"><span class="ex"><i></i>' + esc(r.exam || 'فحص') + '</span>' + (r.pages ? '<small>' + r.pages + ' صفحة · ' + mb(r.size) + '</small>' : '') + '</div>' +
           '<div class="ct">' + hmOf(r.at) + '<small>اتحفظت</small></div><div class="cs">' + src + '</div>' +
-          '<div class="cv"><span class="vw' + (r.views ? ' on' : '') + '" id="vw-' + r.token + '">' + ic('eye') + (r.views ? r.views : 'لسه') + '</span><small id="lv-' + r.token + '">' + (r.last_view ? when(r.last_view) : '') + '</small></div>' +
+          '<div class="cv"><span class="vw' + (r.views ? ' on' : '') + '" data-vw="' + r.token + '" title="مين فتح الحالة وإمتى" id="vw-' + r.token + '">' + ic('eye') + (r.views ? r.views : 'لسه') + '</span><small id="lv-' + r.token + '">' + (r.last_view ? when(r.last_view) : '') + '</small></div>' +
           '<div class="ca">' + (loc && r.active ? '<button class="ic2" data-a="qr" data-tip="الباركود">' + ic('qr') + '</button><button class="ic2" data-a="print" data-tip="اطبع استيكر">' + ic('print') + '</button>' + (r.phone ? '<button class="ic2 wa" data-a="wa" data-tip="واتساب للمريض">' + ic('wa') + '</button>' : '') : '') +
           (r.active ? '<button class="ic2" data-a="stop" data-tip="وقّف — الباركود مش هيفتح">' + ic('pause') + '</button>' : '<button class="ic2 go" data-a="start">' + ic('play') + ' شغّل</button>') + '<button class="ic2 dl" data-a="del" data-tip="امسح">' + ic('trash') + '</button></div></div>';
       }).join('') + '</div>';
     }).join('');
     [].forEach.call($('tbl').querySelectorAll('[data-qr]'), function (x) { x.onclick = function () { showQr(x.dataset.qr); }; });
+    [].forEach.call($('tbl').querySelectorAll('[data-vw]'), function (x) { x.onclick = function () { viewsModal(x.dataset.vw); }; });
     [].forEach.call($('tbl').querySelectorAll('[data-a]'), function (b) { b.onclick = function () { act(b.closest('[data-t]').dataset.t, b.dataset.a, b); }; });
+  }
+  /* ── 4.98 · access log: every time a patient opens his case ── */
+  var VIA = { qr: ['▦', 'باركود الحالة'], fixed: ['📌', 'الباركود الثابت'] }, SRC = { cache: '☁ من السيرفر', center: '💻 من جهاز المركز' };
+  function entryRow(e, withName) {
+    var v = VIA[e.via] || VIA.qr;
+    return '<div class="ve"><span class="vi">' + v[0] + '</span><div><b>' + (withName ? esc(e.patient || '') + (e.exam ? ' <small>· ' + esc(e.exam) + '</small>' : '') : esc(e.dev || 'جهاز')) + '</b><small>' + when(e.at) + ' · ' + v[1] + (withName ? (e.dev ? ' · ' + esc(e.dev) : '') : (SRC[e.src] ? ' · ' + SRC[e.src] : '')) + '</small></div></div>';
+  }
+  function recent() {
+    var el = $('rec'); if (!el) return; var L = ui.recent.slice(0, 6);
+    el.innerHTML = L.length ? L.map(function (e, i) { return '<div class="rx" data-vt="' + esc(e.token) + '" style="animation-delay:' + i * 40 + 'ms">' + entryRow(e, true) + '</div>'; }).join('') : '<p class="rmt">لسه محدش فتح حالته — أول ما مريض يفتح هتلاقيه هنا لايف.</p>';
+    [].forEach.call(el.querySelectorAll('[data-vt]'), function (x) { x.onclick = function () { viewsModal(x.dataset.vt); }; });
+  }
+  function viewsModal(tok) {
+    var r = itemOf(tok); if (!r) return;
+    ui.vwOpen = tok;
+    var o = modal('<h3>مرات فتح الحالة</h3><p>' + esc(r.patient) + (r.exam ? ' · ' + esc(r.exam) : '') + '</p><div class="vsum"><div><b id="vmn">' + (r.views || 0) + '</b><span>مرة اتفتحت</span></div><div><b>' + (r.last_view ? when(r.last_view) : '—') + '</b><span>آخر مرة</span></div></div><div class="vlist" id="vml"><div class="sk"></div><div class="sk" style="opacity:.6"></div></div><button class="btn g w" data-x="cl" style="margin-top:12px">تمام</button>');
+    var obs = new MutationObserver(function () { if (!document.body.contains(o)) { ui.vwOpen = ''; obs.disconnect(); } }); obs.observe(document.body, { childList: true });
+    api('GET', 'views/' + tok).then(function (x) {
+      var el = $('vml'); if (!el) return; var L = x.list || [];
+      el.innerHTML = L.length ? L.map(function (e) { return entryRow(e, false); }).join('') : '<p class="rmt">لسه المريض مافتحهاش.</p>' + (r.views ? '<p class="rmt">(المرات القديمة قبل التحديث ده اتعدّت من غير تفاصيل)</p>' : '');
+    }).catch(function (e) { var el = $('vml'); if (el) el.innerHTML = '<p class="rmt">' + esc(e.message) + '</p>'; });
   }
   function itemOf(tok) { return ui.list.filter(function (r) { return r.token === tok; })[0]; }
   function act(tok, a, b) {
@@ -516,7 +570,9 @@
       var r = itemOf(m.token); if (r) { r.views = m.views; r.last_view = m.last_view; }
       var t = $('vw-' + m.token); if (t) { t.className = 'vw on'; void t.offsetWidth; t.className = 'vw on pop'; t.innerHTML = ic('eye') + m.views; }
       var lv = $('lv-' + m.token); if (lv) lv.textContent = when(m.last_view);
-      if (r) { toast('👁 ' + r.patient + ' فتح حالته دلوقتي'); stats(); }
+      if (m.entry) { ui.recent.unshift(m.entry); ui.recent = ui.recent.slice(0, 30); recent(); var f = $('rec') && $('rec').firstChild; if (f && f.classList) f.classList.add('new'); }
+      if (m.entry && ui.vwOpen === m.token) { var vl = $('vml'), vn = $('vmn'); if (vn) vn.textContent = m.views; if (vl) { if (!vl.querySelector('.ve')) vl.innerHTML = ''; vl.insertAdjacentHTML('afterbegin', entryRow(m.entry, false)); vl.firstChild.classList.add('new'); } }
+      if (r) { toast('👁 ' + r.patient + ' فتح حالته دلوقتي' + (m.entry && m.entry.dev ? ' (' + m.entry.dev + ')' : '')); stats(); }
     });
   }
   function disk() {
@@ -532,7 +588,7 @@
   }
   function boot() {
     shell();
-    Promise.all([api('GET', 'list'), localAll()]).then(function (a) { ui.list = a[0].list || []; ui.local = a[1] || {}; ui.asks = a[0].asks || []; asks(); table(); stats(); disk(); backfill(); }).catch(function (e) { $('tbl').innerHTML = '<div class="emp"><i>⚠️</i>' + esc(e.message) + '</div>'; });
+    Promise.all([api('GET', 'list'), localAll()]).then(function (a) { ui.list = a[0].list || []; ui.local = a[1] || {}; ui.asks = a[0].asks || []; ui.recent = a[0].recent || []; asks(); recent(); table(); stats(); disk(); backfill(); }).catch(function (e) { $('tbl').innerHTML = '<div class="emp"><i>⚠️</i>' + esc(e.message) + '</div>'; });
     connect(); bootWatch();
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && (!ui.es || ui.es.readyState === 2)) connect(); });
     window.addEventListener('beforeunload', function (e) { if (Object.keys(ui.local).length || ui.queue.some(function (q) { return q.st === 'ready' || q.st === 'saving'; })) { e.preventDefault(); e.returnValue = ''; } });

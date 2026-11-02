@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════════
-   4.94 · «مودة» جوّه صفحة حالات المرضى — DICOM ← PDF ← حالة بباركود
+   4.94 · «PDF DICOM» (كان «مودة») جوّه صفحة QR Patient — DICOM ← PDF ← حالة بباركود
    نفس محرك MAWDA Pro (قراءة DICOM + نوافذ CT + شبكة ثابتة + ترويسة عربية
    مرسومة على Canvas)، والـ PDF اللي بيطلع بيدخل على طول في قايمة الحفظ
    باسم المريض ونوع الفحص من ملفات الـ DICOM نفسها.
@@ -168,7 +168,7 @@
       return out;
     }
     function shell() {
-      el.innerHTML = '<div class="mw' + (open ? ' op' : '') + '"><div class="mwh" id="mwH"><span class="mwi">🩻</span><div><b>مودة — حوّل <bdi>DICOM</bdi> لـ <bdi>PDF</bdi> وارفعه على طول</b><small>اسحب ملفات أو فولدر الأشعة ← الـ <bdi>PDF</bdi> بيتعمل هنا ويدخل قايمة الحفظ باسم المريض ونوع الفحص</small></div><span class="mwc">⌄</span></div><div class="mwb" id="mwB"></div></div>';
+      el.innerHTML = '<div class="mw' + (open ? ' op' : '') + '"><div class="mwh" id="mwH"><span class="mwi">🩻</span><div><b><bdi>PDF DICOM</bdi> — حوّل ملفات الأشعة لـ <bdi>PDF</bdi> وارفعها على طول</b><small>اسحب ملفات أو فولدر الأشعة ← الـ <bdi>PDF</bdi> بيتعمل هنا ويدخل قايمة الحفظ باسم المريض ونوع الفحص</small></div><span class="mwc">⌄</span></div><div class="mwb" id="mwB"></div></div>';
       $('mwH').onclick = function () { open = !open; save(); el.firstChild.classList.toggle('op', open); if (open && !$('mwDrop')) body(); };
       if (open) body();
     }

@@ -13,7 +13,7 @@
   try { if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.js'; } catch (e) {}
 
   function shell() {
-    var head = '<div class="ctr"><span class="lg">' + esc(String(C.center || 'م').trim().charAt(0)) + '</span><div><b>' + esc(C.center || '') + '</b><span>نتيجة الفحص</span></div></div>';
+    var head = '<div class="ctr"><span class="lg' + (C.logo ? ' img' : '') + '">' + (C.logo ? '<img src="' + C.logo + '" alt="">' : esc(String(C.center || 'م').trim().charAt(0))) + '</span><div><b>' + esc(C.center || '') + '</b><span>نتيجة الفحص</span></div></div>';
     if (C.missing) { document.body.innerHTML = '<div class="w"><div class="ld" style="margin-top:30vh"><i>🔍</i><b>الحالة دي مش موجودة</b><p>اتأكد من الباركود، أو كلّم المركز.</p></div></div>'; return; }
     var back = null; try { back = /^\/h\/[A-Za-z0-9]{8}$/.exec(sessionStorage.getItem('ozx_back') || ''); } catch (e) {}
     if (back) head = head.replace('</div></div>', '</div><a class="btn g sm" href="' + back[0] + '" style="margin-inline-start:auto">↩ نتايج تانية</a></div>');
@@ -39,7 +39,8 @@
     if (!KEY || KEY.length < 20) return box('🔑', 'اللينك ناقص', 'امسح الباركود تاني بكاميرا الموبايل — أو افتح اللينك كامل زي ما اتبعتلك.');
     if (!(window.crypto && crypto.subtle)) return box('⚠️', 'المتصفح ده قديم', 'افتح اللينك من Chrome أو Safari.');
     box('spin', 'بنجيب الحالة…', '', '<div class="bar"><i id="pr" style="width:4%"></i></div><p id="prt" style="margin-top:6px"></p>');
-    fetch(location.pathname.replace(/\/$/, '') + '/file', { cache: 'no-store' }).then(function (r) {
+    var viaH = false; try { viaH = /^\/h\//.test(sessionStorage.getItem('ozx_back') || ''); } catch (e) {}
+    fetch(location.pathname.replace(/\/$/, '') + '/file' + (viaH ? '?h=1' : ''), { cache: 'no-store' }).then(function (r) {
       if (!r.ok) return r.json().catch(function () { return {}; }).then(function (j) { var e = new Error(j.message || 'محصلش'); e.j = j; e.status = r.status; throw e; });
       var total = Number(r.headers.get('Content-Length')) || C.size || 0, src = r.headers.get('X-Source');
       if (!r.body || !r.body.getReader) return r.arrayBuffer().then(function (b) { return { buf: b, src: src }; });

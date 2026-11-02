@@ -104,10 +104,10 @@
           (ph ? '<button class="btn btn-secondary btn-sm cl-wa" onclick="AXClients.wa(\'' + c.id + '\')">واتساب</button>' : '') +
           '<button class="btn btn-secondary btn-sm" onclick="AXClients.qr(\'' + c.id + '\')">▦ باركود</button>' +
           '<button class="btn btn-secondary btn-sm" onclick="AXClients.reset(\'' + c.id + '\')" title="امسح طلبات الورق أو الصيانة من صفحة المركز">🧹 ريست</button>' +
-          '<button class="btn btn-secondary btn-sm" onclick="AXClients.cases(\'' + c.id + '\')" title="لينك منفصل بباسوورد يرفع منه المركز PDF الحالات ويطلع باركود للمريض">📁 حالات المرضى</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="AXClients.cases(\'' + c.id + '\')" title="لينك منفصل بباسوورد يرفع منه المركز PDF الحالات ويطلع باركود للمريض">▦ QR Patient</button>' +
           '<button class="btn btn-ghost btn-sm" onclick="AXClients.rotate(\'' + c.id + '\')">↻ لينك جديد</button>' +
           '<button class="btn btn-ghost btn-sm" onclick="AXClients.stop(\'' + c.id + '\')">⏸ إيقاف</button></div>'
-        : '<div class="cl-a"><button class="btn btn-primary btn-sm" onclick="AXClients.make(\'' + c.id + '\')">🔗 اعمل لينك للمركز ده</button><button class="btn btn-secondary btn-sm" onclick="AXClients.cases(\'' + c.id + '\')">📁 حالات المرضى</button></div>') +
+        : '<div class="cl-a"><button class="btn btn-primary btn-sm" onclick="AXClients.make(\'' + c.id + '\')">🔗 اعمل لينك للمركز ده</button><button class="btn btn-secondary btn-sm" onclick="AXClients.cases(\'' + c.id + '\')">▦ QR Patient</button></div>') +
       '</div></div>';
   }
   function group(key, title, list, extra) {
@@ -572,19 +572,19 @@
     api('GET', '/cases?cid=' + encodeURIComponent(cid)).then(function (r) {
       var s = r.site, ph = phoneOf(c);
       if (!s) {
-        openModal('📁 حالات المرضى — ' + esc(c.name),
+        openModal('▦ QR Patient — ' + esc(c.name),
           '<p class="ax-modal-lead">لينك منفصل للمركز بباسوورد، يفتحه من الكمبيوتر بتاعه ويرفع PDF الحالة، ويطلعله باركود يتلزق للمريض. المريض يمسحه ويشوف حالته على موبايله.</p>' +
           '<ul style="margin:8px 18px 12px;line-height:1.9;font-size:13.5px"><li>الملف بيتشفّر على جهاز المركز، والأصل بيفضل عنده.</li><li>نسخة مشفّرة مؤقتة على السيرفر أول 7 أيام بس — بعدها المريض بيفتح من جهاز المركز لايف (لو صفحته مفتوحة).</li><li>الباسوورد مختلف عن لينك الحسابات.</li></ul>' +
           '<div class="form-group"><label>الباسوورد (سيبه فاضي ونعملك واحد 6 أرقام)</label><input class="form-control" id="cs-pw" maxlength="40" placeholder="مثلاً 482913"></div>',
-          '<button class="btn btn-primary" id="cs-go">📁 اعمل لينك الحالات</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
+          '<button class="btn btn-primary" id="cs-go">▦ اعمل لينك QR Patient</button><button class="btn btn-ghost" onclick="closeModal()">إلغاء</button>');
         document.getElementById('cs-go').onclick = function () {
           api('POST', '/cases/make', { cid: cid, name: c.name, wa: c.phone || '', pass: (document.getElementById('cs-pw') || {}).value || '' }).then(function (x) { casesModal(cid, x.pass); }).catch(function (e) { T(e.message, 'error'); });
         };
         return;
       }
       if (!s.wa && c.phone) api('POST', '/cases/wa', { cid: cid, wa: c.phone, ifEmpty: true }).catch(function () {});   /* 4.92 · patients who don't find their result ask on this WhatsApp */
-      var u = casesUrl(s.code), msg = 'السلام عليكم ' + c.name + ' 🌿\nده لينك «حالات المرضى» من *' + company() + '*:\n' + u + (fresh ? '\nالباسوورد: ' + fresh : '') + '\n\nافتحوه من كمبيوتر المركز، اسحبوا PDF الحالة، وهيطلعلكم باركود تلزقوه للمريض — المريض يمسحه ويشوف أشعته على موبايله.\nسيبوا الصفحة مفتوحة على الكمبيوتر عشان الحالات القديمة تفضل تفتح.';
-      openModal('📁 حالات المرضى — ' + esc(c.name),
+      var u = casesUrl(s.code), msg = 'السلام عليكم ' + c.name + ' 🌿\nده لينك «QR Patient» من *' + company() + '*:\n' + u + (fresh ? '\nالباسوورد: ' + fresh : '') + '\n\nافتحوه من كمبيوتر المركز، اسحبوا PDF الحالة، وهيطلعلكم باركود تلزقوه للمريض — المريض يمسحه ويشوف أشعته على موبايله.\nسيبوا الصفحة مفتوحة على الكمبيوتر عشان الحالات القديمة تفضل تفتح.';
+      openModal('▦ QR Patient — ' + esc(c.name),
         (fresh ? '<div style="background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;border-radius:14px;padding:12px 14px;margin-bottom:12px;text-align:center"><div style="font-size:13px">الباسوورد (اكتبه دلوقتي — مش هيظهر تاني)</div><div style="font-size:30px;font-weight:900;letter-spacing:4px;direction:ltr">' + esc(fresh) + '</div></div>' : '') +
         '<div class="cl-l"><input readonly value="' + esc(u) + '" onclick="this.select()"><button class="btn btn-secondary btn-sm" id="cs-cp">نسخ</button></div>' +
         '<div class="cl-st" style="margin-top:12px"><div class="' + (s.online ? 'ok' : '') + '"><b>' + (s.online ? '🟢' : '⚪') + '</b><span>' + (s.online ? 'متصل دلوقتي' : (s.last_seen ? 'آخر دخول ' + esc(String(s.last_seen).slice(0, 16)) : 'لسه مدخلش')) + '</span></div><div><b>' + s.cases + '</b><span>حالة</span></div><div><b>' + s.views + '</b><span>مرة اتفتحت</span></div></div>' +
