@@ -17,7 +17,7 @@
     if (C.missing) { document.body.innerHTML = '<div class="w"><div class="ld" style="margin-top:30vh"><i>🔍</i><b>الحالة دي مش موجودة</b><p>اتأكد من الباركود، أو كلّم المركز.</p></div></div>'; return; }
     var back = null; try { back = /^\/h\/[A-Za-z0-9]{8}$/.exec(sessionStorage.getItem('ozx_back') || ''); } catch (e) {}
     if (back) head = head.replace('</div></div>', '</div><a class="btn g sm" href="' + back[0] + '" style="margin-inline-start:auto">↩ نتايج تانية</a></div>');
-    document.body.innerHTML = '<div class="w">' + head + '<div class="pt"><small>المريض</small><h1>' + esc(C.patient) + '</h1><div class="m">' + (C.exam ? '<span>🩻 ' + esc(C.exam) + '</span>' : '') + '<span>📅 ' + dmy(C.at) + '</span>' + (C.pages ? '<span>📄 ' + C.pages + ' صفحة</span>' : '') + '</div></div>' +
+    document.body.innerHTML = '<div class="w">' + head + '<div class="pt"><small>المريض</small><h1>' + esc(C.patient) + '</h1><div class="m">' + (C.exam ? '<span>🩻 ' + esc(C.exam) + '</span>' : '') + '<span>📅 ' + dmy(C.at) + '</span>' + (C.pages ? '<span>' + (C.kind === 'dicom' ? '🩻 ' + C.pages + ' صورة' : '📄 ' + C.pages + ' صفحة') + '</span>' : '') + '</div></div>' +
       '<div id="body"></div><p class="foot">الملف متشفّر — بيتفتح بس بالباركود ده. · ' + esc(C.center || '') + '</p></div>';
   }
   /* 4.92 · stuck (center offline / file missing / stopped) → ask the center on WhatsApp */
@@ -55,7 +55,7 @@
       var all = new Uint8Array(x.buf), iv = all.slice(0, 12), ct = all.slice(12);
       return crypto.subtle.importKey('raw', unb64u(KEY), { name: 'AES-GCM' }, false, ['decrypt']).then(function (k) { return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, k, ct); })
         .catch(function () { var e = new Error('bad'); e.bad = true; throw e; });
-    }).then(function (plain) { PDF = new Uint8Array(plain); show(); })
+    }).then(function (plain) { if (C.kind === 'dicom') return showDicom(plain); PDF = new Uint8Array(plain); show(); })
       .catch(function (e) {
         if (e.bad) return box('🔑', 'مش قادر أفتح الملف', 'الباركود ده مش بتاع الحالة دي أو ناقص — امسحه تاني.');
         if (e.j && e.j.stopped) return box('⏸', 'الحالة دي اتوقفت', 'كلّم المركز لو محتاجها.');
@@ -63,6 +63,13 @@
         if (e.j && e.j.offline) { TRY++; box('🌙', 'جهاز المركز مقفول دلوقتي', 'الحالة محفوظة على كمبيوتر المركز، وهتتفتح أول ما يشتغل. هنجرّب تاني لوحدنا…', '<button class="btn" id="re" style="margin-top:14px">↻ جرّب دلوقتي</button>'); $('re').onclick = load; clearTimeout(load.t); load.t = setTimeout(load, Math.min(120000, 20000 * TRY)); return; }
         box('⚠️', 'محصلش', esc(e.message || 'النت فصل — جرّب تاني'), '<button class="btn" id="re" style="margin-top:14px">↻ جرّب تاني</button>'); $('re').onclick = load;
       });
+  }
+  /* 5.00 · a DICOM case → the mini PACS right here */
+  function showDicom(buf) {
+    if (!window.OZPacs || !window.DecompressionStream) { box('⚠️', 'المتصفح ده قديم', 'افتح اللينك من Chrome أو Safari جديد.'); return; }
+    $('body').innerHTML = '<div id="pacs"></div><p class="pxtip">◐ اسحب على الصورة للتباين والسطوع · صباعين للزوم والتحريك · ⇅ لتقليب الشرايح · دبل كليك يرجّعها</p>';
+    try { OZPacs.viewer($('pacs'), buf, { name: String(C.patient || 'صورة').replace(/[\\/:*?"<>|]+/g, ' ') }); }
+    catch (e) { box('⚠️', 'مش قادر أفتح الصور', esc(e.message || '')); }
   }
   function fname() { return (String(C.patient || 'case') + (C.exam ? ' - ' + C.exam : '')).replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.pdf'; }
   function blobUrl() { if (!blobUrl.u) blobUrl.u = URL.createObjectURL(new Blob([PDF], { type: 'application/pdf' })); return blobUrl.u; }

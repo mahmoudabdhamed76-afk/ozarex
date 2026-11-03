@@ -367,3 +367,58 @@ label.l{display:block;font-size:12.5px;font-weight:700;color:var(--mut);margin:1
 .mdl .vsum div{background:var(--soft);border-radius:14px;padding:10px}
 .mdl .vsum b{display:block;font-size:20px}.mdl .vsum span{font-size:11.5px;color:var(--mut)}
 .mdl .vlist{max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:16px;padding:2px 12px}
+
+/* ════ 5.00 · PDF + DICOM pop icons in the drop zone ════ */
+.pis{display:flex;gap:12px;flex:none;position:relative;z-index:1}
+.pi{position:relative;width:118px;border:1px solid var(--line);background:#fff;border-radius:22px;padding:12px 8px 10px;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:var(--sh);transition:transform .35s var(--spring),box-shadow .3s,border-color .3s;animation:pin .7s var(--spring) both}
+.pi.dcm{animation-delay:.12s}
+@keyframes pin{0%{opacity:0;transform:scale(.4) translateY(14px)}70%{opacity:1;transform:scale(1.08)}100%{transform:none}}
+.pi .pg{width:54px;height:58px;display:grid;place-items:center;animation:bob 3.2s ease-in-out infinite}
+.pi.dcm .pg{animation-delay:-1.6s}
+.pi .pg svg{width:100%;height:100%;filter:drop-shadow(0 8px 10px rgba(11,16,36,.18))}
+.pi.pdf .pg svg path:first-child{stroke:#FDA4AF;stroke-width:1.5}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-5px) rotate(-3deg)}}
+.pi b{font-size:14px;font-weight:800;letter-spacing:.4px;direction:ltr}.pi small{font-size:11px;color:var(--mut)}
+.pi:hover{transform:translateY(-4px) scale(1.04);box-shadow:var(--sh2)}
+.pi.pdf:hover{border-color:#FDA4AF}.pi.dcm:hover{border-color:#A5B4FC}
+.pi:active{transform:scale(.95)}
+.pi::after{content:'';position:absolute;inset:-1px;border-radius:inherit;border:2px solid transparent;pointer-events:none}
+.drop.ov .pi{animation:popov .6s var(--spring) infinite alternate}.drop.ov .pi.dcm{animation-delay:.15s}
+@keyframes popov{to{transform:translateY(-6px) scale(1.06)}}
+.drop .dt{min-width:0}.drop .dt b{font-size:17px}
+@media (max-width:760px){.drop{flex-direction:column;text-align:center}.pis{justify-content:center}}
+.qi.dcm::before{background:linear-gradient(#4F46E5,#06B6D4)}
+.qi .th.dz{position:relative;background:#0B1024;color:#fff;overflow:hidden}
+.qi .th.dz i{position:absolute;left:0;right:0;height:2px;top:10%;background:#67E8F9;box-shadow:0 0 10px #67E8F9;animation:scanl 1.6s ease-in-out infinite}
+
+/* ════ 5.00 · the patient's mini PACS ════ */
+.px{margin-top:12px;background:#05070F;border-radius:22px;overflow:hidden;color:#E2E8F0;box-shadow:0 22px 44px -24px rgba(11,16,36,.9);user-select:none;-webkit-user-select:none}
+.px.max,.px:fullscreen{position:fixed;inset:0;z-index:60;border-radius:0;margin:0;display:flex;flex-direction:column}
+.px.max .pxv,.px:fullscreen .pxv{flex:1;height:auto}
+.pxs{display:flex;gap:6px;overflow-x:auto;padding:10px 10px 0;scrollbar-width:none}.pxs:empty{display:none}
+.pxs button{flex:none;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:#CBD5E1;border-radius:12px;padding:6px 10px;font-size:12px;font-weight:700;max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pxs button em{font-style:normal;opacity:.6;margin-inline-start:5px}
+.pxs button.on{background:#4F46E5;border-color:#4F46E5;color:#fff}
+.pxv{position:relative;height:62vh;min-height:300px;touch-action:none;cursor:crosshair;background:#000;margin-top:10px}
+.pxv canvas{width:100%;height:100%;display:block}
+.pxo{position:absolute;font-size:11px;line-height:1.5;color:#E2E8F0;text-shadow:0 1px 2px #000;pointer-events:none;display:flex;flex-direction:column;font-variant-numeric:tabular-nums}
+.pxo.tl{top:8px;left:10px;direction:ltr;align-items:flex-start;color:#67E8F9}.pxo.tr{top:8px;right:10px;align-items:flex-end}.pxo.tr b{font-size:12.5px}
+.pxo.bl{bottom:8px;left:10px;direction:ltr}.pxo.br{bottom:8px;right:10px;max-width:60%;text-align:right}
+.pxh{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);background:rgba(79,70,229,.85);color:#fff;font-size:12px;font-weight:700;border-radius:999px;padding:6px 12px;white-space:nowrap;pointer-events:none;transition:opacity .4s;animation:fd .5s .4s both}
+.pxh.gone{opacity:0}
+.pxr{display:flex;align-items:center;gap:10px;padding:10px 12px 4px}
+.pxr input{flex:1;accent-color:#818CF8;direction:ltr}
+.pxr span{font-size:12px;font-weight:700;color:#94A3B8;min-width:58px;text-align:center;direction:ltr;font-variant-numeric:tabular-nums}
+.pxb{width:36px;height:36px;border-radius:12px;border:0;background:#4F46E5;color:#fff;font-size:14px;flex:none}
+.pxt{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;padding:8px 8px 6px}
+.pxt button{border:0;background:rgba(255,255,255,.05);color:#CBD5E1;border-radius:12px;padding:7px 2px 6px;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:17px;line-height:1.1;transition:background .2s,color .2s,transform .15s}
+.pxt button span{font-size:10.5px;font-weight:700}
+.pxt button.on{background:#4F46E5;color:#fff}
+.pxt button:active{transform:scale(.92)}
+.pxp{display:flex;gap:6px;overflow-x:auto;padding:2px 10px 12px;scrollbar-width:none}.pxp:empty{display:none}
+.pxp button{flex:none;border:1px solid rgba(255,255,255,.14);background:transparent;color:#CBD5E1;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700}
+.pxp button.on{background:#fff;color:#0B1024;border-color:#fff}
+.pxtip{text-align:center;color:var(--mut);font-size:11.5px;margin-top:10px}
+.af{text-align:right;margin:6px 0 10px}.af .fld{font-size:15px;padding:11px 12px}
+.af input[type=date]{direction:rtl;min-height:46px;background:#fff}
+.aer{color:var(--red);font-weight:700;font-size:12.5px;min-height:18px;margin-top:6px;text-align:center}

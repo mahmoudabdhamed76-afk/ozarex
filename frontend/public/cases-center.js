@@ -132,7 +132,11 @@
           '<div><small>QR Patient</small><h1>' + esc(C.center) + '</h1><p>ارفع PDF الحالة واطبع الباركود — والمريض يفتح نتيجته من موبايله.</p></div></div>' +
         '<div class="hs"><div><b id="s1">0</b><span>النهارده</span></div><div><b id="s2">0</b><span>الشهر ده</span></div><div><b id="s3">0</b><span>مرة اتفتحت</span></div><div><b id="s4">0</b><span>على الجهاز ده</span></div></div></section>' +
       '<div class="kgrid"><div class="kmain">' +
-        '<div id="mwda"></div><div class="upz"><div class="drop" id="drop"><span class="beam"></span><span class="ic">' + ic('file') + '</span><div><b>اسحب ملفات PDF هنا</b><small>ملف واحد أو كذا ملف مرة واحدة · لحد ' + C.maxMb + ' ميجا للملف · بنحاول نقرا الاسم والموبايل من الملف</small></div><div class="db"><button class="btn" id="pk" type="button">＋ اختار ملفات</button></div><input type="file" id="fi" accept="application/pdf,.pdf" multiple hidden></div>' +
+        '<div id="mwda"></div><div class="upz"><div class="drop" id="drop"><span class="beam"></span>' +
+          '<div class="pis"><button class="pi pdf" id="pkP" type="button" title="ارفع PDF"><span class="pg"><svg viewBox="0 0 48 56"><path d="M8 2h22l12 12v36a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V6a4 4 0 0 1 4-4z" fill="#fff"/><path d="M30 2v12h12" fill="#FECACA"/><rect x="0" y="28" width="34" height="16" rx="4" fill="#E11D48"/><text x="17" y="40" text-anchor="middle" font-size="11" font-weight="800" fill="#fff" font-family="Arial,sans-serif">PDF</text></svg></span><b>PDF</b><small>تقرير / نتيجة</small></button>' +
+          '<button class="pi dcm" id="pkD" type="button" title="ارفع DICOM"><span class="pg"><svg viewBox="0 0 56 56"><rect x="4" y="4" width="48" height="48" rx="12" fill="#0B1024"/><circle cx="28" cy="27" r="14" fill="none" stroke="#67E8F9" stroke-width="2.4" stroke-dasharray="5 4"/><path d="M28 16v22M22 21c4 2 8 2 12 0M21 28c5 2 9 2 14 0M22 35c4 2 8 2 12 0" stroke="#E0E7FF" stroke-width="2" fill="none" stroke-linecap="round"/><rect x="12" y="44" width="32" height="6" rx="3" fill="#4F46E5"/></svg></span><b>DICOM</b><small>صور الجهاز نفسها</small></button></div>' +
+          '<div class="dt"><b>اسحب PDF أو ملفات / فولدر DICOM هنا</b><small>PDF: لحد ' + C.maxMb + ' ميجا · DICOM: بيتضغط هنا لحجم صغير، والمريض يفتحه على موبايله ويتحكم فيه كأنه باكس</small></div>' +
+          '<input type="file" id="fi" accept="application/pdf,.pdf" multiple hidden><input type="file" id="fiD" multiple hidden><input type="file" id="fiDD" webkitdirectory multiple hidden></div>' +
           (dirOk ? '<div class="watch" id="wt"></div>' : '') + '</div>' +
         '<div class="queue" id="qu"></div>' +
         '<section class="card list"><div class="ch"><div class="h"><h2>الحالات</h2><small id="lc"></small></div><div class="srch">' + ic('search') + '<input class="fld q" id="q" placeholder="اسم المريض أو الموبايل أو الفحص"></div></div><div class="seg" id="fl"></div><div id="tbl"><div class="sk"></div><div class="sk" style="opacity:.7"></div><div class="sk" style="opacity:.45"></div></div></section>' +
@@ -144,12 +148,15 @@
     $('out').onclick = function () { api('POST', 'logout').then(function () { location.reload(); }).catch(function () { location.reload(); }); };
     $('bk').onclick = backup; $('rs').onclick = function () { $('rsf').click(); }; $('rsf').onchange = function () { if (this.files[0]) restore(this.files[0]); this.value = ''; };
     var dr = $('drop'), fi = $('fi');
-    $('pk').onclick = function (e) { e.stopPropagation(); fi.click(); };
-    dr.onclick = function (e) { if (e.target === dr || e.target.closest('.ic')) fi.click(); };
+    $('pkP').onclick = function (e) { e.stopPropagation(); fi.click(); };
+    $('pkD').onclick = function (e) { e.stopPropagation(); dicomPick(); };
+    $('fiD').onchange = function () { addDicom([].slice.call(this.files || [])); this.value = ''; };
+    $('fiDD').onchange = function () { addDicom([].slice.call(this.files || [])); this.value = ''; };
+    dr.onclick = function (e) { if (e.target === dr || e.target.closest('.dt')) fi.click(); };
     fi.onchange = function () { add([].slice.call(fi.files || [])); fi.value = ''; };
     ['dragenter', 'dragover'].forEach(function (k) { dr.addEventListener(k, function (e) { e.preventDefault(); dr.classList.add('ov'); }); });
     ['dragleave', 'drop'].forEach(function (k) { dr.addEventListener(k, function (e) { e.preventDefault(); dr.classList.remove('ov'); }); });
-    dr.addEventListener('drop', function (e) { add([].slice.call((e.dataTransfer && e.dataTransfer.files) || [])); });
+    dr.addEventListener('drop', function (e) { dropped(e.dataTransfer); });
     document.addEventListener('dragover', function (e) { e.preventDefault(); }); document.addEventListener('drop', function (e) { e.preventDefault(); });
     $('q').oninput = function () { ui.q = this.value.trim(); table(); };
     fixedCard(); watchBar();
@@ -242,9 +249,42 @@
     for (var i = 0; i < EXAMS.length; i++) if (EXAMS[i][0].test(t)) { o.exam = EXAMS[i][1]; break; }
     return o;
   }
+  /* 5.00 · DICOM: files or a whole folder → one compressed bundle per study */
+  function dicomPick() {
+    modal('<h3>ارفع DICOM</h3><p>اختار ملفات الصور من الجهاز، أو الفولدر كله (CD المريض مثلاً). بنقراها ونضغطها هنا على الكمبيوتر ده، وبتترفع متشفّرة زي الـ PDF.</p><div class="bt"><button class="btn" data-x="dir">📂 فولدر</button><button class="btn g" data-x="files">ملفات</button></div><button class="btn g w" data-x="cl" style="margin-top:8px">إلغاء</button>',
+      function (k, close) { close(); if (k === 'dir') $('fiDD').click(); if (k === 'files') $('fiD').click(); });
+  }
+  function isPdf(f) { return /\.pdf$/i.test(f.name) || f.type === 'application/pdf'; }
+  function maybeDicom(f) { return !/^\./.test(f.name) && !/\.(txt|xml|html?|exe|ini|inf|jpg|jpeg|png|gif|bmp|pdf|dll|js|css|json|zip|rar|db|lnk|url|bat|mp4|avi|doc|docx|xls|xlsx)$/i.test(f.name) && f.size > 200; }
+  function dropped(dt) {
+    var items = dt && dt.items ? [].slice.call(dt.items) : [], ents = items.map(function (it) { return it.webkitGetAsEntry ? it.webkitGetAsEntry() : null; }).filter(Boolean);
+    if (!ents.some(function (en) { return en.isDirectory; })) return add([].slice.call((dt && dt.files) || []));
+    var out = [], pend = 0, fin = function () { if (!pend) add(out); };
+    var walk = function (en) { pend++; if (en.isFile) en.file(function (f) { out.push(f); pend--; fin(); }, function () { pend--; fin(); }); else if (en.isDirectory) { var rd = en.createReader(), all = []; (function more() { rd.readEntries(function (L) { if (L.length) { all = all.concat(L); more(); } else { all.forEach(walk); pend--; fin(); } }, function () { pend--; fin(); }); })(); } else { pend--; fin(); } };
+    ents.forEach(walk);
+  }
+  function addDicom(files) {
+    files = files.filter(maybeDicom); if (!files.length) return toast('مفيش ملفات DICOM');
+    if (!window.OZPacs || !window.CompressionStream) return toast('المتصفح ده قديم — افتح الصفحة من Chrome أو Edge');
+    var ph = { id: ++QID, kind: 'dicom', st: 'pack', name: files.length + ' ملف DICOM', msg2: 'بنقرا الملفات…', pct: 2 };
+    ui.queue.push(ph); queue();
+    OZPacs.pack(files, { maxMb: C.maxMb, step: function (k, a, b) { ph.pct = Math.round(a / b * (k === 'read' ? 40 : 60) + (k === 'read' ? 0 : 40)); ph.msg2 = (k === 'read' ? 'بنقرا ' : 'بنضغط الصور ') + a + ' / ' + b; var e = $('pk' + ph.id), t = $('pt' + ph.id); if (e) e.style.width = ph.pct + '%'; if (t) t.textContent = ph.msg2; } })
+      .then(function (L) {
+        ph.st = 'gone';
+        L.forEach(function (r) {
+          var nm = String(r.patient || '').trim(), q = { id: ++QID, kind: 'dicom', file: new File([r.blob], 'DICOM - ' + (nm || 'case') + '.ozxd', { type: 'application/octet-stream' }), name: '🩻 DICOM · ' + r.count + ' صورة' + (r.series > 1 ? ' · ' + r.series + ' سيريز' : ''), size: r.blob.size, pages: r.count, thumb: r.thumb, patient: nm, phone: '', exam: r.exam || '', st: 'ready', af: '🩻 اتضغطت لـ ' + mb(r.blob.size) + (r.date ? ' · ' + r.date : '') + ' — راجع الاسم واكتب موبايل المريض', dir: false };
+          ui.queue.push(q);
+        });
+        queue(); beep(); toast('🩻 جاهز — اكتب موبايل المريض واحفظ');
+        var qu = $('qu'); if (qu) setTimeout(function () { qu.scrollIntoView({ behavior: 'smooth', block: 'start' }); var i = qu.querySelector('[data-k=phone]'); if (i) i.focus(); }, 300);
+      })
+      .catch(function (e) { ph.st = 'gone'; queue(); toast(e.message || 'مش قادر أقرا ملفات DICOM'); });
+  }
   function add(files, fromDir) {
-    files = files.filter(function (f) { return /\.pdf$/i.test(f.name) || f.type === 'application/pdf'; });
-    if (!files.length) return toast('اختار ملفات PDF');
+    var other = files.filter(function (f) { return !isPdf(f) && maybeDicom(f); });
+    files = files.filter(isPdf);
+    if (other.length && !fromDir) addDicom(other);
+    if (!files.length) { if (!other.length) toast('اختار ملفات PDF أو DICOM'); return; }
     files.forEach(function (f) {
       if (f.size > C.maxMb * 1048576) return toast(f.name + ' أكبر من ' + C.maxMb + ' ميجا');
       var q = { id: ++QID, file: f, name: f.name, size: f.size, pages: 0, thumb: '', patient: '', phone: '', exam: '', st: 'ready', af: '', dir: !!fromDir };
@@ -293,13 +333,14 @@
   }
   function paintQ(q) {
     var el = $('qi' + q.id); if (!el) return;
-    el.className = 'qi' + (q.st === 'done' ? ' done' : q.st === 'err' ? ' err' : '');
+    el.className = 'qi' + (q.st === 'done' ? ' done' : q.st === 'err' ? ' err' : '') + (q.kind === 'dicom' ? ' dcm' : '');
+    if (q.st === 'pack') { el.innerHTML = '<span class="th dz"><i></i>🩻</span><div class="nm" style="grid-column:2/-1"><b>' + esc(q.name) + '</b><small id="pt' + q.id + '">' + esc(q.msg2 || '') + '</small><div class="pb"><i id="pk' + q.id + '" style="width:' + (q.pct || 2) + '%"></i></div></div>'; return; }
     if (q.st === 'done') {
       el.innerHTML = (q.thumb ? '<img class="th" src="' + q.thumb + '" alt="">' : '<span class="th">✅</span>') + '<div class="nm"><b>✅ ' + esc(q.patient) + '</b><small>' + esc(q.exam || '') + ' · اتحفظت</small></div><div class="qf" style="display:block;color:#15803D;font-weight:700;font-size:13px">' + (q.wrapped ? '📌 تتلاقى بالباركود الثابت · ' : '') + '▦ الباركود جاهز</div><div class="qa"><button class="btn sm" data-x="qr">▦ باركود</button><button class="btn g sm" data-x="pr">🖨</button><button class="btn g sm" data-x="rm">×</button></div>';
     } else {
       var busy = q.st === 'saving';
       el.innerHTML = (q.thumb ? '<img class="th" src="' + q.thumb + '" alt="">' : '<span class="th">📄</span>') +
-        '<div class="nm"><b>' + esc(q.name) + '</b><small>' + mb(q.size) + (q.pages ? ' · ' + q.pages + ' صفحة' : '') + '</small>' + (q.af ? '<small class="af">' + esc(q.af) + '</small>' : '') + (q.msg ? '<small style="color:#DC2626;font-weight:700">' + esc(q.msg) + '</small>' : '') + (busy ? '<div class="pb"><i id="pb' + q.id + '"></i></div>' : '') + '</div>' +
+        '<div class="nm"><b>' + esc(q.name) + '</b><small>' + mb(q.size) + (q.pages ? ' · ' + q.pages + (q.kind === 'dicom' ? ' صورة' : ' صفحة') : '') + '</small>' + (q.af ? '<small class="af">' + esc(q.af) + '</small>' : '') + (q.msg ? '<small style="color:#DC2626;font-weight:700">' + esc(q.msg) + '</small>' : '') + (busy ? '<div class="pb"><i id="pb' + q.id + '"></i></div>' : '') + '</div>' +
         '<div class="qf"><input class="fld" data-k="patient" maxlength="80" placeholder="اسم المريض *" value="' + esc(q.patient) + '"' + (busy ? ' disabled' : '') + '><input class="fld n" data-k="phone" maxlength="20" inputmode="tel" placeholder="موبايل المريض' + (ui.fixed ? ' *' : '') + '" style="text-align:right" value="' + esc(q.phone) + '"' + (busy ? ' disabled' : '') + '><input class="fld" data-k="exam" maxlength="80" list="exl" placeholder="نوع الفحص" value="' + esc(q.exam) + '"' + (busy ? ' disabled' : '') + '></div>' +
         '<div class="qa"><button class="btn sm" data-x="sv"' + (busy ? ' disabled' : '') + '>' + (busy ? '⏳' : '▦ احفظ') + '</button><button class="btn g sm" data-x="rm"' + (busy ? ' disabled' : '') + ' title="شيل">×</button></div>';
       [].forEach.call(el.querySelectorAll('[data-k]'), function (i) { i.oninput = function () { q[i.dataset.k] = i.value; }; i.onkeydown = function (e) { if (e.key === 'Enter') saveOne(q).catch(function () {}); }; });
@@ -323,7 +364,7 @@
       .then(function (w2) { wrapped2 = w2; return q.file.arrayBuffer(); })
       .then(function (buf) { return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, buf); })
       .then(function (ct) {
-        var blob = new Blob([iv, ct], { type: 'application/octet-stream' }), meta = { patient: q.patient, phone: q.phone, exam: String(q.exam || '').trim(), name: q.name, pages: q.pages, wrap: wrapped, wrap2: wrapped2 };
+        var blob = new Blob([iv, ct], { type: 'application/octet-stream' }), meta = { patient: q.patient, phone: q.phone, exam: String(q.exam || '').trim(), name: q.name, pages: q.pages, kind: q.kind === 'dicom' ? 'dicom' : 'pdf', wrap: wrapped, wrap2: wrapped2 };
         return new Promise(function (ok, no) {
           var x = new XMLHttpRequest(); x.open('POST', BASE + '/case'); x.withCredentials = true;
           x.setRequestHeader('Content-Type', 'application/octet-stream');
@@ -442,7 +483,7 @@
         var qr = loc ? '<div class="cq" data-qr="' + r.token + '" title="كبّر الباركود"><div class="fx' + (loc.thumb ? ' two' : '') + '"><div class="fa">' + qrSvg(linkOf(r.token)) + '</div>' + (loc.thumb ? '<div class="fb"><img src="' + loc.thumb + '" alt=""></div>' : '') + '</div></div>' : '<div class="cq na" title="الباركود متاح على الجهاز اللي اترفعت منه"><div class="fx"><div class="fa">▦</div></div></div>';
         return '<div class="cr' + (r.active ? '' : ' off') + '" style="--i:' + Math.min(i, 14) + ';--x:' + exColor(r.exam) + '" data-t="' + r.token + '">' + qr +
           '<div class="cm"><span class="av">' + esc(String(r.patient || '؟').trim().charAt(0)) + '</span><div><b title="' + esc(r.patient) + '">' + esc(r.patient) + '</b><span class="n">' + esc(r.phone || '—') + '</span></div></div>' +
-          '<div class="ce"><span class="ex"><i></i>' + esc(r.exam || 'فحص') + '</span>' + (r.pages ? '<small>' + r.pages + ' صفحة · ' + mb(r.size) + '</small>' : '') + '</div>' +
+          '<div class="ce"><span class="ex"><i></i>' + esc(r.exam || 'فحص') + '</span>' + (r.pages ? '<small>' + (r.kind === 'dicom' ? '🩻 DICOM · ' + r.pages + ' صورة' : r.pages + ' صفحة') + ' · ' + mb(r.size) + '</small>' : '') + '</div>' +
           '<div class="ct">' + hmOf(r.at) + '<small>اتحفظت</small></div><div class="cs">' + src + '</div>' +
           '<div class="cv"><span class="vw' + (r.views ? ' on' : '') + '" data-vw="' + r.token + '" title="مين فتح الحالة وإمتى" id="vw-' + r.token + '">' + ic('eye') + (r.views ? r.views : 'لسه') + '</span><small id="lv-' + r.token + '">' + (r.last_view ? when(r.last_view) : '') + '</small></div>' +
           '<div class="ca">' + (loc && r.active ? '<button class="ic2" data-a="qr" data-tip="الباركود">' + ic('qr') + '</button><button class="ic2" data-a="print" data-tip="اطبع استيكر">' + ic('print') + '</button>' + (r.phone ? '<button class="ic2 wa" data-a="wa" data-tip="واتساب للمريض">' + ic('wa') + '</button>' : '') : '') +

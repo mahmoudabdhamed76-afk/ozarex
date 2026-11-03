@@ -17,7 +17,7 @@
       '<button class="btn w" id="go" style="margin-top:14px;padding:14px;font-size:16px">🔍 دوّر على نتيجتي</button><div class="err" id="er" style="color:var(--red);font-weight:700;text-align:center;margin-top:8px;min-height:20px"></div>'
       : '<div class="ld" style="box-shadow:none;padding:6px"><i>⏸</i><b>البحث مقفول دلوقتي</b><p>كلّم المركز يبعتلك لينك نتيجتك.</p></div>') + '</div>' +
     '<div class="res" id="res"></div>' +
-    (C.on ? '<div class="miss" id="miss"><b>مش لاقي نتيجتك؟</b><p>اكتب موبايلك فوق، ودوس هنا — طلبك بيوصل للمركز على طول وهم يرفعولك النتيجة.</p><input class="fld" id="nt0" maxlength="100" placeholder="نوع الفحص وتاريخه (اختياري) — مثلاً: مقطعية يوم 25/10" style="margin-bottom:8px"><button class="btn ask2 w" id="wa0">📨 اطلب نتيجتك من المركز</button></div>' : '') +
+    (C.on ? '<div class="miss" id="miss"><b>مش لاقي نتيجتك؟</b><p>اكتب موبايلك فوق، ودوس هنا — طلبك بيوصل للمركز على طول وهم يرفعولك النتيجة.</p>' + '<div class="af"><label class="l">اسمك زي ما اتسجّل في المركز *</label><input class="fld" id="an0" maxlength="60" autocomplete="name" placeholder="الاسم بالكامل"><label class="l">تاريخ عمل الأشعة *</label><input class="fld" id="ad0" type="date"><label class="l">نوع الفحص (اختياري)</label><input class="fld" id="nt0" maxlength="60" placeholder="مثلاً: مقطعية على الصدر"><div class="aer" id="ae0"></div></div>' + '<button class="btn ask2 w" id="wa0">📨 اطلب نتيجتك من المركز</button></div>' : '') +
     '<div class="steps"><div><i>📷</i>مسحت الباركود</div><div><i>✍️</i>اكتب رقم موبايلك</div><div><i>🩻</i>افتح نتيجتك</div></div>' +
     '<p class="foot">نتيجتك متشفّرة — بتتفتح برقم موبايلك اللي في المركز.</p></div>';
   /* 4.95 · «اطلب نتيجتك» → a request inside the system (the center sees it live on its cases page) — no WhatsApp */
@@ -25,7 +25,8 @@
   if (wa0) wa0.onclick = function () {
     var ph = $('ph').value.trim(), er = $('er');
     if (!K.last10(ph)) { if (er) er.textContent = 'اكتب رقم موبايلك الأول'; $('ph').focus(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
-    askIn(ph, '', ($('nt0') || {}).value || '', wa0);
+    var f = form('0'); if (!f) return;
+    askIn(ph, f.name, f.note, wa0);
   };
   if (!C.on) return;
   try { var last = JSON.parse(sessionStorage.getItem('ozx_find') || 'null'); if (last) { $('ph').value = last.p || ''; } } catch (e) {}
@@ -46,11 +47,22 @@
         var href = function (m) { return '/v/' + m.x.token + '#' + m.k; };
         if (M.length === 1) { $('res').innerHTML = '<div class="ld"><i>✅</i><b>لقينا نتيجتك</b><p>بنفتحها…</p></div>'; setTimeout(function () { location.href = href(M[0]); }, 450); return; }
         $('res').innerHTML = '<p style="color:var(--mut);font-weight:700;margin:4px 4px 0">لقينا ' + M.length + ' نتايج — اختار:</p>' + M.map(function (m, i) {
-          return '<a class="rc" href="' + href(m) + '" style="animation-delay:' + (i * 60) + 'ms"><span class="ri">🩻</span><div><b>' + esc(m.x.exam || 'نتيجة فحص') + '</b><small>📅 ' + dmy(m.x.at) + (m.x.pages ? ' · ' + m.x.pages + ' صفحة' : '') + ' · ' + esc(m.x.hint) + '</small></div><span class="go">←</span></a>';
+          return '<a class="rc" href="' + href(m) + '" style="animation-delay:' + (i * 60) + 'ms"><span class="ri">' + (m.x.kind === 'dicom' ? '🩻' : '📄') + '</span><div><b>' + esc(m.x.exam || 'نتيجة فحص') + '</b><small>📅 ' + dmy(m.x.at) + (m.x.pages ? ' · ' + m.x.pages + (m.x.kind === 'dicom' ? ' صورة DICOM' : ' صفحة') : '') + ' · ' + esc(m.x.hint) + '</small></div><span class="go">←</span></a>';
         }).join('');
       })
       .catch(function (e) { b.disabled = false; b.innerHTML = '🔍 دوّر على نتيجتي'; er.textContent = e.message; });
   };
+  /* 5.00 · asking for a result: the name as registered + the day of the exam (both needed by the center to find it) */
+  function form(k) {
+    var n = ($('an' + k) || {}).value || '', d = ($('ad' + k) || {}).value || '', t = ($('nt' + k) || {}).value || '', e = $('ae' + k);
+    n = n.trim(); t = t.trim();
+    if (n.length < 3) { if (e) e.textContent = 'اكتب اسمك زي ما اتسجّل في المركز'; $('an' + k).focus(); return null; }
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+    if (!m) { if (e) e.textContent = 'اختار تاريخ عمل الأشعة'; $('ad' + k).focus(); return null; }
+    if (new Date(+m[1], m[2] - 1, +m[3]) > new Date()) { if (e) e.textContent = 'التاريخ ده لسه مجاش'; return null; }
+    if (e) e.textContent = '';
+    return { name: n, note: 'يوم الأشعة ' + (+m[3]) + '/' + (+m[2]) + '/' + m[1] + (t ? ' · ' + t : '') };
+  }
   function askIn(ph, name, note, b) {
     var t0 = b ? b.innerHTML : ''; if (b) { b.disabled = true; b.innerHTML = '<span class="spin" style="width:18px;height:18px;border-width:3px;margin:0"></span> بنبعت…'; }
     fetch(location.pathname.replace(/\/$/, '') + '/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: String(name).trim(), phone: ph, note: String(note || '').trim() }) })
@@ -80,9 +92,9 @@
   function notFound(ph) {
     var mi = $('miss'); if (mi) mi.style.display = 'none';
     $('res').innerHTML = '<div class="ld"><i>🤔</i><b>ملقيناش نتيجة بالبيانات دي</b><p>اتأكد إن الرقم هو اللي اتسجّل في المركز. لو النتيجة لسه طالعة النهارده جرّب بعد شوية.</p>' +
-      '<div class="ask"><input class="fld" id="nt" maxlength="100" placeholder="نوع الفحص وتاريخه (اختياري) — مثلاً: مقطعية يوم 25/10"><button class="btn ask2" id="wa">📨 اطلب نتيجتك من المركز</button><small>طلبك بيوصل للمركز على طول، وهم يرفعولك النتيجة.</small></div></div>';
+      '<div class="ask">' + '<div class="af"><label class="l">اسمك زي ما اتسجّل في المركز *</label><input class="fld" id="an" maxlength="60" autocomplete="name" placeholder="الاسم بالكامل"><label class="l">تاريخ عمل الأشعة *</label><input class="fld" id="ad" type="date"><label class="l">نوع الفحص (اختياري)</label><input class="fld" id="nt" maxlength="60" placeholder="مثلاً: مقطعية على الصدر"><div class="aer" id="ae"></div></div>' + '<button class="btn ask2" id="wa">📨 اطلب نتيجتك من المركز</button><small>طلبك بيوصل للمركز على طول، وهم يرفعولك النتيجة.</small></div></div>';
     var b = $('wa'); if (!b) return;
-    b.onclick = function () { askIn(ph, '', ($('nt') || {}).value || '', b); };
+    b.onclick = function () { var f = form(''); if (f) askIn(ph, f.name, f.note, b); };
   }
   $('go').onclick = go; $('ph').onkeydown = function (e) { if (e.key === 'Enter') go(); };
 })();

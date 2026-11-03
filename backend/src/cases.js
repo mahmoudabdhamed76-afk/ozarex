@@ -34,6 +34,7 @@ try {
   const ic = db.prepare('PRAGMA table_info(case_item)').all().map(c => c.name);
   if (!ic.includes('phash')) db.exec('ALTER TABLE case_item ADD COLUMN phash TEXT');
   if (!ic.includes('wrap')) db.exec('ALTER TABLE case_item ADD COLUMN wrap TEXT');
+  if (!ic.includes('kind')) db.exec("ALTER TABLE case_item ADD COLUMN kind TEXT NOT NULL DEFAULT 'pdf'");   /* 5.00 · pdf | dicom */
   if (!ic.includes('wrap2')) db.exec('ALTER TABLE case_item ADD COLUMN wrap2 TEXT');   /* 4.99 · the key wrapped by the mobile alone (the fixed barcode asks for the mobile only) */
   if (!sc.includes('wa')) db.exec('ALTER TABLE case_site ADD COLUMN wa TEXT');
   if (!sc.includes('logo')) db.exec('ALTER TABLE case_site ADD COLUMN logo TEXT');   /* 4.98 · the center's own logo (also in the middle of every QR) */
@@ -111,11 +112,11 @@ function send(res, code, o, h) { res.writeHead(code, Object.assign({ 'Content-Ty
 function readJson(req, max) {
   return new Promise((ok, no) => { const ch = []; let n = 0; req.on('data', c => { n += c.length; if (n > max) { no(Object.assign(new Error('كبير'), { status: 413 })); req.destroy(); } else ch.push(c); }); req.on('end', () => { try { ok(JSON.parse(Buffer.concat(ch).toString('utf8') || '{}')); } catch (e) { no(Object.assign(new Error('bad'), { status: 400 })); } }); req.on('error', no); });
 }
-function itemOut(r) { return { id: r.id, token: r.token, patient: r.patient, phone: r.phone, exam: r.exam, name: r.file_name, size: r.size, pages: r.pages, at: r.created_at, views: r.views, last_view: r.last_view, active: !!r.active, cached: !!r.cached && r.cache_until > Date.now(), cache_until: r.cache_until, wrapped: !!(r.wrap || r.wrap2), wrapped2: !!r.wrap2 }; }
+function itemOut(r) { return { id: r.id, token: r.token, patient: r.patient, phone: r.phone, exam: r.exam, name: r.file_name, size: r.size, pages: r.pages, at: r.created_at, views: r.views, last_view: r.last_view, active: !!r.active, cached: !!r.cached && r.cache_until > Date.now(), cache_until: r.cache_until, wrapped: !!(r.wrap || r.wrap2), wrapped2: !!r.wrap2, kind: r.kind || 'pdf' }; }
 
 function page(title, body, css, js) {
   return '<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><meta name="theme-color" content="#0E9F9A">' +
-    '<title>' + esc(title) + '</title><link rel="icon" href="/icons/favicon-32.png"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/cases.css?v=499"></head><body class="' + css + '">' + body + js + '</body></html>';
+    '<title>' + esc(title) + '</title><link rel="icon" href="/icons/favicon-32.png"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/cases.css?v=500"></head><body class="' + css + '">' + body + js + '</body></html>';
 }
 function html(res, code, s) { res.writeHead(code, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' }); res.end(s); }
 
@@ -141,7 +142,7 @@ async function centerRoute(req, res, m) {
     if (req.method !== 'GET') return false;
     const CD = { code, center: site.center_name || '', logo: site.logo || '', auth: me, cacheDays: CACHE_DAYS, maxMb: MAX_MB, pub: me ? pubOf(site) : '', fixedOn: !!site.fixed_on, wa: me ? (site.wa || '') : '', waDefault: me && !site.wa ? waFor(cid0(site), '') : '' };
     if (me) db.prepare('UPDATE case_site SET last_seen = ? WHERE customer_id = ?').run(nowTs(), site.customer_id);
-    html(res, 200, page('QR Patient — ' + (site.center_name || ''), '<div id="app"></div>', 'k', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/qrcode.js"></script><script src="/cases-kit.js?v=499"></script><script src="/cases-dicom.js?v=499"></script><script src="/cases-center.js?v=499"></script>'));
+    html(res, 200, page('QR Patient — ' + (site.center_name || ''), '<div id="app"></div>', 'k', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/qrcode.js"></script><script src="/cases-kit.js?v=500"></script><script src="/cases-dicom.js?v=500"></script><script src="/cases-pacs.js?v=500"></script><script src="/cases-center.js?v=500"></script>'));
     return true;
   }
   if (sub === 'login' && req.method === 'POST') {
@@ -176,8 +177,8 @@ async function centerRoute(req, res, m) {
     const done = n => {
       const wj = w => w && typeof w === 'object' && w.s && w.i && w.k ? JSON.stringify({ s: clean(w.s, 40), i: clean(w.i, 40), k: clean(w.k, 120) }) : null;
       const wrap = wj(meta.wrap), wrap2 = wj(meta.wrap2);
-      const r = db.prepare('INSERT INTO case_item (customer_id, token, patient, phone, exam, file_name, size, pages, created_at, cache_until, cached, phash, wrap, wrap2) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-        .run(cid, token, patient, clean(meta.phone, 20), clean(meta.exam, 80), clean(meta.name, 120), n, Math.max(0, Math.min(5000, Number(meta.pages) || 0)) || null, nowTs(), Date.now() + CACHE_DAYS * 864e5, keep ? 1 : 0, phashOf(meta.phone), wrap, wrap2);
+      const r = db.prepare('INSERT INTO case_item (customer_id, token, patient, phone, exam, file_name, size, pages, created_at, cache_until, cached, phash, wrap, wrap2, kind) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        .run(cid, token, patient, clean(meta.phone, 20), clean(meta.exam, 80), clean(meta.name, 120), n, Math.max(0, Math.min(5000, Number(meta.pages) || 0)) || null, nowTs(), Date.now() + CACHE_DAYS * 864e5, keep ? 1 : 0, phashOf(meta.phone), wrap, wrap2, meta.kind === 'dicom' ? 'dicom' : 'pdf');
       send(res, 200, { ok: true, item: itemOut(db.prepare('SELECT * FROM case_item WHERE id = ?').get(Number(r.lastInsertRowid))) });
     };
     if (!keep) { let n = 0; req.on('data', c => { n += c.length; }); req.on('end', () => done(n)); return true; }
@@ -291,8 +292,8 @@ async function viewRoute(req, res, token, file) {
   const it = db.prepare('SELECT i.*, s.center_name, s.logo AS site_logo, s.active AS site_on, s.wa AS site_wa, s.pub AS site_pub FROM case_item i LEFT JOIN case_site s ON s.customer_id = i.customer_id WHERE i.token = ?').get(token);
   if (!file) {
     if (!it) { if (limited('vx:' + ip, 40, 600e3)) { send(res, 429, { message: 'حاولت كتير' }); return true; } }
-    const CD = it ? { token, center: it.center_name || '', logo: it.site_logo || '', patient: it.patient, exam: it.exam || '', at: it.created_at, pages: it.pages || 0, size: it.size, name: it.file_name || '', active: !!(it.active && it.site_on), ready: !!(it.cached && it.cache_until > Date.now()) || online(it.customer_id), wa: waFor(it.customer_id, it.site_wa), pub: it.site_pub || '' } : { missing: true };
-    html(res, it ? 200 : 404, page(it ? 'نتيجة الفحص — ' + (it.center_name || '') : 'الحالة مش موجودة', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/vendor/pdfjs/pdf.min.js"></script><script src="/cases-view.js?v=499"></script>'));
+    const CD = it ? { token, kind: it.kind || 'pdf', center: it.center_name || '', logo: it.site_logo || '', patient: it.patient, exam: it.exam || '', at: it.created_at, pages: it.pages || 0, size: it.size, name: it.file_name || '', active: !!(it.active && it.site_on), ready: !!(it.cached && it.cache_until > Date.now()) || online(it.customer_id), wa: waFor(it.customer_id, it.site_wa), pub: it.site_pub || '' } : { missing: true };
+    html(res, it ? 200 : 404, page(it ? 'نتيجة الفحص — ' + (it.center_name || '') : 'الحالة مش موجودة', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script>' + (it && it.kind === 'dicom' ? '<script src="/cases-pacs.js?v=500"></script>' : '<script src="/vendor/pdfjs/pdf.min.js"></script>') + '<script src="/cases-view.js?v=500"></script>'));
     return true;
   }
   if (!it) { send(res, 404, { message: 'الحالة مش موجودة' }); return true; }
@@ -339,7 +340,7 @@ async function findRoute(req, res, pub, sub) {
     if (req.method !== 'GET') return false;
     if (!site) { if (limited('hx:' + ip, 30, 600e3)) { send(res, 429, { message: 'حاولت كتير' }); return true; } }
     const CD = site ? { pub, center: site.center_name || '', logo: site.logo || '', on: !!site.fixed_on, wa: waFor(site.customer_id, site.wa) } : { missing: true };
-    html(res, site ? 200 : 404, page(site ? 'نتيجتك — ' + (site.center_name || '') : 'اللينك مش شغال', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/cases-kit.js?v=499"></script><script src="/cases-find.js?v=499"></script>'));
+    html(res, site ? 200 : 404, page(site ? 'نتيجتك — ' + (site.center_name || '') : 'اللينك مش شغال', '<div id="app"></div>', 'v', '<script>window.CD=' + json(CD) + '</script><script src="/cases-kit.js?v=500"></script><script src="/cases-find.js?v=500"></script>'));
     return true;
   }
   if (req.method !== 'POST') return false;
@@ -348,9 +349,9 @@ async function findRoute(req, res, pub, sub) {
   let b = {}; try { b = await readJson(req, 1000); } catch (e) { send(res, 400, { message: 'محصلش' }); return true; }
   const ph = phashOf(b.phone); if (!ph) { send(res, 400, { message: 'اكتب رقم الموبايل صح' }); return true; }
   if (limited('hp:' + pub + ':' + ph, 25, 864e5)) { send(res, 429, { message: 'الرقم ده اتدوّر عليه كتير النهارده — كلّم المركز' }); return true; }
-  const rows = db.prepare('SELECT token, patient, exam, created_at, pages, wrap, wrap2 FROM case_item WHERE customer_id = ? AND phash = ? AND active = 1 AND (wrap IS NOT NULL OR wrap2 IS NOT NULL) ORDER BY id DESC LIMIT 30').all(site.customer_id, ph);
+  const rows = db.prepare('SELECT token, patient, exam, created_at, pages, kind, wrap, wrap2 FROM case_item WHERE customer_id = ? AND phash = ? AND active = 1 AND (wrap IS NOT NULL OR wrap2 IS NOT NULL) ORDER BY id DESC LIMIT 30').all(site.customer_id, ph);
   const pj = x => { try { return x ? JSON.parse(x) : null; } catch (e) { return null; } };
-  send(res, 200, { list: rows.map(r => ({ token: r.token, hint: maskName(r.patient), exam: r.exam || '', at: r.created_at, pages: r.pages || 0, w: pj(r.wrap), w2: pj(r.wrap2) })).filter(x => x.w || x.w2) });
+  send(res, 200, { list: rows.map(r => ({ token: r.token, hint: maskName(r.patient), exam: r.exam || '', at: r.created_at, pages: r.pages || 0, kind: r.kind || 'pdf', w: pj(r.wrap), w2: pj(r.wrap2) })).filter(x => x.w || x.w2) });
   return true;
 }
 
