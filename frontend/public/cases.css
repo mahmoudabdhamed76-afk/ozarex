@@ -549,3 +549,4 @@ html.tc .v .pt h1{font-family:'Zain','IBM Plex Sans Arabic';font-size:34px}
 .tx .v .top .on + #dkb.in,.tx .v .top .bk + #dkb.in{margin-inline-start:8px}
 .tx .v .top .tn + #dkb.in{margin-inline-start:auto}
 .tx .v .btn.w{padding:10px 16px;max-width:none}
+.tx .v .pxt button.on{background:var(--pp);color:#fff}

@@ -17,17 +17,37 @@
     var pxi = -1, i;
     for (i = 132; i < bytes.length - 4; i++) if (bytes[i] === 0xE0 && bytes[i + 1] === 0x7F && bytes[i + 2] === 0x10 && bytes[i + 3] === 0x00) { pxi = i; break; }
     if (pxi < 0) return null;
-    var tags = {}, pos = 0;
+    /* 5.02 · explicit VR (most devices) AND implicit VR little endian (1.2.840.10008.1.2 — RadiAnt exports, many PACS) */
+    var tags = {}, pos = 0, implicit = false;
+    var hasMagic = bytes.length > 132 && bytes[128] === 68 && bytes[129] === 73 && bytes[130] === 67 && bytes[131] === 77;
+    if (hasMagic) {
+      pos = 132;
+      while (pos < pxi && dv.getUint16(pos, true) === 0x0002) {
+        var mg = dv.getUint16(pos, true), me = dv.getUint16(pos + 2, true), mvr = String.fromCharCode(bytes[pos + 4], bytes[pos + 5]), ml, mv;
+        if (LONG[mvr]) { ml = dv.getUint32(pos + 8, true); mv = pos + 12; } else { ml = dv.getUint16(pos + 6, true); mv = pos + 8; }
+        tags[(mg << 16) | me] = [mv, ml]; pos = mv + ml;
+      }
+      var tsT = tags[0x00020010], ts = tsT ? new TextDecoder('latin1').decode(bytes.subarray(tsT[0], tsT[0] + tsT[1])).replace(/[\0\s]/g, '') : '';
+      implicit = ts === '1.2.840.10008.1.2';
+    } else {   /* no preamble: guess — an explicit file has two letters after the first tag */
+      var v0 = String.fromCharCode(bytes[4], bytes[5]); implicit = !VALID[v0];
+    }
     while (pos < pxi) {
       try {
-        var g = dv.getUint16(pos, true), e = dv.getUint16(pos + 2, true), vr = String.fromCharCode(bytes[pos + 4], bytes[pos + 5]);
-        if (!VALID[vr]) { pos++; continue; }
-        var len, vs;
-        if (LONG[vr]) { len = dv.getUint32(pos + 8, true); vs = pos + 12; } else { len = dv.getUint16(pos + 6, true); vs = pos + 8; }
-        if (len === 0xFFFFFFFF) { pos = vs; continue; }
+        var g = dv.getUint16(pos, true), e = dv.getUint16(pos + 2, true), len, vs;
+        if (implicit) {
+          len = dv.getUint32(pos + 4, true); vs = pos + 8;
+          if (len === 0xFFFFFFFF || g === 0xFFFE) { pos = vs; continue; }   /* sequences / items: walk inside */
+        } else {
+          var vr = String.fromCharCode(bytes[pos + 4], bytes[pos + 5]);
+          if (g === 0xFFFE) { pos += 8; continue; }
+          if (!VALID[vr]) { pos++; continue; }
+          if (LONG[vr]) { len = dv.getUint32(pos + 8, true); vs = pos + 12; } else { len = dv.getUint16(pos + 6, true); vs = pos + 8; }
+          if (len === 0xFFFFFFFF) { pos = vs; continue; }
+        }
         if (vs + len > bytes.length) break;
         var key = (g << 16) | e; if (!tags[key]) tags[key] = [vs, len];
-        pos = vs + len; if (len % 2) pos++;
+        pos = vs + len; if (len % 2 && !implicit) pos++;
       } catch (er) { pos++; }
     }
     function gus(g, e) { var t = tags[(g << 16) | e]; return (t && t[1] >= 2) ? dv.getUint16(t[0], true) : 0; }
