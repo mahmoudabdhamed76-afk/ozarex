@@ -13,10 +13,10 @@
   try { if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.js'; } catch (e) {}
 
   function shell() {
-    var head = '<div class="ctr"><span class="lg' + (C.logo ? ' img' : '') + '">' + (C.logo ? '<img src="' + C.logo + '" alt="">' : esc(String(C.center || 'م').trim().charAt(0))) + '</span><div><b>' + esc(C.center || '') + '</b><span>نتيجة الفحص</span></div></div>';
+    var head = '<div class="top"><span class="tlg">' + (window.OZSkin ? OZSkin.logo('') : '') + '</span><div class="tn"><b>' + esc(C.center || '') + '</b><small>نتيجة الفحص</small></div></div>';
     if (C.missing) { document.body.innerHTML = '<div class="w"><div class="ld" style="margin-top:30vh"><i>🔍</i><b>الحالة دي مش موجودة</b><p>اتأكد من الباركود، أو كلّم المركز.</p></div></div>'; return; }
     var back = null; try { back = /^\/h\/[A-Za-z0-9]{8}$/.exec(sessionStorage.getItem('ozx_back') || ''); } catch (e) {}
-    if (back) head = head.replace('</div></div>', '</div><a class="btn g sm" href="' + back[0] + '" style="margin-inline-start:auto">↩ نتايج تانية</a></div>');
+    if (back) head = head.replace(/<\/div><\/div>$/, '</div><a class="bk" href="' + back[0] + '">↩ نتايج تانية</a></div>');
     document.body.innerHTML = '<div class="w">' + head + '<div class="pt"><small>المريض</small><h1>' + esc(C.patient) + '</h1><div class="m">' + (C.exam ? '<span>🩻 ' + esc(C.exam) + '</span>' : '') + '<span>📅 ' + dmy(C.at) + '</span>' + (C.pages ? '<span>' + (C.kind === 'dicom' ? '🩻 ' + C.pages + ' صورة' : '📄 ' + C.pages + ' صفحة') + '</span>' : '') + '</div></div>' +
       '<div id="body"></div><p class="foot">الملف متشفّر — بيتفتح بس بالباركود ده. · ' + esc(C.center || '') + '</p></div>';
   }

@@ -10,11 +10,14 @@
   function dmy(ts) { var m = /(\d{4})-(\d{2})-(\d{2})/.exec(String(ts || '')); return m ? (+m[3]) + '/' + (+m[2]) + '/' + m[1] : ''; }
   document.body.className = 'v f';
   if (C.missing) { document.body.innerHTML = '<div class="w"><div class="ld" style="margin-top:30vh"><i>🔍</i><b>الباركود ده مش شغال</b><p>كلّم المركز.</p></div></div>'; return; }
-  document.body.innerHTML = '<div class="w"><div class="hero"><span class="lg' + (C.logo ? ' img' : '') + '" style="width:58px;height:58px;font-size:26px">' + (C.logo ? '<img src="' + C.logo + '" alt="">' : esc(String(C.center || 'م').trim().charAt(0))) + '</span><h1>' + esc(C.center) + '</h1><p>شوف نتيجة الأشعة بتاعتك على موبايلك 📱</p></div>' +
+  /* 5.01 · the look comes from cases-skin.js (A «نَفَس» / C «دفا» + night mode) */
+  var TC = window.OZSkin && OZSkin.theme === 'c';
+  document.body.innerHTML = '<div class="w"><div class="top"><span class="tlg">' + (window.OZSkin ? OZSkin.logo('') : '') + '</span><div class="tn"><b>' + esc(C.center) + '</b><small>نتيجة الأشعة على موبايلك</small></div></div>' +
+    '<h1 class="ttl">' + (TC ? 'نتيجتك<br><span>بموبايلك بس.</span>' : 'أهلاً بيك 🌿<br><span>نتيجتك</span> جاهزة في ثواني') + '</h1>' + (C.on ? '<span class="on2">● شغالين 24 ساعة</span>' : '') +
     '<div class="srch" id="sr">' + (C.on ?
-      '<label class="l">رقم موبايلك (اللي اتسجّل في المركز)</label><input class="fld n" id="ph" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="01xxxxxxxxx" style="text-align:right">' +
+      '<label class="l">رقم موبايلك اللي سجّلته في المركز</label><input class="fld n" id="ph" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="01xxxxxxxxx" style="text-align:right">' +
       '<p class="hint">نفس الرقم اللي اديته للمركز وانت بتعمل الأشعة.</p>' +
-      '<button class="btn w" id="go" style="margin-top:14px;padding:14px;font-size:16px">🔍 دوّر على نتيجتي</button><div class="err" id="er" style="color:var(--red);font-weight:700;text-align:center;margin-top:8px;min-height:20px"></div>'
+      '<button class="btn w" id="go">🔍 دوّر على نتيجتي</button><div class="err" id="er" style="color:var(--red);font-weight:700;text-align:center;margin-top:8px;min-height:20px"></div>'
       : '<div class="ld" style="box-shadow:none;padding:6px"><i>⏸</i><b>البحث مقفول دلوقتي</b><p>كلّم المركز يبعتلك لينك نتيجتك.</p></div>') + '</div>' +
     '<div class="res" id="res"></div>' +
     (C.on ? '<div class="miss" id="miss"><b>مش لاقي نتيجتك؟</b><p>اكتب موبايلك فوق، ودوس هنا — طلبك بيوصل للمركز على طول وهم يرفعولك النتيجة.</p>' + '<div class="af"><label class="l">اسمك زي ما اتسجّل في المركز *</label><input class="fld" id="an0" maxlength="60" autocomplete="name" placeholder="الاسم بالكامل"><label class="l">تاريخ عمل الأشعة *</label><input class="fld" id="ad0" type="date"><label class="l">نوع الفحص (اختياري)</label><input class="fld" id="nt0" maxlength="60" placeholder="مثلاً: مقطعية على الصدر"><div class="aer" id="ae0"></div></div>' + '<button class="btn ask2 w" id="wa0">📨 اطلب نتيجتك من المركز</button></div>' : '') +
@@ -47,7 +50,8 @@
         var href = function (m) { return '/v/' + m.x.token + '#' + m.k; };
         if (M.length === 1) { $('res').innerHTML = '<div class="ld"><i>✅</i><b>لقينا نتيجتك</b><p>بنفتحها…</p></div>'; setTimeout(function () { location.href = href(M[0]); }, 450); return; }
         $('res').innerHTML = '<p style="color:var(--mut);font-weight:700;margin:4px 4px 0">لقينا ' + M.length + ' نتايج — اختار:</p>' + M.map(function (m, i) {
-          return '<a class="rc" href="' + href(m) + '" style="animation-delay:' + (i * 60) + 'ms"><span class="ri">' + (m.x.kind === 'dicom' ? '🩻' : '📄') + '</span><div><b>' + esc(m.x.exam || 'نتيجة فحص') + '</b><small>📅 ' + dmy(m.x.at) + (m.x.pages ? ' · ' + m.x.pages + (m.x.kind === 'dicom' ? ' صورة DICOM' : ' صفحة') : '') + ' · ' + esc(m.x.hint) + '</small></div><span class="go">←</span></a>';
+          var dm = /(\d{4})-(\d{2})-(\d{2})/.exec(String(m.x.at || '')), MO = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+          return '<a class="rc" href="' + href(m) + '" style="animation-delay:' + (i * 60) + 'ms"><span class="ri ' + (m.x.kind === 'dicom' ? 'd' : '') + '">' + (m.x.kind === 'dicom' ? '🩻' : '📄') + '</span>' + (dm ? '<span class="dn">' + dm[3] + '<small>' + MO[+dm[2] - 1] + '</small></span>' : '') + '<div><b>' + esc(m.x.exam || 'نتيجة فحص') + '</b><small>📅 ' + dmy(m.x.at) + (m.x.pages ? ' · ' + m.x.pages + (m.x.kind === 'dicom' ? ' صورة DICOM' : ' صفحة') : '') + ' · ' + esc(m.x.hint) + '</small></div><span class="go">←</span></a>';
         }).join('');
       })
       .catch(function (e) { b.disabled = false; b.innerHTML = '🔍 دوّر على نتيجتي'; er.textContent = e.message; });

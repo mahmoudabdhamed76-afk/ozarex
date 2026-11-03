@@ -142,6 +142,7 @@
         '<section class="card list"><div class="ch"><div class="h"><h2>الحالات</h2><small id="lc"></small></div><div class="srch">' + ic('search') + '<input class="fld q" id="q" placeholder="اسم المريض أو الموبايل أو الفحص"></div></div><div class="seg" id="fl"></div><div id="tbl"><div class="sk"></div><div class="sk" style="opacity:.7"></div><div class="sk" style="opacity:.45"></div></div></section>' +
       '</div><aside class="kside"><div id="asks"></div><div class="opt fxc" id="fx"></div>' +
         '<div class="opt"><h3>' + ic('qr') + ' باركود لكل حالة <span class="tg ok">شغال دايماً</span></h3><div class="how"><div><span>1</span>اسحب PDF الحالة واكتب اسم المريض</div><div><span>2</span>اطبع الاستيكر أو ابعته واتساب</div><div><span>3</span>المريض يمسحه ويشوف أشعته على طول</div></div></div>' +
+        '<div class="opt thm" id="thm"></div>' +
         '<div class="opt rec"><h3>' + ic('eye') + ' آخر مرات الفتح</h3><div id="rec"></div></div>' +
         '<div class="disk" id="disk"><div class="sk" style="height:40px;margin:0"></div></div></aside></div></div><div class="toast" id="toast"></div>';
     $('lgo').onclick = pickLogo;
@@ -159,7 +160,7 @@
     dr.addEventListener('drop', function (e) { dropped(e.dataTransfer); });
     document.addEventListener('dragover', function (e) { e.preventDefault(); }); document.addEventListener('drop', function (e) { e.preventDefault(); });
     $('q').oninput = function () { ui.q = this.value.trim(); table(); };
-    fixedCard(); watchBar();
+    fixedCard(); watchBar(); themeCard();
     if (window.OZDicom) OZDicom.mount($('mwda'), { center: C.center, toast: toast, onPdf: addConverted });   /* 4.94 · مودة: DICOM → PDF right here */
   }
   function addConverted(L) {
@@ -180,6 +181,15 @@
   }
 
   /* ── option 2: the fixed barcode on every report ── */
+  /* 5.01 · the look of the patient's pages (A «نَفَس» / C «دفا») — the patient can switch to night mode himself */
+  function themeCard() {
+    var el = $('thm'); if (!el) return; var t = ui.theme || C.theme || 'a';
+    el.innerHTML = '<h3>🎨 شكل صفحة المريض</h3><p>بيظهر للمريض لما يمسح الباركود — بشاشة ترحيب «ألف سلامة» باسم المركز، وفيه وضع ليلي.</p>' +
+      '<div class="thg"><button data-th="a" class="' + (t === 'a' ? 'on' : '') + '"><span class="sw2 a"><i></i><i></i><i></i></span><b>«نَفَس»</b><small>أبيض وتركواز</small></button>' +
+      '<button data-th="c" class="' + (t === 'c' ? 'on' : '') + '"><span class="sw2 c"><i></i><i></i><i></i></span><b>«دفا»</b><small>كريمي وبرتقالي</small></button></div>' +
+      '<a class="btn g sm w" href="' + fixedUrl() + '" target="_blank" rel="noopener" style="margin-top:10px">👁 شوف صفحة المريض</a>';
+    [].forEach.call(el.querySelectorAll('[data-th]'), function (b) { b.onclick = function () { var v = b.dataset.th; api('POST', 'theme', { theme: v }).then(function () { ui.theme = v; themeCard(); toast(v === 'c' ? '🎨 صفحة المريض بقت «دفا»' : '🎨 صفحة المريض بقت «نَفَس»'); }).catch(function (e) { toast(e.message); }); }; });
+  }
   function fixedCard() {
     var el = $('fx'); if (!el) return;
     el.innerHTML = '<h3>📌 باركود ثابت على كل الورق <button class="sw' + (ui.fixed ? ' on' : '') + '" id="fsw" type="button" aria-label="تشغيل/إيقاف"></button></h3>' +
