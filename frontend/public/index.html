@@ -9767,7 +9767,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 5.02</div>
+      <div class="version">الإصدار 5.03</div>
     </footer>
   </div>
 </div>
@@ -16314,6 +16314,17 @@ function saveInvoice() {
   updateNotifBadge();
 }
 
+/* 5.03 · «نوع الورق غلط؟» — an invoice made from a supply is fixed from that supply line (stock + center + invoice together) */
+function invFixPaperHtml(inv) {
+  if (!inv || inv.isConsolidated) return '';
+  const lines = (DB.data.issuances || []).filter(x => x && x.invoiceId === inv.id);
+  if (!lines.length) return '';
+  return `<div class="inv-fixpaper" style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:rgba(59,130,246,.08);border-inline-start:3px solid var(--info);font-size:12.5px">
+    <b>نوع الورق غلط؟</b> عدّله من سطر الصرف — المخزن وحساب المركز والفاتورة بيتظبطوا مع بعض:
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${lines.map(l => `<button type="button" class="btn btn-secondary btn-sm" onclick="closeModal();setTimeout(()=>editIssuance('${l.id}'),120)">✏️ ${escapeHtml(l.productName || '-')} × ${fmt(l.quantity)}</button>`).join('')}</div>
+  </div>`;
+}
+
 function viewInvoice(id) {
   const inv = DB.data.invoices.find(x=>x.id===id);
   if (!inv) return;
@@ -16394,6 +16405,7 @@ function viewInvoice(id) {
       <div class="kpi"><div class="l">الحالة</div><div class="v">${statusBadge(inv.status)}</div></div>
     </div>
     ${itemsTable}
+    ${invFixPaperHtml(inv)}
     <div class="invoice-totals">
       <div class="row"><span>الإجمالي قبل الخصم</span><span>${fmtCurrency(inv.subtotal)}</span></div>
       <div class="row"><span>الخصم</span><span style="color:var(--danger)">${fmtCurrency(inv.discount)}</span></div>
@@ -17386,8 +17398,9 @@ function _showEditInvoiceModal(inv) {
   openModal(`✏️ تعديل فاتورة #${escapeHtml(String(inv.number))}`, `
     <form id="edit-invoice-form">
       <div style="padding:10px 14px;background:rgba(245,158,11,.10);border-inline-start:3px solid #f59e0b;border-radius:8px;margin-bottom:14px;font-size:12.5px;color:var(--text)">
-        ✏️ تقدر تعدّل <b>سعر</b> أي صنف أو <b>مبلغه</b> — الإجمالي وحساب العميل بيتظبطوا لوحدهم. الكمية ثابتة عشان المخزن (لو عايز تغيرها احذف الفاتورة واعمل واحدة جديدة).
+        ✏️ تقدر تعدّل <b>سعر</b> أي صنف أو <b>مبلغه</b> — الإجمالي وحساب العميل بيتظبطوا لوحدهم. الكمية ونوع الورق بيتعدلوا من سطر الصرف (تحت).
       </div>
+      ${invFixPaperHtml(inv)}
 
       <div class="form-row">
         <div class="form-group">
@@ -23016,7 +23029,7 @@ function renderIssuances() {
   /* how many rows: everything for a short list; otherwise as many as were shown before (a refresh keeps the
      user's place), or the first step after the filters changed */
   const shown = _stepCount(_issSteps, list, JSON.stringify(issuanceFilters));
-  const ctx = { today: todayStr(), canEdit: currentUser.role==='admin' || currentUser.role==='accountant', isAdmin: currentUser.role==='admin' };
+  const ctx = { today: todayStr(), canEdit: true, isAdmin: currentUser.role==='admin' };   // 5.03 · any user fixes a wrong line; a non-admin's edit goes to «طلبات الموافقة» when his rule says so
 
   root.innerHTML = `
     <div class="page-header">
@@ -24209,6 +24222,7 @@ function editIssuance(id) {
     title: 'سبب تعديل صرف الورق',
     description: `تعديل عملية صرف #${i.number} - ${i.productName}`,
     suggestedReasons: [
+      'تصحيح نوع الورق',
       'تصحيح كمية الصرف',
       'تعديل السعر',
       'تصحيح التاريخ',
@@ -24225,11 +24239,16 @@ function _showEditIssuanceModal(i) {
   const p = DB.data.products.find(x => x.id === i.productId);
   // Available stock = current stock + this issuance's qty (since we'll revert it before re-applying)
   const availableStock = (p ? p.quantity : 0) + i.quantity;
+  /* 5.03 · نوع الورق بيتغير من هنا (اتسجل نوع غلط): الكمية بترجع للصنف القديم وتتخصم من الجديد */
+  const prodOpts = (DB.data.products || []).filter(x => x && (x.id === i.productId || !x.archived)).slice()
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ar'))
+    .map(x => `<option value="${escapeHtml(String(x.id))}" ${x.id === i.productId ? 'selected' : ''}>${escapeHtml(x.name || '-')} — متاح ${fmt((Number(x.quantity) || 0) + (x.id === i.productId ? i.quantity : 0))} ${escapeHtml(x.unit || '')}</option>`).join('');
+  const missingOpt = p ? '' : `<option value="${escapeHtml(String(i.productId))}" selected>${escapeHtml(i.productName || '-')} (محذوف)</option>`;
 
   openModal(`✏️ تعديل صرف ورق #${escapeHtml(String(i.number))}`, `
     <form id="edit-issuance-form">
       <div style="padding:10px 14px;background:rgba(245,158,11,.10);border-inline-start:3px solid #f59e0b;border-radius:8px;margin-bottom:14px;font-size:12.5px;color:var(--text)">
-        ⚠️ <b>ملاحظة:</b> لا يمكن تغيير المركز أو نوع الورق. لو محتاج تغيير دول، احذف العملية وأنشئ واحدة جديدة.
+        ✏️ تقدر تغيّر <b>نوع الورق</b> والكمية والسعر والتاريخ — المخزن وحساب المركز والفاتورة بيتظبطوا لوحدهم. المركز بس اللي ثابت (لو غلط احذف العملية واعمل واحدة جديدة).
       </div>
 
       <div class="form-row">
@@ -24238,8 +24257,9 @@ function _showEditIssuanceModal(i) {
           <input class="form-control" value="${escapeHtml(c?c.name:'-')}" readonly style="background:var(--surface-2)">
         </div>
         <div class="form-group">
-          <label>الصنف</label>
-          <input class="form-control" value="${escapeHtml(i.productName||'-')}" readonly style="background:var(--surface-2)">
+          <label>نوع الورق *</label>
+          <select class="form-control" name="productId" id="ei2-product" onchange="eiProductChanged()">${missingOpt}${prodOpts}</select>
+          <small id="ei2-prod-note" style="color:var(--warning);font-size:11px;display:none"></small>
         </div>
       </div>
 
@@ -24250,7 +24270,7 @@ function _showEditIssuanceModal(i) {
         </div>
         <div class="form-group">
           <label>المخزون المتاح</label>
-          <input class="form-control" value="${fmt(availableStock)} ${escapeHtml(p?p.unit||'':'')}" readonly style="background:var(--surface-2);color:var(--success);font-weight:800">
+          <input class="form-control" id="ei2-stock" value="${fmt(availableStock)} ${escapeHtml(p?p.unit||'':'')}" readonly style="background:var(--surface-2);color:var(--success);font-weight:800">
         </div>
       </div>
 
@@ -24258,7 +24278,7 @@ function _showEditIssuanceModal(i) {
         <div class="form-group">
           <label>الكمية *</label>
           <input class="form-control" type="number" step="any" min="0.01" max="${availableStock}" name="quantity" id="ei2-qty" value="${i.quantity}" required oninput="recalcEditIssuanceTotal()">
-          <small style="color:var(--text-muted);font-size:11px">الحد الأقصى: ${fmt(availableStock)}</small>
+          <small id="ei2-max" style="color:var(--text-muted);font-size:11px">الحد الأقصى: ${fmt(availableStock)}</small>
         </div>
         <div class="form-group">
           <label>السعر للورقة *</label>
@@ -24283,6 +24303,26 @@ function _showEditIssuanceModal(i) {
     <button class="btn btn-secondary" onclick="closeModal();delete window._pendingAuditReason">إلغاء</button>
     <button class="btn btn-primary" onclick="saveEditedIssuance()">💾 حفظ التعديلات</button>
   `, 'large');
+}
+
+/* 5.03 · picked another paper type: show its stock, take the center's price for it */
+function eiProductChanged() {
+  const form = document.getElementById('edit-issuance-form');
+  if (!form) return;
+  const i = (DB.data.issuances||[]).find(x => x.id === form._issuanceId.value);
+  const np = DB.data.products.find(x => x.id === form.productId.value);
+  if (!i || !np) return;
+  const avail = (Number(np.quantity) || 0) + (np.id === i.productId ? i.quantity : 0);
+  const qty = document.getElementById('ei2-qty');
+  qty.max = avail;
+  document.getElementById('ei2-stock').value = fmt(avail) + ' ' + (np.unit || '');
+  document.getElementById('ei2-max').textContent = 'الحد الأقصى: ' + fmt(avail);
+  const c = DB.data.customers.find(x => x.id === i.customerId);
+  const price = np.id === i.productId ? i.unitPrice : ((c && c.customPrices && c.customPrices[np.id] != null) ? c.customPrices[np.id] : (np.price || 0));
+  document.getElementById('ei2-price').value = Number(price) || 0;
+  const note = document.getElementById('ei2-prod-note');
+  if (note) { note.style.display = np.id === i.productId ? 'none' : 'block'; note.textContent = np.id === i.productId ? '' : '↩ ' + fmt(i.quantity) + ' هترجع لـ«' + (i.productName || '') + '» وتتخصم من «' + np.name + '»'; }
+  recalcEditIssuanceTotal();
 }
 
 function recalcEditIssuanceTotal() {
@@ -24320,21 +24360,27 @@ function saveEditedIssuance() {
   const newDate = form.date.value;
   if (newQty <= 0 || newPrice < 0) { toast('قيم غير صحيحة', 'error'); return; }
 
-  const p = DB.data.products.find(x => x.id === i.productId);
-  if (!p) { toast('المنتج غير موجود', 'error'); return; }
+  const oldP = DB.data.products.find(x => x.id === i.productId);           // may be gone (deleted item)
+  const newPid = form.productId ? form.productId.value : i.productId;
+  const p = DB.data.products.find(x => x.id === newPid);
+  if (!p) { toast('اختار نوع الورق', 'error'); return; }
+  const changedProduct = p.id !== i.productId;
 
-  // Check stock: (current stock + old qty being returned) must be >= new qty
-  const availableAfterRevert = p.quantity + i.quantity;
+  // Check stock: the new item's stock (+ this issuance's own qty when it is the same item) must be >= new qty
+  const availableAfterRevert = (Number(p.quantity) || 0) + (changedProduct ? 0 : i.quantity);
   if (newQty > availableAfterRevert) {
-    toast(`الكمية المطلوبة (${fmt(newQty)}) أكبر من المتاح (${fmt(availableAfterRevert)})`, 'error');
+    toast(`الكمية المطلوبة (${fmt(newQty)}) أكبر من المتاح من «${p.name}» (${fmt(availableAfterRevert)})`, 'error');
     return;
   }
 
   const before = JSON.parse(JSON.stringify(i));
   const c = DB.data.customers.find(x => x.id === i.customerId);
+  const oldPid = i.productId, oldTotal = Number(i.total) || 0, oldQty = i.quantity;
+  const sameSale = m => m && m.type === 'out' && String(m.productId) === String(oldPid) && new RegExp('صرف (ورق )?#' + i.number + ' - ').test(m.reference || m.note || '');
+  const move = (DB.data.stockMoves||[]).find(m => sameSale(m) && Number(m.quantity) === Number(oldQty)) || (DB.data.stockMoves||[]).find(sameSale);
 
   // Revert old stock & balance
-  p.quantity += i.quantity;
+  if (oldP) oldP.quantity += i.quantity;
   if (c) {
     const oldRemaining = (i.total || 0) - (i.paid || 0);
     c.balance = Math.max(0, c.balance - oldRemaining);
@@ -24342,6 +24388,7 @@ function saveEditedIssuance() {
 
   // Apply new values
   const newTotal = newQty * newPrice;
+  if (changedProduct) { i.productId = p.id; i.productName = p.name; i.productUnit = p.unit || ''; }
   i.quantity = newQty;
   i.unitPrice = newPrice;
   i.total = newTotal;
@@ -24356,24 +24403,30 @@ function saveEditedIssuance() {
     c.balance += newRemaining;
   }
 
-  // Update linked invoice (if any) to match
+  // Update linked invoice (if any) to match — 5.03: also an invoice with several paper types (this line only)
   if (i.invoiceId) {
     const inv = DB.data.invoices.find(x => x.id === i.invoiceId);
-    if (inv && inv.items && inv.items.length === 1) {
-      inv.items[0].qty = newQty;
-      inv.items[0].price = newPrice;
-      inv.items[0].total = newTotal;
-      inv.subtotal = newTotal;
-      inv.total = newTotal;
-      inv.date = newDate;
-      inv.status = i.status;
-      inv.updatedAt = Date.now();
+    if (inv && inv.items && inv.items.length) {
+      const k = inv.items.length === 1 ? 0 : (inv.items[i.batchIndex] && String(inv.items[i.batchIndex].productId) === String(oldPid) ? i.batchIndex : inv.items.findIndex(it => String(it.productId) === String(oldPid)));
+      const it = inv.items[k];
+      if (it) {
+        if (changedProduct) { it.productId = p.id; it.productName = p.name; }
+        it.qty = newQty;
+        it.price = newPrice;
+        it.total = newTotal;
+        const delta = newTotal - oldTotal;
+        inv.subtotal = (Number(inv.subtotal) || 0) + delta;
+        inv.total = (Number(inv.total) || 0) + delta;
+        if (inv.items.length === 1) inv.status = i.status;
+        inv.updatedAt = Date.now();
+      }
+      if (inv.items.length === 1) inv.date = newDate;
     }
   }
 
-  // Update related stock move
-  const move = (DB.data.stockMoves||[]).find(m => (m.reference||'').includes(`صرف ورق #${i.number}`) || (m.note||'').includes(`صرف ورق #${i.number}`));
+  // Update related stock move (the one of this line)
   if (move) {
+    if (changedProduct) move.productId = p.id;
     move.quantity = newQty;
     move.date = newDate;
   }
@@ -24390,7 +24443,7 @@ function saveEditedIssuance() {
   delete window._pendingAuditReason;
   closeModal();
   playTone('save');
-  toast(`✓ تم تحديث عملية الصرف #${i.number}`);
+  toast(changedProduct ? `✓ صرف #${i.number}: «${before.productName}» اتغير لـ«${p.name}»` : `✓ تم تحديث عملية الصرف #${i.number}`);
   renderIssuances();
   renderSidebar();
   updateNotifBadge();
