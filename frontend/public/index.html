@@ -9767,7 +9767,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 5.03</div>
+      <div class="version">الإصدار 5.04</div>
     </footer>
   </div>
 </div>
@@ -18412,8 +18412,8 @@ function openProductForm(id) {
       <div class="form-row">
         <div class="form-group">
           <label>الكمية الحالية</label>
-          <input class="form-control" type="number" name="quantity" value="${p.quantity}" step="0.01" min="0" ${id?'readonly':''}>
-          ${id?'<small style="color:var(--text-muted)">يتم تعديلها من حركات المخزن</small>':''}
+          <input class="form-control" type="number" name="quantity" id="pf-qty" value="${p.quantity}" step="0.01" ${id?`data-old="${p.quantity}" oninput="pfQtyHint(this)"`:'min="0"'} ${id && Number(p.quantity) < 0 ? 'style="color:var(--danger);font-weight:800"' : ''}>
+          ${id?`<small id="pf-qty-hint" style="color:${Number(p.quantity) < 0 ? 'var(--danger)' : 'var(--text-muted)'}">${Number(p.quantity) < 0 ? '⚠️ الرصيد بالسالب — اكتب الكمية الفعلية اللي عندك، وهتتسجل «تسوية جرد» في حركات المخزن' : 'لو الرصيد مش مظبوط اكتب الكمية الفعلية — هتتسجل «تسوية جرد» في حركات المخزن'}</small>`:''}
         </div>
         <div class="form-group">
           <label>الحد الأدنى (تنبيه)</label>
@@ -18440,6 +18440,17 @@ function openProductForm(id) {
       <button class="btn btn-secondary" onclick="closeModal()">إلغاء</button>`);
 }
 
+/* 5.04 · «الكمية الحالية» بتتعدل من شاشة الصنف: الفرق بيتسجل حركة «تسوية جرد» (وارد أو منصرف) */
+function pfQtyHint(el) {
+  const h = document.getElementById('pf-qty-hint'); if (!h) return;
+  const o = Number(el.dataset.old) || 0, n = parseFloat(el.value);
+  if (!isFinite(n)) { h.textContent = 'اكتب الكمية الفعلية'; return; }
+  const df = Math.round((n - o) * 100) / 100;
+  h.style.color = n < 0 ? 'var(--danger)' : df ? 'var(--info)' : 'var(--text-muted)';
+  el.style.color = n < 0 ? 'var(--danger)' : '';
+  h.textContent = n < 0 ? 'الكمية ماينفعش تكون بالسالب' : df ? `هتتسجل تسوية جرد: ${df > 0 ? 'وارد +' + fmt(df) : 'منصرف −' + fmt(-df)} (من ${fmt(o)} لـ ${fmt(n)})` : 'زي ما هي';
+}
+
 function saveProduct(id) {
   const d = Object.fromEntries(new FormData(document.getElementById('prod-form')));
   if (!d.name.trim()) { toast('اسم المنتج مطلوب', 'error'); return; }
@@ -18451,8 +18462,19 @@ function saveProduct(id) {
     const p = DB.data.products.find(x=>x.id===id);
     if (!p) return;
     before = JSON.parse(JSON.stringify(p));
-    const oldQty = p.quantity;
+    const oldQty = Number(p.quantity) || 0;
+    const rawQty = (document.getElementById('prod-form').quantity || {}).value;
+    const newQty = rawQty === '' || rawQty == null ? oldQty : Math.round(parseFloat(rawQty) * 100) / 100;
+    if (!isFinite(newQty)) { toast('اكتب الكمية الحالية صح', 'error'); return; }
+    if (newQty < 0) { toast('الكمية الحالية ماينفعش تكون بالسالب — اكتب الكمية الفعلية اللي عندك', 'error'); return; }
     Object.assign(p, d, { quantity: oldQty });
+    const diff = Math.round((newQty - oldQty) * 100) / 100;
+    if (diff) {
+      p.quantity = newQty;
+      DB.data.stockMoves.push({ id:'sm_adj_'+uid(), productId: p.id, type: diff > 0 ? 'in' : 'out', kind: 'adjust', quantity: Math.abs(diff), date: todayStr(),
+        reference: 'تسوية جرد', note: `تسوية جرد من تعديل الصنف: من ${oldQty} لـ ${newQty}` + (window._pendingAuditReason ? ' — ' + window._pendingAuditReason : ''),
+        by: (currentUser && (currentUser.name || currentUser.username)) || '', createdAt: Date.now() });
+    }
     record = p;
   } else {
     record = { id:'p_'+uid(), ...d };
