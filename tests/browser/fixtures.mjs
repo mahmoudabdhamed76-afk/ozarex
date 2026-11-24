@@ -12,7 +12,7 @@ export const PAGES = {
   debts: 'سداد المديونية', suppliers: 'الموردين', purchases: 'فواتير المشتريات', inventory: 'إدارة المخازن', stock: 'مخزوني وجرد',
   expenses: 'المصروفات', reports: 'التقارير', monthly: 'تقرير الشهر والتقفيل', profit: 'أرباحي', aiassistant: 'المساعد الذكي',
   approvals: 'طلبات الموافقة', requests: 'الطلبات والمقترحات', users: 'إدارة المستخدمين', audit: 'سجل التعديلات الذكي',
-  security: 'الأمان والنسخ الاحتياطي', settings: 'الإعدادات'
+  staff: 'الموظفين', clients: 'متابعة العملاء', security: 'الأمان والنسخ الاحتياطي', settings: 'الإعدادات'
 };
 
 /* outside services this sandbox / an offline machine cannot reach — not app errors */

@@ -7,13 +7,16 @@
      · «نظرة عامة»: وردنا إيه (كل نوع ورق بكميته ومبلغه وآخر مرة) + آخر 6 شهور + آخر الحركات
      · «التوريدات»: كل طلب (البيعة اللي فيها كذا نوع = كارت واحد) بحالته، ومنه 👁 و✏️ لكل سطر
      · «التحصيلات» · «الفواتير» · «البيانات» (بيانات المركز وأسعاره الخاصة)
+     · «💹 الربح» (5.06 — لمين عنده «أرباحي» بس): الإيرادات والتكلفة والربح والهامش منه، ومقارنة بمتوسط
+       كل المراكز وترتيبه بينهم، وربح كل نوع ورق (متوسط سعر البيع والتكلفة والهامش) + تنبيه للبيع تحت التكلفة
+       والأصناف اللي مالهاش تكلفة. بنفس حسبة «أرباحي» بالظبط (AXProfit.lines) فالرقمين بيطلعوا زي بعض
    ومنه على طول: ✏️ تعديل البيانات · 💰 تحصيل · 📋 صرف جديد · 📄 كشف الحساب · واتساب
    أي تعديل من جوه الملف (تعديل صرف، تحصيل، بيانات) بيرجع يحدّث الملف لوحده.
    كل تاب بيظهر لمين صلاحياته بتوريه الصفحة دي بس.
 ════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
-  var ID = 'axcf', ui = { id: null, tab: 'over', f: 'all', q: '' };
+  var ID = 'axcf', ui = { id: null, tab: 'over', f: 'all', q: '', pp: 'all' };
 
   function D() { return (typeof DB !== 'undefined' && DB && DB.data) || {}; }
   function A(k) { var d = D(); return Array.isArray(d[k]) ? d[k] : []; }
@@ -135,7 +138,7 @@
 
   function tabs(M) {
     var T = [['over', 'نظرة عامة', ''], ['sales', 'التوريدات', M.sales.length], canGo('payments') || isAdmin() ? ['pays', 'التحصيلات', M.pays.length] : null,
-      canGo('invoices') ? ['invs', 'الفواتير', M.invs.length] : null, ['info', 'البيانات', '']].filter(Boolean);
+      canGo('invoices') ? ['invs', 'الفواتير', M.invs.length] : null, canProfit() ? ['profit', '💹 الربح', ''] : null, ['info', 'البيانات', '']].filter(Boolean);
     if (!T.some(function (t) { return t[0] === ui.tab; })) ui.tab = 'over';
     return '<nav class="axcf-tabs" role="tablist">' + T.map(function (t) { return '<button type="button" role="tab" data-t="' + t[0] + '" class="' + (ui.tab === t[0] ? 'on' : '') + '" aria-selected="' + (ui.tab === t[0]) + '">' + t[1] + (t[2] !== '' ? ' <em>' + t[2] + '</em>' : '') + '</button>'; }).join('') + '</nav>';
   }
@@ -150,7 +153,7 @@
       kpi('آخر تحصيل', M.lastPay ? dfmt(M.lastPay.date) : '—', M.lastPay ? ago(M.lastPay.date) + ' · ' + money(M.lastPay.amount) : 'مادفعش لسه', M.lastPay ? '' : 'warn') +
       kpi('طلبات مش متسددة', String(M.open), M.oldest && M.bal > 0 ? 'أقدمها ' + ago(M.oldest) : 'كله مسدد', M.open ? 'bad' : 'ok') +
       kpi('متوسط شهري', money(M.avgMonth), 'آخر 6 شهور') +
-    '</div>' +
+    '</div>' + profitStrip(M) +
     '<section class="axcf-card"><h3>📦 وردنا له إيه</h3>' + (M.papers.length ? '<div class="axcf-papers">' + M.papers.map(function (p) {
       var cp = M.c.customPrices && p.id && M.c.customPrices[p.id] != null ? M.c.customPrices[p.id] : null;
       return '<div class="axcf-pp"><div class="axcf-pp-t"><b>' + esc(p.name) + '</b><span>' + money(p.total) + '</span></div>' +
@@ -218,8 +221,75 @@
       }).join('') + '</div>' : '<p class="axcf-note">بيتحاسب بالأسعار العادية — الأسعار الخاصة بتتحط من «تعديل بيانات المركز».</p>') + '</section>';
   }
 
+  /* ── 5.06 · profit from one center — the same lines «أرباحي» counts (current item cost × qty, returns minus) ── */
+  function canProfit() { return canGo('profit') && !!(window.AXProfit && AXProfit.lines); }
+  var PP = [['all', 'من الأول'], ['year', 'السنة دي'], ['3m', 'آخر 3 شهور']];
+  function ppFrom(pp) {
+    var t = pd(today());
+    if (pp === 'year') return t.getFullYear() + '-01-01';
+    if (pp === '3m') { var d = new Date(t.getFullYear(), t.getMonth() - 2, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01'; }
+    return '';
+  }
+  function profitModel(id, pp) {
+    if (!canProfit()) return null;
+    var from = ppFrom(pp), all;
+    try { all = AXProfit.lines().filter(function (l) { return !from || l.date >= from; }); } catch (e) { return null; }
+    var mine = all.filter(function (l) { return l.cid === id; });
+    var sum = function (ls) { var r = { rev: 0, cost: 0, qty: 0 }; ls.forEach(function (l) { r.rev += l.rev; r.cost += l.cost; r.qty += l.qty; }); r.profit = r.rev - r.cost; r.margin = r.rev ? r.profit / r.rev * 100 : 0; return r; };
+    var me = sum(mine), co = sum(all);
+    /* rank among the centers that bought in the same period, by profit */
+    var byC = {};
+    all.forEach(function (l) { if (!l.cid) return; var g = byC[l.cid] || (byC[l.cid] = 0); byC[l.cid] = g + l.rev - l.cost; });
+    var ranked = Object.keys(byC).sort(function (a, b) { return byC[b] - byC[a]; });
+    var P = {};
+    mine.forEach(function (l) {
+      var g = P[l.pid] || (P[l.pid] = { pid: l.pid, name: l.name, qty: 0, rev: 0, cost: 0, sold: 0, below: 0, noCost: 0 });
+      g.qty += l.qty; g.rev += l.rev; g.cost += l.cost;
+      if (!l.ret) { g.sold += l.qty; if (l.noCost) g.noCost++; else if (l.rev < l.cost - 0.01) g.below++; }
+    });
+    var papers = Object.keys(P).map(function (k) { var g = P[k]; g.profit = g.rev - g.cost; g.margin = g.rev ? g.profit / g.rev * 100 : 0; g.avgP = g.qty ? g.rev / g.qty : 0; g.avgC = g.qty ? g.cost / g.qty : 0; return g; })
+      .sort(function (a, b) { return b.profit - a.profit; });
+    return { me: me, co: co, papers: papers, rank: ranked.indexOf(id) + 1, centers: ranked.length,
+      noCost: papers.filter(function (g) { return g.noCost; }), below: papers.filter(function (g) { return g.below; }),
+      returns: -mine.filter(function (l) { return l.ret; }).reduce(function (t, l) { return t + l.rev; }, 0), n: mine.filter(function (l) { return !l.ret; }).length };
+  }
+  function pct(v) { return (Math.round(v * 10) / 10).toLocaleString('en-US') + '%'; }
+  function profitStrip(M) {
+    var R = profitModel(M.c.id, 'all');
+    if (!R || !R.n) return '';
+    return '<button type="button" class="axcf-pstrip ' + (R.me.profit < 0 ? 'bad' : '') + '" data-t="profit"><i>💹</i><span>ربحنا منه <b>' + money(R.me.profit) + '</b> · هامش <b>' + pct(R.me.margin) + '</b>' +
+      (R.centers > 1 ? ' · ترتيبه <b>' + R.rank + '</b> من ' + R.centers : '') + '</span><em>التفاصيل ←</em></button>';
+  }
+  function profitTab(M) {
+    var R = profitModel(M.c.id, ui.pp);
+    var seg = '<div class="axcf-tools"><div class="axcf-seg">' + PP.map(function (x) { return '<button type="button" data-pp="' + x[0] + '" class="' + (ui.pp === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('') + '</div></div>';
+    if (!R || !R.n) return seg + empty('💹', 'مافيش مبيعات للمركز ده في الفترة دي');
+    var me = R.me, diff = me.margin - R.co.margin, maxAbs = R.papers.reduce(function (t, g) { return Math.max(t, Math.abs(g.margin)); }, 0) || 1;
+    var cmp = R.co.rev ? '<span class="axcf-chip ' + (diff >= 0 ? 'ok' : 'warn') + '">' + (Math.abs(diff) < 0.5 ? 'زي متوسط المراكز' : (diff > 0 ? 'أعلى' : 'أقل') + ' من متوسط المراكز بـ ' + pct(Math.abs(diff))) + '</span>' : '';
+    var warn = '';
+    if (R.below.length) warn += '<div class="axcf-alert bad">🔻 <b>بيتباع تحت التكلفة:</b> ' + R.below.map(function (g) { return esc(g.name) + ' (متوسط البيع ' + num(Math.round(g.avgP * 100) / 100) + ' والتكلفة ' + num(Math.round(g.avgC * 100) / 100) + ')'; }).join('، ') + '</div>';
+    if (R.noCost.length) warn += '<div class="axcf-alert warn">⚠️ <b>' + R.noCost.length + ' صنف مالوش تكلفة متسجلة</b> (' + R.noCost.map(function (g) { return esc(g.name); }).join('، ') + ') — ربحه محسوب كامل، فالربح هنا أعلى من الحقيقي. حط التكلفة من «المخازن».</div>';
+    return seg +
+      '<div class="axcf-kpis">' +
+        kpi('الإيرادات منه', money(me.rev), num(me.qty) + ' وحدة' + (R.returns ? ' · بعد مرتجع ' + money(R.returns) : '')) +
+        kpi('تكلفة البضاعة', money(me.cost), pct(me.rev ? me.cost / me.rev * 100 : 0) + ' من الإيرادات') +
+        kpi('الربح منه', money(me.profit), R.centers > 1 ? 'ترتيبه ' + R.rank + ' من ' + R.centers + ' مركز' : '', me.profit < 0 ? 'bad' : 'ok') +
+        '<div class="axcf-kpi' + (me.margin < 0 ? ' bad' : '') + '"><span>هامش الربح</span><b>' + pct(me.margin) + '</b><small>متوسط كل المراكز ' + pct(R.co.margin) + '</small>' + cmp + '</div>' +
+      '</div>' + warn +
+      '<section class="axcf-card"><h3>📦 ربح كل نوع ورق</h3><div class="axcf-ptbl" role="table">' +
+        '<div class="axcf-ptr axcf-pth" role="row"><span>الصنف</span><span>الكمية</span><span>متوسط البيع</span><span>متوسط التكلفة</span><span>الربح</span><span>الهامش</span></div>' +
+        R.papers.map(function (g) {
+          var tone = g.noCost ? 'warn' : g.margin < 0 ? 'bad' : g.margin < 10 ? 'warn' : 'ok';
+          return '<div class="axcf-ptr" role="row"><span class="n">' + esc(g.name) + '</span><span data-l="الكمية">' + num(g.qty) + '</span><span data-l="متوسط البيع">' + num(Math.round(g.avgP * 100) / 100) + '</span>' +
+            '<span data-l="متوسط التكلفة">' + (g.noCost ? '<em class="axcf-miss">مش متسجلة</em>' : num(Math.round(g.avgC * 100) / 100)) + '</span>' +
+            '<span data-l="الربح" class="' + (g.profit < 0 ? 'neg' : '') + '"><b>' + money(g.profit) + '</b></span>' +
+            '<span data-l="الهامش" class="m"><i class="axcf-mbar ' + tone + '"><i style="width:' + Math.max(3, Math.round(Math.abs(g.margin) / maxAbs * 100)) + '%"></i></i><b class="' + tone + '">' + pct(g.margin) + '</b></span></div>';
+        }).join('') + '</div></section>' +
+      '<p class="axcf-note axcf-foot">بنفس حسبة «أرباحي»: تكلفة الصنف الحالية × الكمية، والمرتجعات بتتخصم. المصروفات العامة (إيجار، مرتبات…) مش متوزعة على المراكز هنا.</p>';
+  }
+
   function body(M) {
-    return ui.tab === 'sales' ? salesTab(M) : ui.tab === 'pays' ? paysTab(M) : ui.tab === 'invs' ? invsTab(M) : ui.tab === 'info' ? infoTab(M) : over(M);
+    return ui.tab === 'sales' ? salesTab(M) : ui.tab === 'pays' ? paysTab(M) : ui.tab === 'invs' ? invsTab(M) : ui.tab === 'info' ? infoTab(M) : ui.tab === 'profit' ? profitTab(M) : over(M);
   }
 
   /* ── the screen ── */
@@ -231,10 +301,11 @@
     el.innerHTML = '<div class="axcf-scroll" id="axcf-scroll"></div>';
     document.body.appendChild(el);
     el.addEventListener('click', function (e) {
-      var t = e.target.closest && e.target.closest('[data-t],[data-f],[data-a]');
+      var t = e.target.closest && e.target.closest('[data-t],[data-f],[data-pp],[data-a]');
       if (!t) return;
       if (t.hasAttribute('data-t')) { ui.tab = t.getAttribute('data-t'); draw(true); return; }
       if (t.hasAttribute('data-f')) { ui.f = t.getAttribute('data-f'); draw(); return; }
+      if (t.hasAttribute('data-pp')) { ui.pp = t.getAttribute('data-pp'); draw(); return; }
       act(t.getAttribute('data-a'), t.getAttribute('data-id'));
     });
     el.addEventListener('input', function (e) { if (e.target.id === 'axcf-q') { ui.q = e.target.value; var pos = e.target.selectionStart; draw(); var i = document.getElementById('axcf-q'); if (i) { i.focus(); try { i.setSelectionRange(pos, pos); } catch (x) {} } } });
@@ -274,7 +345,7 @@
   function open(id, tab) {
     if (!A('customers').some(function (x) { return x && x.id === id; })) return;
     var el = root(), was = isOpen();
-    ui.id = id; ui.tab = tab || 'over'; ui.f = 'all'; ui.q = '';
+    ui.id = id; ui.tab = tab || 'over'; ui.f = 'all'; ui.q = ''; ui.pp = 'all';
     draw();
     var box = document.getElementById('axcf-scroll'); if (box) box.scrollTop = 0;
     if (!was) {
@@ -290,5 +361,14 @@
     if (!fromPop) { try { if (history.state && history.state.axcf) history.back(); } catch (e) {} }
   }
 
-  window.AXCenter = { open: open, close: close, model: model, isOpen: isOpen };
+  /* 5.06 · a tap anywhere on a center's row in «العملاء والمراكز» opens its file (the row's own buttons keep their job) */
+  document.addEventListener('click', function (e) {
+    var tr = e.target.closest && e.target.closest('tr.cust-row[data-cid]');
+    if (!tr || e.target.closest('button, a, input, select, textarea, label, .row-actions')) return;
+    var sel = window.getSelection && window.getSelection();
+    if (sel && String(sel).length) return;                                        // selecting text to copy, not a tap
+    open(tr.getAttribute('data-cid'));
+  });
+
+  window.AXCenter = { open: open, close: close, model: model, isOpen: isOpen, profit: profitModel };
 })();

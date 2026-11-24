@@ -9767,7 +9767,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 5.05</div>
+      <div class="version">الإصدار 5.06</div>
     </footer>
   </div>
 </div>
@@ -11591,7 +11591,7 @@ function navigate(page, isBack) {
   currentPage = page;
   renderSidebar();
   toggleSidebar(false);
-  const titles = { sales:'المبيعات', dashboard:'لوحة التحكم', customers:'العملاء والمراكز', issuances:'صرف الورق للمراكز', forecast:'مواعيد السحب المتوقعة', purchases:'فواتير المشتريات', monthly:'تقرير الشهر والتقفيل', invoices:'الفواتير', payments:'التحصيل والمديونيات', transfers:'التحويلات البنكية', debts:'سداد المديونية', suppliers:'الموردين', inventory:'إدارة المخازن', stock:'مخزوني وجرد', expenses:'المصروفات', reports:'التقارير', aiassistant:'المساعد الذكي', approvals:'طلبات الموافقة', requests:'الطلبات والمقترحات', aging:'أعمار الديون', cheques:'الشيكات', profit:'أرباحي', users:'إدارة المستخدمين', staff:'الموظفين', security:'الأمان والنسخ الاحتياطي', audit:'سجل التعديلات الذكي', settings:'الإعدادات' };
+  const titles = { sales:'المبيعات', dashboard:'لوحة التحكم', customers:'العملاء والمراكز', issuances:'صرف الورق للمراكز', forecast:'مواعيد السحب المتوقعة', purchases:'فواتير المشتريات', monthly:'تقرير الشهر والتقفيل', invoices:'الفواتير', payments:'التحصيل والمديونيات', transfers:'التحويلات البنكية', debts:'سداد المديونية', suppliers:'الموردين', inventory:'إدارة المخازن', stock:'مخزوني وجرد', expenses:'المصروفات', reports:'التقارير', aiassistant:'المساعد الذكي', approvals:'طلبات الموافقة', requests:'الطلبات والمقترحات', aging:'أعمار الديون', cheques:'الشيكات', profit:'أرباحي', users:'إدارة المستخدمين', staff:'الموظفين', clients:'متابعة العملاء', security:'الأمان والنسخ الاحتياطي', audit:'سجل التعديلات الذكي', settings:'الإعدادات' };
   document.getElementById('topbar-title').innerText = titles[page] || '';
 
   const pc = document.getElementById('page-content');
@@ -15182,7 +15182,7 @@ let customerSearch = '';
 const _custSteps = { mark: 'cust-more', shown: 0, key: '', obs: null };
 function _custRow(c, ctx) {
                 const overLimit = c.balance > c.creditLimit;
-                return `<tr>
+                return `<tr class="cust-row" data-cid="${escapeHtml(String(c.id))}" title="دوس لفتح «ملف المركز»">
                   <td><button type="button" class="cust-open" onclick="AXCenter.open('${c.id}')" title="ملف المركز">${escapeHtml(c.name)}</button><br><small style="color:var(--text-muted)">${escapeHtml(c.address||'')}</small></td>
                   <td>${escapeHtml(c.company||'-')}</td>
                   <td>${escapeHtml(c.phone||'-')}</td>

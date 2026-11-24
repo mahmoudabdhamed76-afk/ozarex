@@ -20,7 +20,13 @@ test('sidebar: every item opens its page; back button returns', async ({ app: pa
   const errors = watchErrors(page);
   const mobile = info.project.name === 'iphone';
   const labels = await page.$$eval('#sidebar-nav .nav-item', els => els.map(e => ({ text: e.innerText.trim().split('\n')[0], click: e.getAttribute('onclick') })));
-  expect(labels.length).toBe(26);                                  // 4.27: + «المبيعات»
+  /* 5.06 · the sidebar is exactly the app's own list (NAV_ITEMS) of pages this user may open, in order — not a
+     hard-coded count that goes stale every time a page is added — and every one of them has a known page title */
+  const keys = labels.map(it => (/navigate\('([^']+)'\)/.exec(it.click) || [])[1]);
+  const expected = await page.evaluate(() => NAV_ITEMS.filter(it => can(it.key)).map(it => it.key));
+  expect(keys).toEqual(expected);
+  expect(keys.length).toBeGreaterThanOrEqual(26);
+  for (const k of keys) expect(PAGES[k], 'a page title for «' + k + '» in fixtures PAGES').toBeTruthy();
   for (const it of labels) {
     const key = /navigate\('([^']+)'\)/.exec(it.click)[1];
     if (mobile) { await page.click('.topbar .menu-toggle'); await expect(page.locator('#sidebar')).toHaveClass(/open/); }

@@ -7156,3 +7156,40 @@ html .axcf a.axcf-act, html .axcf a.axcf-act:visited { color: #fff !important; }
 .cust-open { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: 800; cursor: pointer; text-align: start; }
 .cust-open:hover { color: var(--ax-blue, var(--info)); text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) { .axcf, .axcf.show { transition: none; } }
+
+/* §79 · 5.06 «ملف المركز ← 💹 الربح» + a center row in «العملاء والمراكز» opens its file */
+.axcf-pstrip { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; border-radius: 16px; border: 1px solid var(--ax-ok, #138A47);
+  background: var(--ax-ok-soft, #DBF2E4); color: var(--ax-text, var(--text)); font: 14px var(--ax-font, inherit); text-align: start; cursor: pointer; }
+.axcf-pstrip.bad { border-color: var(--ax-bad, #D5221A); background: var(--ax-bad-soft, #FBDEDB); }
+.axcf-pstrip i { font-style: normal; font-size: 20px; }
+.axcf-pstrip span { flex: 1; min-width: 0; }
+.axcf-pstrip em { font-style: normal; font-weight: 800; font-size: 12.5px; white-space: nowrap; color: var(--ax-ok, #138A47); }
+.axcf-pstrip.bad em { color: var(--ax-bad, #D5221A); }
+.axcf-kpi .axcf-chip { margin-top: 6px; }
+.axcf-alert { padding: 11px 14px; border-radius: 14px; font-size: 13px; line-height: 1.7; border-inline-start: 4px solid; }
+.axcf-alert.bad { background: var(--ax-bad-soft, #FBDEDB); border-color: var(--ax-bad, #D5221A); }
+.axcf-alert.warn { background: var(--ax-warn-soft, #FDEBD2); border-color: var(--ax-warn, #C27400); }
+.axcf-ptbl { display: grid; }
+.axcf-ptr { display: grid; grid-template-columns: minmax(0, 2.2fr) .8fr 1fr 1fr 1.2fr 1.5fr; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--ax-line, var(--border)); font-size: 13.5px; }
+.axcf-ptr:last-child { border-bottom: 0; }
+.axcf-pth { font-size: 12px; font-weight: 700; color: var(--ax-muted, var(--text-muted)); padding-top: 0; }
+.axcf-ptr .n { font-weight: 700; overflow-wrap: anywhere; }
+.axcf-ptr .neg b { color: var(--ax-bad, #D5221A); }
+.axcf-ptr .m { display: flex; align-items: center; gap: 8px; }
+.axcf-ptr .m b { min-width: 48px; text-align: end; }
+.axcf-ptr b.ok { color: var(--ax-ok, #138A47); } .axcf-ptr b.warn { color: var(--ax-warn, #C27400); } .axcf-ptr b.bad { color: var(--ax-bad, #D5221A); }
+.axcf-mbar { flex: 1; height: 6px; border-radius: 99px; background: var(--ax-surface-3, var(--surface-3)); overflow: hidden; display: block; }
+.axcf-mbar i { display: block; height: 100%; border-radius: inherit; }
+.axcf-mbar.ok i { background: var(--ax-ok, #138A47); } .axcf-mbar.warn i { background: var(--ax-warn, #C27400); } .axcf-mbar.bad i { background: var(--ax-bad, #D5221A); }
+.axcf-miss { font-style: normal; font-size: 11.5px; color: var(--ax-warn, #C27400); font-weight: 700; }
+.axcf-foot { font-size: 12px; text-align: center; padding: 2px 8px; }
+@media (max-width: 640px) {
+  .axcf-pth { display: none; }
+  .axcf-ptr { grid-template-columns: 1fr 1fr; gap: 6px 12px; padding: 12px 0; }
+  .axcf-ptr .n { grid-column: 1 / -1; font-size: 14.5px; }
+  .axcf-ptr [data-l]::before { content: attr(data-l); display: block; font-size: 11px; color: var(--ax-muted, var(--text-muted)); font-weight: 500; }
+  .axcf-ptr .m { grid-column: 1 / -1; }
+  .axcf-ptr .m::before { display: none; }
+}
+tr.cust-row { cursor: pointer; }
+tr.cust-row:hover td { background: var(--ax-hover, rgba(0,0,0,.025)); }
