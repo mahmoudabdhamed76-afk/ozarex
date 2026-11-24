@@ -150,6 +150,7 @@
     if (canGo('payments') && typeof openPaymentForm === 'function') acts += '<button type="button" class="axst-act ok" onclick="AXStmt.pay()">💰 تحصيل</button>';
     if (owes && m.c.phone && typeof sendDebtReminderWhatsApp === 'function') acts += '<button type="button" class="axst-act wa" onclick="AXStmt.wa()">📲 واتساب</button>';
     if (typeof viewCustomerStatement === 'function') acts += '<button type="button" class="axst-act" onclick="AXStmt.full()">📄 الكشف الكامل</button>';
+    if (window.AXCenter) acts += '<button type="button" class="axst-act" onclick="var i=\'' + m.c.id + '\';AXStmt.close();setTimeout(function(){AXCenter.open(i)},260)">🪪 ملف المركز</button>';   // 5.05
     return '<div class="axst-top"><button type="button" class="axst-back" onclick="AXStmt.back()" aria-label="مركز تاني">→ مركز تاني</button>' +
         '<button type="button" class="mo-x" onclick="AXStmt.close()" aria-label="اقفل">✕</button></div>' +
       '<div class="axst-hero ' + (owes ? 'owes' : 'clear') + '">' +

@@ -9767,7 +9767,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 5.04</div>
+      <div class="version">الإصدار 5.05</div>
     </footer>
   </div>
 </div>
@@ -12226,11 +12226,11 @@ function runGlobalSearch(q) {
       html += `<div class="search-result-section">
         <div class="search-result-header">👥 العملاء / المراكز (${customers.length})</div>
         ${customers.map(c => `
-          <div class="search-result-item" onclick="navigate('customers');setTimeout(()=>{document.getElementById('global-search').value='';document.getElementById('search-results').classList.remove('show');},50)">
+          <div class="search-result-item" onclick="document.getElementById('global-search').value='';document.getElementById('search-results').classList.remove('show');try{document.activeElement.blur()}catch(e){};if(window.AXCenter)AXCenter.open('${c.id}');else navigate('customers')">
             <div class="sr-icon" style="background:rgba(139,92,246,.15);color:#8b5cf6">👤</div>
             <div class="sr-body">
               <div class="sr-title">${escapeHtml(c.name)}</div>
-              <div class="sr-sub">${escapeHtml(c.phone||'-')} ${c.balance>0?'• <b style="color:var(--danger)">مديونية '+fmtCurrency(c.balance)+'</b>':''}</div>
+              <div class="sr-sub">${escapeHtml(c.phone||'-')} ${c.balance>0?'• <b style="color:var(--danger)">مديونية '+fmtCurrency(c.balance)+'</b>':''} • <span style="color:var(--info)">🪪 ملف المركز</span></div>
             </div>
           </div>
         `).join('')}
@@ -15183,7 +15183,7 @@ const _custSteps = { mark: 'cust-more', shown: 0, key: '', obs: null };
 function _custRow(c, ctx) {
                 const overLimit = c.balance > c.creditLimit;
                 return `<tr>
-                  <td><b>${escapeHtml(c.name)}</b><br><small style="color:var(--text-muted)">${escapeHtml(c.address||'')}</small></td>
+                  <td><button type="button" class="cust-open" onclick="AXCenter.open('${c.id}')" title="ملف المركز">${escapeHtml(c.name)}</button><br><small style="color:var(--text-muted)">${escapeHtml(c.address||'')}</small></td>
                   <td>${escapeHtml(c.company||'-')}</td>
                   <td>${escapeHtml(c.phone||'-')}</td>
                   <td>${fmtCurrency(c.creditLimit)}</td>
@@ -15191,6 +15191,9 @@ function _custRow(c, ctx) {
                   <td>${overLimit ? '<span class="badge-status badge-unpaid">تجاوز الحد</span>' : c.balance>0 ? '<span class="badge-status badge-partial">له مستحقات</span>' : '<span class="badge-status badge-paid">مسدد</span>'}</td>
                   <td>
                     <div class="row-actions">
+                      <button class="btn-icon" title="ملف المركز" onclick="AXCenter.open('${c.id}')" style="color:var(--info)">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M6 16c.6-1.6 1.8-2.4 3-2.4s2.4.8 3 2.4"/><line x1="14" y1="9" x2="18" y2="9"/><line x1="14" y1="13" x2="18" y2="13"/></svg>
+                      </button>
                       <button class="btn-icon" title="كشف الحساب" onclick="viewCustomerStatement('${c.id}')">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                       </button>
@@ -26914,6 +26917,7 @@ function exportSuppliersCSV() {
 <script src="js/fxtape.js"></script>
 <script src="js/forcepw.js"></script>
 <script src="js/centerstmt.js"></script>
+<script src="js/centerfile.js"></script>
 <script src="js/navsmart.js"></script>
 <script src="js/deskmore.js"></script>
 <script src="js/aibot.js"></script>
