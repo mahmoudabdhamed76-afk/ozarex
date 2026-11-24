@@ -270,7 +270,7 @@
     if (R.below.length) warn += '<div class="axcf-alert bad">🔻 <b>بيتباع تحت التكلفة:</b> ' + R.below.map(function (g) { return esc(g.name) + ' (متوسط البيع ' + num(Math.round(g.avgP * 100) / 100) + ' والتكلفة ' + num(Math.round(g.avgC * 100) / 100) + ')'; }).join('، ') + '</div>';
     if (R.noCost.length) warn += '<div class="axcf-alert warn">⚠️ <b>' + R.noCost.length + ' صنف مالوش تكلفة متسجلة</b> (' + R.noCost.map(function (g) { return esc(g.name); }).join('، ') + ') — ربحه محسوب كامل، فالربح هنا أعلى من الحقيقي. حط التكلفة من «المخازن».</div>';
     return seg +
-      '<div class="axcf-kpis">' +
+      '<div class="axcf-kpis k4">' +
         kpi('الإيرادات منه', money(me.rev), num(me.qty) + ' وحدة' + (R.returns ? ' · بعد مرتجع ' + money(R.returns) : '')) +
         kpi('تكلفة البضاعة', money(me.cost), pct(me.rev ? me.cost / me.rev * 100 : 0) + ' من الإيرادات') +
         kpi('الربح منه', money(me.profit), R.centers > 1 ? 'ترتيبه ' + R.rank + ' من ' + R.centers + ' مركز' : '', me.profit < 0 ? 'bad' : 'ok') +

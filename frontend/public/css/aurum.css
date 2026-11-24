@@ -7165,7 +7165,8 @@ html .axcf a.axcf-act, html .axcf a.axcf-act:visited { color: #fff !important; }
 .axcf-pstrip span { flex: 1; min-width: 0; }
 .axcf-pstrip em { font-style: normal; font-weight: 800; font-size: 12.5px; white-space: nowrap; color: var(--ax-ok, #138A47); }
 .axcf-pstrip.bad em { color: var(--ax-bad, #D5221A); }
-.axcf-kpi .axcf-chip { margin-top: 6px; }
+.axcf-kpi .axcf-chip { margin-top: 6px; white-space: normal; }
+@media (min-width: 760px) { .axcf-kpis.k4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .axcf-alert { padding: 11px 14px; border-radius: 14px; font-size: 13px; line-height: 1.7; border-inline-start: 4px solid; }
 .axcf-alert.bad { background: var(--ax-bad-soft, #FBDEDB); border-color: var(--ax-bad, #D5221A); }
 .axcf-alert.warn { background: var(--ax-warn-soft, #FDEBD2); border-color: var(--ax-warn, #C27400); }
