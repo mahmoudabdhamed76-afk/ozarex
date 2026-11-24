@@ -24,6 +24,9 @@ export default [
   },
   /* the browser modules are classic <script>s sharing globals across 37 files — no-undef can't judge them one file at a time */
   { files: ['frontend/public/**/*.js'], rules: { 'no-undef': 'off' } },
+  /* Phase 7 · js/core + js/utils hold top-level globals used by other scripts and by onclick="…" in the HTML — a
+     top-level name nobody calls in the same file is not «unused»; inside functions the usual rule still applies */
+  { files: ['frontend/public/js/core/**/*.js', 'frontend/public/js/utils/**/*.js'], rules: { 'no-unused-vars': ['warn', { vars: 'local', args: 'none', caughtErrors: 'none', varsIgnorePattern: '^_' }] } },
   { files: ['**/*.mjs'], languageOptions: { sourceType: 'module' } },
   { files: ['tests/browser/**/*.mjs', 'tests/bench/page-profile.mjs', 'tests/bench/layout-probe.mjs'], languageOptions: { globals: APP_GLOBALS }, rules: { 'no-empty-pattern': 'off' } }
 ];

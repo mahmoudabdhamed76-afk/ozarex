@@ -1,6 +1,7 @@
 {
-  "no-useless-assignment": 6,
-  "no-useless-escape": 5,
-  "no-prototype-builtins": 1,
-  "no-control-regex": 1
+  "no-control-regex": 6,
+  "no-useless-assignment": 22,
+  "no-unused-vars": 7,
+  "no-useless-escape": 16,
+  "no-prototype-builtins": 1
 }

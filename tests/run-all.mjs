@@ -22,7 +22,8 @@ mkdirSync(path.join(here, 'test-results'), { recursive: true });
 if (!only.length || only.includes('lint')) {
   const a = await run(process.execPath, ['lint/check-syntax.mjs']);
   const b = await run(process.execPath, ['lint/run-eslint.mjs']);
-  summary.lint = { ok: a.code === 0 && b.code === 0, ms: a.ms + b.ms, detail: (a.out + b.out).trim().split('\n').slice(-3) };
+  const c = await run(process.execPath, ['lint/check-load-order.mjs']);          // Phase 7 · the split app script keeps its load order
+  summary.lint = { ok: a.code === 0 && b.code === 0 && c.code === 0, ms: a.ms + b.ms + c.ms, detail: (a.out + b.out + c.out).trim().split('\n').slice(-4) };
   console.log(`\n■ lint ${summary.lint.ok ? 'OK' : 'FAILED'} (${sec(summary.lint.ms)})\n  ` + summary.lint.detail.join('\n  '));
 }
 

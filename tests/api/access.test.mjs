@@ -41,9 +41,17 @@ after(() => s.stop());
 
 const why = r => (r.json && r.json.error) + ' ' + (r.json && r.json.message);
 
+/* the browser's own code: index.html + the scripts it loads from js/core and js/utils (Phase 7 moved
+   PERMISSIONS / NAV_ITEMS / ADMIN_ONLY_PAGES there, verbatim), in page order */
+function browserCode() {
+  const pub = path.join(ROOT, 'frontend', 'public');
+  const html = readFileSync(path.join(pub, 'index.html'), 'utf8');
+  return html.replace(/<script src="(js\/(?:core|utils)\/[^"]+)"><\/script>/g, (_, f) => readFileSync(path.join(pub, f), 'utf8'));
+}
+
 /* ═══ the matrix itself ═══ */
-test('matrix: role pages and admin-only pages are the same as the browser (index.html)', () => {
-  const html = readFileSync(path.join(ROOT, 'frontend', 'public', 'index.html'), 'utf8');
+test('matrix: role pages and admin-only pages are the same as the browser (index.html + js/core)', () => {
+  const html = browserCode();
   const block = html.slice(html.indexOf('const PERMISSIONS = {'), html.indexOf('};', html.indexOf('const PERMISSIONS = {')));
   for (const role of ['admin', 'accountant', 'sales']) {
     const m = block.match(new RegExp(role + ": \\[([^\\]]*)\\]"));
@@ -55,7 +63,7 @@ test('matrix: role pages and admin-only pages are the same as the browser (index
 });
 
 test('matrix: every page in the menu has a policy, every policy names real collections', () => {
-  const html = readFileSync(path.join(ROOT, 'frontend', 'public', 'index.html'), 'utf8');
+  const html = browserCode();
   const nav = [...html.slice(html.indexOf('const NAV_ITEMS'), html.indexOf('const SECTIONS')).matchAll(/key: '([a-z]+)'/g)].map(m => m[1]);
   /* 4.27: «المبيعات» is a view of the issuance records — the browser maps it to «صرف الورق» (same right, same data),
      so the server policy that covers it is the issuances one */

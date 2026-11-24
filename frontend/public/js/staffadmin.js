@@ -743,7 +743,7 @@
     if (a === 'cvis') return centerVisits(id);
     if (a === 'pin') return pinModal(id);
     if (a === 'vcsv') return vcsv();
-    if (a === 'vm') { var q = S.vmonth.split('-'), dq = new Date(Date.UTC(+q[0], +q[1] - 1 + Number(d), 1)); S.vmonth = dq.getUTCFullYear() + '-' + p2(dq.getUTCMonth() + 1); return load(); }
+    if (a === 'vm') { var vq = S.vmonth.split('-'), vd = new Date(Date.UTC(+vq[0], +vq[1] - 1 + Number(d), 1)); S.vmonth = vd.getUTCFullYear() + '-' + p2(vd.getUTCMonth() + 1); return load(); }
     if (a === 'pm') { var p = S.month.split('-'), dt = new Date(Date.UTC(+p[0], +p[1] - 1 + Number(d), 1)); S.month = dt.getUTCFullYear() + '-' + p2(dt.getUTCMonth() + 1); return load(); }
     if (a === 'csv') return csv();
     if (a === 'print') return printReport();
