@@ -7245,7 +7245,7 @@ tr.cust-row:hover td { background: var(--ax-hover, rgba(0,0,0,.025)); }
   padding: 3px 12px; border-radius: 99px; pointer-events: none; white-space: nowrap; }
 .axh-show { display: block; margin: 0 0 14px; padding: 9px 16px; border-radius: 12px; border: 1px dashed var(--ax-line-2, var(--border)); background: transparent; color: var(--ax-muted, var(--text-muted)); font: 700 13px var(--ax-font, inherit); cursor: pointer; }
 @media (max-width: 599px) {
-  .axh-l:not(.z):not(.axh-al) { display: none !important; }
+  .axh-labels:not(.zfocus) .axh-l:not(.z):not(.axh-al) { display: none !important; }
   .axh-hud { font-size: 13px; top: 10px; right: 12px; } .axh-k span { font-size: 10.5px; padding: 2px 8px; }
   .axh-zone { font-size: 11px; padding: 3px 9px; }
   .axh-tools button { width: 30px; height: 30px; font-size: 13px; }
@@ -7253,3 +7253,45 @@ tr.cust-row:hover td { background: var(--ax-hover, rgba(0,0,0,.025)); }
   .axh-ribbon { right: 8px; bottom: 36px; font-size: 11.5px; }
 }
 @media (min-width: 900px) { .axh-lb, .axh-lb b { font-size: 11px; } .axh-lb { padding: 3px 8px; } .axh-lb b { max-width: 120px; } }
+/* 5.09 · zone chips, zone / bay close views */
+.axh-l.z { pointer-events: auto; }
+.axh-zone { border: 0; cursor: pointer; }
+.axh-zones { position: absolute; bottom: 10px; left: 10px; right: 10px; display: flex; gap: 6px; justify-content: center; overflow-x: auto; scrollbar-width: none; padding: 2px; }
+.axh-zones::-webkit-scrollbar { display: none; }
+.axh-zones button { flex: none; height: 32px; padding: 0 13px; border-radius: 99px; border: 1px solid rgba(255,255,255,.16); background: rgba(20,14,12,.62); color: #fff; font: 700 12.5px Cairo, system-ui, sans-serif; cursor: pointer;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); display: inline-flex; align-items: center; gap: 6px; transition: background .2s, color .2s; }
+.axh-zones button::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--c, #F6C453); }
+.axh-zones button em { font-style: normal; font-size: 11px; opacity: .7; }
+.axh-zones button.on { background: var(--c, #F6C453); color: #1A1412; border-color: transparent; }
+.axh-zones button.on::before { background: #1A1412; }
+.axh-nav { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
+.axh-nav[hidden] { display: none; }
+.axh-nav button { height: 34px; min-width: 34px; padding: 0 12px; border-radius: 11px; border: 1px solid rgba(255,255,255,.18); background: rgba(20,14,12,.72); color: #fff; font: 800 14px Cairo, system-ui, sans-serif; cursor: pointer;
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.axh-nav button[hidden] { display: none; }
+.axh-nav .axh-back { font-size: 12.5px; white-space: nowrap; }
+.axh-tip { bottom: 50px; }
+.axh.axh-close .axh-tip { bottom: 92px; }
+.axh.axh-bay .axh-tip { display: none; }
+.axh-ribbon, .axh-card { bottom: 50px; }
+.axh.axh-close .axh-ribbon, .axh.axh-close .axh-card { bottom: 92px; }
+.axh-labels.zfocus[data-zone="paper"] .axh-l[data-zone]:not([data-zone="paper"]), .axh-labels.zfocus[data-zone="ink"] .axh-l[data-zone]:not([data-zone="ink"]),
+.axh-labels.zfocus[data-zone="parts"] .axh-l[data-zone]:not([data-zone="parts"]), .axh-labels.zfocus[data-zone="other"] .axh-l[data-zone]:not([data-zone="other"]) { display: none !important; }
+.axh-labels.zfocus .axh-lb { font-size: 11px; padding: 3px 9px; }
+.axh-labels.zfocus .axh-lb b { font-size: 11.5px; max-width: 130px; }
+@media (max-width: 599px) {
+  .axh-zones button { height: 30px; padding: 0 10px; font-size: 11.5px; }
+  .axh-zones { justify-content: flex-start; }
+  .axh-ribbon, .axh-card { bottom: 46px; } .axh-tip { bottom: 46px; }
+  .axh.axh-close .axh-ribbon, .axh.axh-close .axh-card { bottom: 88px; } .axh.axh-close .axh-tip { display: none; }
+  .axh-nav { bottom: 46px; }
+  .axh.axh-close:not(.tall) { height: 440px; }
+  .axh.axh-close .axh-k { display: none; }
+  .axh.axh-close .axh-card { padding: 9px 11px; }
+  .axh.axh-close .axh-cn { font-size: 13px; }
+  .axh.axh-close .axh-cq { font-size: 19px; margin: 1px 0; }
+  .axh.axh-close .axh-card small { font-size: 10.5px; }
+  .axh.axh-close .axh-card small + small { display: none; }
+  .axh.axh-close .axh-ca { grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 7px; }
+  .axh.axh-close .axh-ca button { height: 30px; font-size: 10.5px; padding: 0 2px; }
+}

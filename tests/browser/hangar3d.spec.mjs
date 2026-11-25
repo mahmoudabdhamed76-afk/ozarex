@@ -1,8 +1,11 @@
-/* 5.08 · «المخزن ثري دي»: a live 3D hangar at the top of «المخازن».
+/* 5.08 / 5.09 · «المخزن ثري دي»: a live 3D hangar at the top of «المخازن».
    One bay per item with cartons = the real quantity (sheets ÷ 1000, a box = a carton); about-to-run-out / out
    items are flagged; a change made on ANOTHER device (live sync) plays in the hangar (cartons go, «صرف …» on the
    ribbon); a tap on a bay opens its card and «➕ وارد» opens the stock form for that item — saving it adds the
-   cartons; ✕ hides it (remembered) and «اعرض» brings it back; leaving the page and coming back keeps it working. */
+   cartons; ✕ hides it (remembered) and «اعرض» brings it back; leaving the page and coming back keeps it working.
+   5.09: a zone chip flies the camera to that zone and its bays show the REAL items at the REAL count (12 ink
+   bottles, 3000 sheets = 6 reams …); a tap on a bay comes up to it with its card, ‹ › go to the next bay, ↩ goes
+   back; a change while you look at a zone changes the real items at once. */
 import { test, expect, watchErrors } from './fixtures.mjs';
 import { adminLogin, send, ops, col, data } from '../helpers/api.mjs';
 
@@ -15,7 +18,7 @@ async function seed(server) {
   const r = await send(server.base, admin, ops({ cols: { products: col({ added: [
     P('hz_blue', 'Green Tec - Blue', 'ورق', 'علبة', 42, 10), P('hz_vivid', 'A4 Photo Vivid', 'ورق', 'ورقة', 3000, 1000),
     P('hz_a3', 'A3 Photo Paper', 'ورق', 'ورقة', 0, 500), P('hz_mag', 'Epson Ink Magenta', 'حبر', 'خرطوشة', 3, 4),
-    P('hz_head', 'رأس طباعة', 'قطع غيار', 'قطعة', 5, 1)] }) } }));
+    P('hz_head', 'رأس طباعة', 'قطع غيار', 'قطعة', 5, 1), P('hz_cyan', 'Epson Ink Cyan', 'حبر', 'خرطوشة', 12, 2)] }) } }));
   expect(r.status).toBe(200);
   return admin;
 }
@@ -119,5 +122,70 @@ test('✕ hides the hangar (remembered), «اعرض» brings it back; another pa
   await page.evaluate(() => navigate('inventory'));
   await expect(page.locator('.axh .axh-cv')).toBeVisible();
   expect(await shown(page, 'hz_head')).toBe(5);
+  expect(errors).toEqual([]);
+});
+
+const view = page => page.evaluate(() => { const s = AXHangar.state(); return s && s.view.mode + ':' + (s.view.zone || '') + ':' + (s.view.id || ''); });
+const detail = (page, id) => page.evaluate(i => { const s = AXHangar.state(); return s && s.bays[i] ? s.bays[i].detail : null; }, id);
+
+test('a zone chip flies to the zone and shows the real items at the real count; a bay comes up close with its card', async ({ app: page, server }) => {
+  await seed(server);
+  await page.reload();
+  await page.waitForFunction(() => typeof DB !== 'undefined' && DB.data.products.some(p => p.id === 'hz_cyan'), null, { timeout: 20000 });
+  const errors = watchErrors(page);
+  await openHangar(page);
+  expect(await page.evaluate(() => [AXHangar.kindOf({ name: 'Epson Ink Cyan', type: 'حبر', unit: 'خرطوشة' }), AXHangar.kindOf({ name: 'A4 Photo', unit: 'ورقة' }), AXHangar.unitsOf({ name: 'A4 Photo', unit: 'ورقة', quantity: 3000 }), AXHangar.kindOf({ name: 'رأس طباعة', unit: 'قطعة', type: 'قطع غيار' }), AXHangar.kindOf({ name: 'بكرة سحب ورق', unit: 'قطعة', type: 'قطع غيار' }), AXHangar.kindOf({ name: 'Green Tec - Blue', unit: 'علبة', type: 'ورق' })]))
+    .toEqual(['bottle', 'ream', 6, 'head', 'roller', 'box']);
+  expect(await detail(page, 'hz_cyan')).toBe(null);                                     // the whole hangar: cartons only
+  await page.locator('.axh-zones button[data-zone="ink"]').click();
+  await expect.poll(() => view(page)).toBe('zone:ink:');
+  await expect(page.locator('.axh-zones button[data-zone="ink"]')).toHaveClass(/on/);
+  expect(await detail(page, 'hz_cyan')).toBe(12);                                       // 12 bottles, one by one
+  expect(await detail(page, 'hz_mag')).toBe(await page.evaluate(() => DB.data.products.find(p => p.id === 'hz_mag').quantity));
+  expect(await detail(page, 'hz_vivid')).toBe(null);                                    // only the zone you look at is built
+  await expect(page.locator('.axh-l[data-id="hz_cyan"]')).toBeVisible();                // every bay of the zone is named, phone too
+  await expect.poll(() => page.evaluate(() => AXHangar.state().flying), { timeout: 5000 }).toBe(false);
+  /* a tap on a bay: close up + its card */
+  const at = await page.evaluate(() => AXHangar.screenOf('hz_cyan'));
+  await page.mouse.click(at.x, at.y);
+  await expect.poll(() => view(page)).toBe('bay:ink:hz_cyan');
+  const card = page.locator('.axh-card');
+  await expect(card).toBeVisible();
+  await expect(card.locator('.axh-cn')).toHaveText('Epson Ink Cyan');
+  await expect(card).toContainText('12 زجاجة');
+  await page.locator('.axh-nav [data-a="next"]').click();                                // ‹ › the next bay of the zone
+  await expect.poll(() => view(page)).toBe('bay:ink:hz_mag');
+  await expect(card.locator('.axh-cn')).toHaveText('Epson Ink Magenta');
+  await page.locator('.axh-nav [data-a="back"]').click();
+  await expect.poll(() => view(page)).toBe('zone:ink:');
+  await expect(card).toBeHidden();
+  /* paper: 3000 sheets = 6 reams */
+  await page.locator('.axh-zones button[data-zone="paper"]').click();
+  await expect.poll(() => view(page)).toBe('zone:paper:');
+  expect(await detail(page, 'hz_vivid')).toBe(6);
+  expect(await detail(page, 'hz_cyan')).toBe(null);                                     // the ink zone was let go
+  await page.locator('.axh-nav [data-a="back"]').click();
+  await expect.poll(() => view(page)).toBe('all::');
+  expect(await detail(page, 'hz_vivid')).toBe(null);
+  expect(errors).toEqual([]);
+});
+
+test('a change made on another device while looking at a zone changes the real items at once', async ({ app: page, server }) => {
+  const admin = await seed(server);
+  await page.reload();
+  await page.waitForFunction(() => typeof DB !== 'undefined' && DB.data.products.some(p => p.id === 'hz_cyan'), null, { timeout: 20000 });
+  const errors = watchErrors(page);
+  await openHangar(page);
+  await page.evaluate(() => AXHangar.zone('ink'));
+  await expect.poll(() => view(page)).toBe('zone:ink:');
+  const d = await data(server.base, admin);
+  const q = d.products.find(p => p.id === 'hz_cyan').quantity;
+  expect(await detail(page, 'hz_cyan')).toBe(q);
+  const r = await send(server.base, admin, ops({ cols: { products: col({ modified: [{ id: 'hz_cyan', before: { quantity: q }, after: { quantity: q - 4 } }] }) } }));
+  expect(r.status).toBe(200);
+  await expect.poll(() => detail(page, 'hz_cyan'), { timeout: 20000 }).toBe(q - 4);
+  await expect(page.locator('.axh-l[data-id="hz_cyan"]')).toContainText(String(q - 4));
+  await expect(page.locator('.axh-ribbon')).toContainText('Epson Ink Cyan');
+  expect(await page.evaluate(() => AXHangar.state().view.mode)).toBe('zone');            // the view stays where you were
   expect(errors).toEqual([]);
 });
