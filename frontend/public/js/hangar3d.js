@@ -387,11 +387,16 @@
         steps.push({ wait: 0.45, fn: function () { setLoad(0); } });
       }
       ribbonSay(ev);
-      return { ev: ev, steps: steps, i: 0, t: 0 };
+      return { ev: ev, steps: steps, i: 0, t: 0, until: performance.now() + 9000 };   // a slow phone never leaves a bay wrong
     }
     var doorOpen = 0, doorWant = 0, lift = 0, liftWant = 0;
     var tmpV = new T.Vector3();
+    function finishJob() {                                                     // past its time: land the change now
+      for (var i = job.i; i < job.steps.length; i++) if (job.steps[i].fn) job.steps[i].fn();
+      setLoad(0); liftWant = 0; doorWant = 0; job = null;
+    }
     function stepJob(dt) {
+      if (performance.now() > job.until) return finishJob();
       var s = job.steps[job.i];
       if (!s) { job = null; return; }
       if (s.door) doorWant = 1;
