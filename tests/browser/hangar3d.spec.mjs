@@ -5,7 +5,10 @@
    cartons; ✕ hides it (remembered) and «اعرض» brings it back; leaving the page and coming back keeps it working.
    5.09: a zone chip flies the camera to that zone and its bays show the REAL items at the REAL count (12 ink
    bottles, 3000 sheets = 6 reams …); a tap on a bay comes up to it with its card, ‹ › go to the next bay, ↩ goes
-   back; a change while you look at a zone changes the real items at once. */
+   back; a change while you look at a zone changes the real items at once.
+   5.10: a zone too big for one line of racks: the camera stands straight in front of the tapped bay and every line
+   of racks in front of it steps aside (it used to stand inside the line in front); ‹ › in the zone go to its
+   other line. */
 import { test, expect, watchErrors } from './fixtures.mjs';
 import { adminLogin, send, ops, col, data } from '../helpers/api.mjs';
 
@@ -187,5 +190,47 @@ test('a change made on another device while looking at a zone changes the real i
   await expect(page.locator('.axh-l[data-id="hz_cyan"]')).toContainText(String(q - 4));
   await expect(page.locator('.axh-ribbon')).toContainText('Epson Ink Cyan');
   expect(await page.evaluate(() => AXHangar.state().view.mode)).toBe('zone');            // the view stays where you were
+  expect(errors).toEqual([]);
+});
+
+test('a big zone on two lines: a tapped bay on the back line is faced straight on, the lines in front step aside', async ({ app: page, server }) => {
+  const admin = await seed(server);
+  const inks = ['Black', 'Yellow', 'Light Cyan', 'Light Magenta', 'Vivid Magenta', 'Grey', 'Light Grey', 'Matte Black'];
+  const r = await send(server.base, admin, ops({ cols: { products: col({ added: inks.map((n, i) => P('hz_ink' + i, 'MG Ink ' + n, 'حبر', 'خرطوشة', 4 + i, 1)) }) } }));
+  expect(r.status).toBe(200);
+  await page.reload();
+  await page.waitForFunction(() => typeof DB !== 'undefined' && DB.data.products.some(p => p.id === 'hz_ink7'), null, { timeout: 20000 });
+  const errors = watchErrors(page);
+  await openHangar(page);
+  await page.evaluate(() => AXHangar.zone('ink'));
+  await expect.poll(() => view(page)).toMatch(/^zone:ink:/);
+  const st = await page.evaluate(() => AXHangar.state());
+  expect(st.view.lines).toBeGreaterThan(1);                                             // 10 ink items: two lines of racks
+  await expect(page.locator('.axh-nav [data-a="next"]')).toBeVisible();                 // ‹ › the zone's other line
+  const first = st.view.line;
+  await page.locator('.axh-nav [data-a="next"]').click();
+  await expect.poll(() => page.evaluate(() => AXHangar.state().view.line)).not.toBe(first);
+  /* the ink bay furthest back, with a line of racks in front of it */
+  const ink = Object.entries(st.bays).filter(([, b]) => b.zone === 'ink');
+  const backZ = Math.min(...ink.map(([, b]) => b.z));
+  const id = ink.find(([, b]) => b.z === backZ)[0];
+  expect(Object.values(st.bays).some(b => b.z > backZ)).toBe(true);
+  await page.evaluate(i => AXHangar.bay(i), id);
+  await expect.poll(() => view(page)).toBe('bay:ink:' + id);
+  const s2 = await page.evaluate(() => AXHangar.state());
+  for (const b of Object.values(s2.bays)) { expect(b.cut).toBe(b.z > backZ); if (b.cut) expect(b.drawn).toBe(false); }   // every line in front steps aside — rack, cartons and real items — the rest stays
+  expect(s2.bays[id].detail).toBe(s2.bays[id].units);
+  await expect.poll(() => page.evaluate(() => AXHangar.state().flying), { timeout: 8000 }).toBe(false);
+  const off = await page.evaluate(i => { const r = document.querySelector('.axh-cv').getBoundingClientRect(), p = AXHangar.screenOf(i); return Math.abs(p.x - (r.left + r.width / 2)) / r.width; }, id);
+  expect(off).toBeLessThan(0.03);                                                        // straight in front of it
+  /* a tap on the canvas in front of it can't land on a hidden bay in the line that stepped aside */
+  const at = await page.evaluate(i => AXHangar.screenOf(i), id);
+  await page.mouse.click(at.x, at.y);
+  await expect.poll(() => view(page)).toBe('bay:ink:' + id);
+  await page.locator('.axh-nav [data-a="back"]').click();
+  await expect.poll(() => view(page)).toMatch(/^zone:ink:/);
+  await page.locator('.axh-zones button[data-zone=""]').click();
+  await expect.poll(() => view(page)).toBe('all::');
+  expect(Object.values(await page.evaluate(() => AXHangar.state().bays)).some(b => b.cut)).toBe(false);   // whole hangar: everything back
   expect(errors).toEqual([]);
 });

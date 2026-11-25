@@ -442,7 +442,10 @@
     /* looking at a line: the lines in front of it are lifted out of the way (back in the whole-hangar view) */
     function cutaway(zFocus) {
       Object.keys(lineGroups).forEach(function (lz) { lineGroups[lz].visible = zFocus === null || Number(lz) <= zFocus + 0.5; });
-      order.forEach(function (b) { b.cut = zFocus !== null && b.z > zFocus + 0.5; b.g.visible = !b.cut; if (b.label) b.label.cut = b.cut; });
+      order.forEach(function (b) {
+        b.cut = zFocus !== null && b.z > zFocus + 0.5; b.g.visible = !b.cut; if (b.label) b.label.cut = b.cut;
+        if (b.detail) b.detail.meshes.forEach(function (m) { m.visible = !b.cut && b.detail.shown > 0; });   // its real items too
+      });
       labelItems.forEach(function (l) { if (l.zone) l.cut = zFocus !== null; });               // zone signs: the chips do that job up close
     }
     function bayCapacity() { return 2 * 2 * 3 * 2 * LEVELS.length; }
@@ -552,7 +555,7 @@
       var kind = kindOf(b.p), units = unitsOf(b.p, kind), slots = slotsFor(kind, Math.min(units, 2000)), parts = KIND[kind].parts(b.p);
       var m4 = new T.Matrix4(), meshes = parts.map(function (pt) {
         var im = new T.InstancedMesh(pt[0], pt[1], Math.max(1, slots.length)); im.userData.sharedGeo = true; im.userData.sharedMat = true;
-        im.castShadow = !weak; im.receiveShadow = true; im.count = slots.length; im.visible = slots.length > 0;
+        im.castShadow = !weak; im.receiveShadow = true; im.count = slots.length; im.visible = slots.length > 0 && !b.cut;
         slots.forEach(function (s, i) { m4.makeRotationY(((i * 7919) % 11 - 5) * 0.01); m4.setPosition(b.x + s[0], s[1], b.z + s[2]); im.setMatrixAt(i, m4); });
         im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); details.add(im); return im;
       });
@@ -696,9 +699,9 @@
     function sync(first, instant) {
       var list = products(), sig = sigOf(list);
       if (sig !== layoutSig) {
-        var added = layoutSig && list.filter(function (p) { return !known[p.id]; }), keep = view.mode !== 'all' ? { mode: view.mode, zone: view.zone, id: view.id } : null;
+        var added = layoutSig && list.filter(function (p) { return !known[p.id]; }), keep = view.mode !== 'all' ? { mode: view.mode, zone: view.zone, id: view.id, line: view.line } : null;
         layoutSig = sig; buildRacks(list);
-        if (keep && order.some(function (b) { return b.zone === keep.zone; })) setView(keep.mode, keep.zone, keep.mode === 'bay' && bays[keep.id] ? keep.id : null, true); else setView('all', null, null, true);
+        if (keep && order.some(function (b) { return b.zone === keep.zone; })) setView(keep.mode === 'bay' && !bays[keep.id] ? 'zone' : keep.mode, keep.zone, keep.mode === 'bay' && bays[keep.id] ? keep.id : null, true, keep.line); else setView('all', null, null, true);
         if (added && added.length) say('<i>✨</i><span><b>صنف جديد</b> · ' + esc(added.map(function (p) { return p.name; }).join('، ')) + '</span>');
         known = {}; list.forEach(function (p) { known[p.id] = { q: N(p.quantity), min: N(p.minQuantity) }; });
         return;
@@ -722,7 +725,7 @@
     }
 
     /* ════════════ the camera: whole hangar → a zone → one bay ════════════ */
-    var view = { mode: 'all', zone: null, id: null };
+    var view = { mode: 'all', zone: null, id: null, line: null };
     var yaw = 0, pitch = 0, zoom = 1, pan = 0, fitR = 30, drag = null, pinch = null;
     var camPos = new T.Vector3(0, 30, 30), camLook = new T.Vector3(), wantPos = new T.Vector3(), wantLook = new T.Vector3(), flyPos = new T.Vector3(), flyLook = new T.Vector3(), fly = 0;
     function fitCamera() {
@@ -732,11 +735,15 @@
       fitR = Math.max((cW + 2.5) / Math.tan(hfov / 2), (cD + 3) / Math.tan(vfov / 2)) * (w < 600 ? 0.78 : 1.0);
     }
     function hfovHalf() { var w = host.clientWidth || 600, h = host.clientHeight || 340; return Math.atan(Math.tan(cam.fov * Math.PI / 360) * Math.max(0.5, w / h)); }
-    function zoneSpan(zone) {
-      var xs = [], z = null; order.forEach(function (b) { if (b.zone === zone) { xs.push(b.x); if (z === null || b.z > z) z = b.z; } });
+    /* a big zone can sit on more than one line of racks: the lines it uses, in layout order (its first bay's line first) */
+    function zoneLines(zone) { var zs = []; order.forEach(function (b) { if (b.zone === zone && zs.indexOf(b.z) < 0) zs.push(b.z); }); return zs; }
+    /* the part of a zone on one line of racks */
+    function zoneSpan(zone, line) {
+      if (line == null) line = zoneLines(zone)[0];
+      var xs = []; order.forEach(function (b) { if (b.zone === zone && b.z === line) xs.push(b.x); });
       if (!xs.length) return null;
       var lo = Math.min.apply(null, xs), hi = Math.max.apply(null, xs);
-      var zFront = z; return { cx: (lo + hi) / 2, half: (hi - lo) / 2 + BAY_W / 2, z: zFront, lo: lo, hi: hi };
+      return { cx: (lo + hi) / 2, half: (hi - lo) / 2 + BAY_W / 2, z: line, lo: lo, hi: hi };
     }
     function target(t) {
       var a = yaw + (reduce || drag || view.mode !== 'all' ? 0 : Math.sin(t * 0.00011) * 0.12);
@@ -744,32 +751,35 @@
         var r = fitR * zoom;
         wantPos.set(Math.sin(a) * r, r * (0.86 + pitch), Math.cos(a) * r + 2); wantLook.set(0, 1.0, -0.8);
       } else if (view.mode === 'zone') {
-        var sp = zoneSpan(view.zone); if (!sp) return;
+        var sp = zoneSpan(view.zone, view.line); if (!sp) return;
         var vis = Math.min(sp.half + 0.8, BAY_W * ((host.clientWidth || 600) < 600 ? 1.2 : 3.7));
         var d = Math.min(30, Math.max(6.5, vis / Math.tan(hfovHalf()))) * zoom, cx = sp.cx + pan;
         wantPos.set(cx + Math.sin(a) * d * 0.5, 2.8 + d * (0.2 + pitch), sp.z + RACK_D / 2 + d); wantLook.set(cx, 2.1, sp.z);
       } else {
         var b = bays[view.id]; if (!b) return;
-        var dd = Math.max(3.4, (BAY_W / 2 + 0.5) / Math.tan(hfovHalf())) * zoom;
-        var low = (host.clientWidth || 600) < 600 ? 0.75 : -0.15;               // a phone's card covers the bottom: keep the shelf in the top half
-        wantPos.set(b.x + Math.sin(a) * dd * 0.6, 2.6 + dd * (0.18 + pitch) - low, b.z + RACK_D / 2 + dd); wantLook.set(b.x, 2.05 - low, b.z);
+        var phone = (host.clientWidth || 600) < 600;
+        var dd = Math.max(3.4, (BAY_W / 2 + (phone ? 0.1 : 0.5)) / Math.tan(hfovHalf())) * zoom;   // the bay fills the width
+        /* straight in front of the bay, at the height of its middle shelf (on a phone looking a little lower, so the shelf sits above the card) */
+        wantPos.set(b.x + Math.sin(a) * dd * 0.6, phone ? 2.5 + dd * pitch : 3.2 + dd * (0.18 + pitch), b.z + RACK_D / 2 + dd); wantLook.set(b.x, phone ? 1.95 : 2.2, b.z);
       }
     }
-    function setView(mode, zone, id, instant) {
+    function setView(mode, zone, id, instant, line) {
       view.mode = mode; view.zone = zone || null; view.id = id || null; pan = 0; yaw = 0; pitch = 0; zoom = 1;
+      var lines = view.zone ? zoneLines(view.zone) : [];
+      view.line = mode === 'bay' && bays[view.id] ? bays[view.id].z : mode === 'zone' ? (lines.indexOf(line) >= 0 ? line : lines[0]) : null;
       if (mode === 'zone') {
-        var sp0 = zoneSpan(view.zone);
+        var sp0 = zoneSpan(view.zone, view.line);
         if (sp0 && (host.clientWidth || 600) < 600) { var fb = order.filter(function (b) { return b.zone === view.zone && b.z === sp0.z; }).sort(function (a, c) { return a.x - c.x; }), st0 = fb.find(function (b) { return N(b.p.quantity) > 0; }) || fb[0]; if (st0) pan = st0.x - sp0.cx; }
         else if (sp0) { var vis0 = Math.min(sp0.half + 0.8, BAY_W * 3.7); pan = Math.min(0, sp0.lo - BAY_W / 2 - 0.4 + vis0 - sp0.cx); }
       }
       flyPos.copy(camPos); flyLook.copy(camLook);
       if (mode === 'all') leaveDetail(); else enterDetail(view.zone);
-      var spc = mode === 'all' ? null : zoneSpan(view.zone); cutaway(spc ? spc.z : null);
+      cutaway(mode === 'all' ? null : view.line);                                // every line in front of the one you look at steps aside
       chips();
       navEl.hidden = mode === 'all';
-      navEl.querySelector('[data-a="prev"]').hidden = navEl.querySelector('[data-a="next"]').hidden = mode !== 'bay';
+      navEl.querySelector('[data-a="prev"]').hidden = navEl.querySelector('[data-a="next"]').hidden = !(mode === 'bay' || (mode === 'zone' && lines.length > 1));
       navEl.querySelector('.axh-back span').textContent = mode === 'bay' ? (ZONES.find(function (z) { return z.key === view.zone; }) || {}).title || 'القسم' : 'كل المخزن';
-      tipEl.textContent = mode === 'all' ? 'اسحب عشان تلف · دوس على قسم أو رف' : mode === 'zone' ? 'دوس على أي رف عشان تقرّب منه' : '‹ › للرف اللي جنبه';
+      tipEl.textContent = mode === 'all' ? 'اسحب عشان تلف · دوس على قسم أو رف' : mode === 'zone' ? (lines.length > 1 ? 'دوس على أي رف · ‹ › باقي القسم' : 'دوس على أي رف عشان تقرّب منه') : '‹ › للرف اللي جنبه';
       host.classList.toggle('axh-close', mode !== 'all'); host.classList.toggle('axh-bay', mode === 'bay');
       fly = instant ? 1 : 0;
       if (mode !== 'bay') closeCard();
@@ -779,6 +789,7 @@
       setView('bay', b.zone, id); openCard(b);
     }
     function neighbor(dir) {
+      if (view.mode === 'zone') { var ls = zoneLines(view.zone), k = ls.indexOf(view.line); if (ls.length > 1) setView('zone', view.zone, null, false, ls[(k + dir + ls.length) % ls.length]); return; }
       var list = order.filter(function (b) { return b.zone === view.zone; }), i = list.findIndex(function (b) { return b.id === view.id; });
       if (i < 0) return; var nb = list[(i + dir + list.length) % list.length]; focusBay(nb.id);
     }
@@ -793,7 +804,7 @@
       var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       if (Math.abs(dx) + Math.abs(dy) > 6) drag.moved = true;
       if (!drag.moved) return;
-      if (view.mode === 'zone') { var sp = zoneSpan(view.zone) || { half: 0 }; pan = Math.max(-sp.half, Math.min(sp.half, drag.pan - dx * 0.03)); pitch = Math.max(-0.2, Math.min(0.5, drag.pitch + dy * 0.003)); }
+      if (view.mode === 'zone') { var sp = zoneSpan(view.zone, view.line) || { half: 0 }; pan = Math.max(-sp.half, Math.min(sp.half, drag.pan - dx * 0.03)); pitch = Math.max(-0.2, Math.min(0.5, drag.pitch + dy * 0.003)); }
       else { yaw = Math.max(-0.85, Math.min(0.85, drag.yaw - dx * 0.005)); pitch = Math.max(view.mode === 'bay' ? -0.15 : -0.35, Math.min(0.5, drag.pitch + dy * 0.003)); }
     });
     window.addEventListener('pointerup', function (e) {
@@ -897,7 +908,7 @@
       var w = host.clientWidth, h = host.clientHeight;
       labelItems.forEach(function (l) {
         if (!l.el) return; v3.copy(l.pos).project(cam);
-        if (l.cut || v3.z > 1 || v3.x < -1.2 || v3.x > 1.2 || v3.y > 1.3) { l.el.style.display = 'none'; return; }
+        if (l.cut || (view.mode === 'bay' && l.bay && l.bay.id === view.id) || v3.z > 1 || v3.x < -1.2 || v3.x > 1.2 || v3.y > 1.3) { l.el.style.display = 'none'; return; }
         var lx = (v3.x + 1) / 2 * w; if (l.zone) lx = Math.max(46, Math.min(w - 46, lx));
         l.el.style.display = ''; l.el.style.transform = 'translate(' + lx.toFixed(1) + 'px,' + ((1 - v3.y) / 2 * h).toFixed(1) + 'px) translate(-50%,' + (l.below ? '0' : '-100%') + ')';   // close up: under the shelf, not over the items
       });
@@ -938,8 +949,8 @@
       zone: function (z) { if (!z) setView('all'); else setView('zone', z); }, bay: focusBay,
       state: function () {
         var o = {};
-        order.forEach(function (b) { o[b.id] = { shown: b.shown, state: b.state, cap: b.cap, zone: b.zone, kind: kindOf(b.p), units: unitsOf(b.p, kindOf(b.p)), detail: b.detail ? b.detail.shown : null }; });
-        return { bays: o, queue: queue.length, busy: !!job, ribbon: ribbon.textContent, view: { mode: view.mode, zone: view.zone, id: view.id }, flying: fly < 1, appearing: appear.length };
+        order.forEach(function (b) { o[b.id] = { shown: b.shown, state: b.state, cap: b.cap, zone: b.zone, kind: kindOf(b.p), units: unitsOf(b.p, kindOf(b.p)), detail: b.detail ? b.detail.shown : null, z: b.z, cut: !!b.cut, drawn: b.g.visible && (!b.detail || b.detail.meshes.some(function (m) { return m.visible; })) }; });
+        return { bays: o, queue: queue.length, busy: !!job, ribbon: ribbon.textContent, view: { mode: view.mode, zone: view.zone, id: view.id, line: view.line, lines: view.zone ? zoneLines(view.zone).length : 0 }, flying: fly < 1, appearing: appear.length };
       }
     };
   }
