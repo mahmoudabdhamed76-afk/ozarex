@@ -7194,3 +7194,62 @@ html .axcf a.axcf-act, html .axcf a.axcf-act:visited { color: #fff !important; }
 }
 tr.cust-row { cursor: pointer; }
 tr.cust-row:hover td { background: var(--ax-hover, rgba(0,0,0,.025)); }
+
+/* §80 · 5.08 «المخزن ثري دي» (js/hangar3d.js) — the live hangar at the top of «المخازن» */
+.axh { position: relative; height: 340px; border-radius: 22px; overflow: hidden; margin: 0 0 16px; background: #1A1412; touch-action: pan-y; user-select: none; -webkit-user-select: none;
+  box-shadow: 0 18px 40px -18px rgba(0,0,0,.6); transition: height .3s ease; contain: layout paint; }
+.axh.tall { height: 560px; }
+@media (min-width: 900px) { .axh { height: 420px; } .axh.tall { height: 640px; } }
+.axh .axh-cv { position: absolute; inset: 0; width: 100% !important; height: 100% !important; max-height: none !important; max-width: none !important; display: block; cursor: grab; }
+.axh .axh-cv:active { cursor: grabbing; }
+.axh-load { position: absolute; inset: 0; display: grid; place-content: center; gap: 10px; justify-items: center; color: #E9D9C9; font: 700 13px Cairo, system-ui, sans-serif;
+  background: radial-gradient(80% 70% at 50% 40%, #3A2A22, #1A1412); }
+.axh-load i { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(246,196,83,.25); border-top-color: #F6C453; animation: axhSpin .9s linear infinite; }
+@keyframes axhSpin { to { transform: rotate(360deg); } }
+.axh-labels, .axh-fx { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.axh-l, .axh-pop { position: absolute; left: 0; top: 0; will-change: transform; }
+.axh-lb { background: rgba(20,14,12,.84); border: 1px solid rgba(255,255,255,.14); color: #fff; border-radius: 8px; padding: 2px 7px; text-align: center; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  white-space: nowrap; font: 600 10px/1.3 Cairo, system-ui, sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+.axh-lb b { display: block; font-size: 10px; font-weight: 800; max-width: 96px; overflow: hidden; text-overflow: ellipsis; }
+.axh-lb span { color: #F6C453; }
+.axh-lb.low { border-color: #FFB061; } .axh-lb.low span { color: #FFC680; }
+.axh-lb.out { border-color: #FF3B30; background: rgba(120,16,12,.9); } .axh-lb.out span { color: #fff; font-weight: 800; }
+.axh-zone { font: 800 12.5px Cairo, system-ui, sans-serif; color: #1A1412; background: var(--c); padding: 4px 12px; border-radius: 99px; box-shadow: 0 4px 14px rgba(0,0,0,.4); white-space: nowrap; }
+.axh-hud { position: absolute; top: 12px; right: 14px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; color: #fff; font: 800 15px Cairo, system-ui, sans-serif; text-shadow: 0 2px 8px rgba(0,0,0,.6); pointer-events: none; }
+.axh-k { display: flex; flex-wrap: wrap; gap: 6px; }
+.axh-k span { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 99px; background: rgba(255,255,255,.14); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); text-shadow: none; }
+.axh-k span.low { background: rgba(255,140,60,.32); } .axh-k span.out { background: rgba(255,59,48,.42); }
+.axh-tools { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; }
+.axh-tools button { width: 34px; height: 34px; border-radius: 11px; border: 1px solid rgba(255,255,255,.16); background: rgba(20,14,12,.55); color: #fff; font: 700 15px/1 system-ui; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.axh-tools button:hover { background: rgba(255,255,255,.18); }
+.axh-ribbon { position: absolute; bottom: 40px; right: 14px; max-width: calc(100% - 28px); display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 14px;
+  background: rgba(20,14,12,.86); border: 1px solid rgba(246,196,83,.35); color: #fff; font: 600 12.5px/1.4 Cairo, system-ui, sans-serif; box-shadow: 0 8px 22px rgba(0,0,0,.4);
+  opacity: 0; transform: translateY(8px); transition: opacity .3s, transform .3s; pointer-events: none; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.axh-ribbon.show { opacity: 1; transform: none; }
+.axh-ribbon i { font-style: normal; font-size: 18px; }
+.axh-ribbon b { color: #F6C453; }
+.axh-pop { font: 900 16px Cairo, system-ui, sans-serif; padding: 3px 10px; border-radius: 99px; white-space: nowrap; box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+.axh-pop.in { background: #1E9E57; color: #fff; } .axh-pop.out { background: #E8641E; color: #fff; }
+.axh-card { position: absolute; left: 12px; bottom: 40px; width: 230px; max-width: calc(100% - 24px); padding: 12px 14px; border-radius: 16px; background: rgba(24,18,16,.94); border: 1px solid rgba(255,255,255,.14);
+  color: #fff; font: 13px/1.5 Cairo, system-ui, sans-serif; box-shadow: 0 14px 34px rgba(0,0,0,.5); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.axh-card[hidden] { display: none; }
+.axh-cn { display: block; font-size: 14px; padding-inline-end: 26px; }
+.axh-cq { font: 900 24px/1.2 Cairo, system-ui, sans-serif; color: #F6C453; margin: 4px 0 2px; }
+.axh-cq.low { color: #FFB061; } .axh-cq.out { color: #FF6B60; }
+.axh-card small { display: block; color: #CDBFB4; font-size: 11.5px; }
+.axh-ca { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; }
+.axh-ca button { height: 34px; border-radius: 10px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.08); color: #fff; font: 700 12.5px Cairo, system-ui, sans-serif; cursor: pointer; }
+.axh-ca button:hover { background: rgba(255,255,255,.16); }
+.axh-cx { position: absolute; top: 8px; left: 8px; width: 26px; height: 26px; border-radius: 8px; border: 0; background: rgba(255,255,255,.1); color: #fff; cursor: pointer; }
+.axh-tip { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font: 600 11px Cairo, system-ui, sans-serif; color: rgba(255,255,255,.72); background: rgba(0,0,0,.35);
+  padding: 3px 12px; border-radius: 99px; pointer-events: none; white-space: nowrap; }
+.axh-show { display: block; margin: 0 0 14px; padding: 9px 16px; border-radius: 12px; border: 1px dashed var(--ax-line-2, var(--border)); background: transparent; color: var(--ax-muted, var(--text-muted)); font: 700 13px var(--ax-font, inherit); cursor: pointer; }
+@media (max-width: 599px) {
+  .axh-l:not(.z):not(.axh-al) { display: none !important; }
+  .axh-hud { font-size: 13px; top: 10px; right: 12px; } .axh-k span { font-size: 10.5px; padding: 2px 8px; }
+  .axh-zone { font-size: 11px; padding: 3px 9px; }
+  .axh-tools button { width: 30px; height: 30px; font-size: 13px; }
+  .axh-card { left: 8px; right: 8px; width: auto; bottom: 36px; }
+  .axh-ribbon { right: 8px; bottom: 36px; font-size: 11.5px; }
+}
+@media (min-width: 900px) { .axh-lb, .axh-lb b { font-size: 11px; } .axh-lb { padding: 3px 8px; } .axh-lb b { max-width: 120px; } }

@@ -9767,7 +9767,7 @@ audio::-webkit-media-controls-panel { background: rgba(15,23,42,.9); }
 
     <footer class="app-footer">
       <div>جميع الحقوق محفوظة © <span class="js-year">2026</span> <span class="js-brand-name">Ozarex</span></div>
-      <div class="version">الإصدار 5.07</div>
+      <div class="version">الإصدار 5.08</div>
     </footer>
   </div>
 </div>
@@ -15490,6 +15490,7 @@ function renderInventory() {
   if (searchEl) {
     searchEl.addEventListener('input', e => { inventorySearch = e.target.value; renderInventory(); searchEl.focus(); });
   }
+  if (window.AXHangar) AXHangar.attach(root);   // 5.08 · «المخزن ثري دي» (js/hangar3d.js)
 }
 
 function renderProductsTab() {
@@ -24216,6 +24217,7 @@ function exportSuppliersCSV() {
 <script src="js/fulusi.js"></script>
 <script src="js/pushx.js"></script>
 <script src="js/consumables.js"></script>
+<script src="js/hangar3d.js"></script>
 <script src="js/staffadmin.js"></script>
 <script src="js/clients.js"></script>
 </body>
