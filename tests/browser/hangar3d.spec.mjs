@@ -8,7 +8,12 @@
    back; a change while you look at a zone changes the real items at once.
    5.10: a zone too big for one line of racks: the camera stands straight in front of the tapped bay and every line
    of racks in front of it steps aside (it used to stand inside the line in front); ‹ › in the zone go to its
-   other line. */
+   other line.
+   5.11: paper and parts look like the real thing — wrapped reams with size/weight (the opened last ream only as full
+   as it is), boxes with lids (the top one opened), film boxes, rolls; print heads in blisters, rollers, boards in
+   bags, fusers, belts, motors …, small parts in blue bins, anything else bagged with a barcode; a location tag on
+   every bay (B-04); tap one item → it lights up «الريم 7 من 7 · مفتوح»; what comes in / goes out while you look
+   close moves one by one; 🔍 finds an item and flies to it. */
 import { test, expect, watchErrors } from './fixtures.mjs';
 import { adminLogin, send, ops, col, data } from '../helpers/api.mjs';
 
@@ -232,5 +237,62 @@ test('a big zone on two lines: a tapped bay on the back line is faced straight o
   await page.locator('.axh-zones button[data-zone=""]').click();
   await expect.poll(() => view(page)).toBe('all::');
   expect(Object.values(await page.evaluate(() => AXHangar.state().bays)).some(b => b.cut)).toBe(false);   // whole hangar: everything back
+  expect(errors).toEqual([]);
+});
+
+test('real paper and parts: kinds, the opened ream, bins, location tags, one item tapped, one-by-one, find', async ({ app: page, server }) => {
+  const admin = await seed(server);
+  const r = await send(server.base, admin, ops({ cols: { products: col({ added: [P('hz_laser', 'A4 Laser 80g', 'ورق', 'ورقة', 3250, 500), P('hz_sens', 'حساس ورق', 'قطع غيار', 'قطعة', 30, 5)] }) } }));
+  expect(r.status).toBe(200);
+  await page.reload();
+  await page.waitForFunction(() => typeof DB !== 'undefined' && DB.data.products.some(p => p.id === 'hz_sens'), null, { timeout: 20000 });
+  const errors = watchErrors(page);
+  await openHangar(page);
+  const K = n => ({ name: n, unit: 'قطعة', type: 'قطع غيار' });
+  expect(await page.evaluate(list => list.map(n => AXHangar.kindOf({ name: n, unit: 'قطعة', type: 'قطع غيار' })), ['فيوزر', 'سير الطابعة', 'ترس سحب', 'حساس ورق', 'كابل فلات', 'موتور', 'طرمبة حبر', 'دامبر', 'كاب ستيشن', 'مفتاح تشغيل', 'رأس طباعة', 'بكرة سحب ورق', 'بورد تحكم']))
+    .toEqual(['fuser', 'belt', 'gear', 'sensor', 'cable', 'motor', 'pump', 'damper', 'cap', 'bag', 'head', 'roller', 'board']);
+  void K;
+  expect(await page.evaluate(() => [AXHangar.specOf({ name: 'A4 Photo (200g) Vivid' }), AXHangar.specOf({ name: 'Fuji Film 14×17' }), AXHangar.specOf({ name: 'ورق A3 260جم' })].map(s => s.size + '|' + s.gsm)))
+    .toEqual(['A4|200g', '14×17|', 'A3|260g']);
+  /* paper: 3250 sheets = 6 reams + one opened, half full */
+  await page.evaluate(() => AXHangar.zone('paper'));
+  await expect.poll(() => view(page)).toMatch(/^zone:paper:/);
+  const st = await page.evaluate(() => AXHangar.state());
+  expect(st.bays.hz_laser.detail).toBe(7);
+  expect(st.bays.hz_laser.fill).toBe(0.5);
+  for (const b of Object.values(st.bays)) expect(b.loc).toMatch(/^[A-Z]-\d\d$/);        // every bay has its location tag
+  expect(new Set(Object.values(st.bays).map(b => b.loc)).size).toBe(Object.keys(st.bays).length);
+  /* tap one item: the 7th ream, the opened one */
+  await page.evaluate(() => AXHangar.bay('hz_laser'));
+  await expect.poll(() => view(page)).toBe('bay:paper:hz_laser');
+  await expect.poll(() => page.evaluate(() => AXHangar.state().flying), { timeout: 8000 }).toBe(false);
+  await expect(page.locator('.axh-card')).toContainText('مكانه في الهانجر: ' + st.bays.hz_laser.loc);
+  const at = await page.evaluate(() => AXHangar.itemScreen('hz_laser', 6));
+  await page.mouse.click(at.x, at.y);
+  await expect.poll(() => page.evaluate(() => AXHangar.state().pick && AXHangar.state().pick.i)).toBe(6);
+  await expect(page.locator('.axh-pick')).toContainText('الريم 7 من 7');
+  await expect(page.locator('.axh-pick')).toContainText('مفتوح · 250 ورقة');
+  expect(await page.evaluate(() => AXHangar.state().view.id)).toBe('hz_laser');
+  /* in and out from another device while looking: one by one, then the right count */
+  let q = 3250;
+  const change = async to => { const rr = await send(server.base, admin, ops({ cols: { products: col({ modified: [{ id: 'hz_laser', before: { quantity: q }, after: { quantity: to } }] }) } })); expect(rr.status).toBe(200); q = to; };
+  await change(4250);                                                                     // +1000 sheets: 9 reams (8 full + 1 half)
+  await expect.poll(() => page.evaluate(() => AXHangar.state().bays.hz_laser.detail), { timeout: 20000 }).toBe(9);
+  await change(1500);                                                                     // −2750: 3 reams, no opened one
+  await expect.poll(() => page.evaluate(() => { const b = AXHangar.state().bays.hz_laser; return b.detail + '|' + b.fill; }), { timeout: 20000 }).toBe('3|1');
+  await expect.poll(() => page.evaluate(() => AXHangar.state().leaving), { timeout: 10000 }).toBe(0);
+  /* small parts sit in blue bins */
+  await page.evaluate(() => AXHangar.bay('hz_sens'));
+  await expect.poll(() => view(page)).toBe('bay:parts:hz_sens');
+  const sens = (await page.evaluate(() => AXHangar.state())).bays.hz_sens;
+  expect(sens.detail).toBe(30);
+  expect(sens.bins).toBeGreaterThan(0);
+  /* 🔍 find */
+  await page.locator('.axh-tools [data-a="find"]').click();
+  await page.locator('.axh-find input').fill('laser');
+  await expect(page.locator('.axh-fr button')).toHaveCount(1);
+  await page.locator('.axh-find input').press('Enter');
+  await expect.poll(() => view(page)).toBe('bay:paper:hz_laser');
+  await expect(page.locator('.axh-find')).toBeHidden();
   expect(errors).toEqual([]);
 });

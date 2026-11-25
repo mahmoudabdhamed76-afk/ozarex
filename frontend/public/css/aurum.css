@@ -7273,6 +7273,25 @@ tr.cust-row:hover td { background: var(--ax-hover, rgba(0,0,0,.025)); }
 .axh-tip { bottom: 50px; }
 .axh.axh-close .axh-tip { bottom: 92px; }
 .axh.axh-bay .axh-tip { display: none; }
+/* 5.11 · a tapped item, the find box, the location line */
+.axh-pick { position: absolute; left: 0; top: 0; pointer-events: none; padding: 5px 10px; border-radius: 10px; background: rgba(255,248,225,.96); color: #2A1F14; box-shadow: 0 6px 18px rgba(0,0,0,.35);
+  font: 700 12px Cairo, system-ui, sans-serif; white-space: nowrap; text-align: center; animation: axhPick .25s ease-out; }
+.axh-pick b { display: block; font-size: 12.5px; }
+.axh-pick span { display: block; font-size: 10.5px; color: #7A5B2E; }
+.axh-pick::after { content: ''; position: absolute; left: 50%; bottom: -5px; margin-left: -5px; border: 5px solid transparent; border-bottom: 0; border-top-color: rgba(255,248,225,.96); }
+@keyframes axhPick { from { opacity: 0; margin-top: 6px; } to { opacity: 1; margin-top: 0; } }
+.axh-find { position: absolute; top: 50px; left: 10px; width: min(300px, calc(100% - 20px)); z-index: 6; background: rgba(20,14,12,.9); border: 1px solid rgba(255,255,255,.16); border-radius: 14px; padding: 8px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 12px 30px rgba(0,0,0,.4); }
+.axh-find[hidden] { display: none; }
+.axh-find input { width: 100%; height: 36px; border-radius: 10px; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.08); color: #fff; padding: 0 10px; font: 600 14px Cairo, system-ui, sans-serif; outline: none; }
+.axh-find input:focus { border-color: #F6C453; }
+.axh-fr { max-height: 210px; overflow-y: auto; margin-top: 6px; display: grid; gap: 4px; }
+.axh-fr button { text-align: right; border: 0; border-radius: 9px; padding: 6px 9px; background: rgba(255,255,255,.06); color: #fff; cursor: pointer; font: 700 12.5px Cairo, system-ui, sans-serif; }
+.axh-fr button:hover, .axh-fr button:focus { background: rgba(246,196,83,.22); }
+.axh-fr button span { display: block; font-size: 10.5px; font-weight: 600; opacity: .7; }
+.axh-fr em { font-style: normal; font-size: 12px; opacity: .7; padding: 6px; }
+.axh-card .axh-loc b { color: #F6C453; letter-spacing: .5px; }
+@media (max-width: 599px) { .axh.axh-close .axh-card small.axh-loc + small { display: block; } .axh-tools { gap: 4px; } .axh-tools button { width: 31px; height: 31px; } }
 .axh-ribbon, .axh-card { bottom: 50px; }
 .axh.axh-close .axh-ribbon, .axh.axh-close .axh-card { bottom: 92px; }
 .axh-labels.zfocus[data-zone="paper"] .axh-l[data-zone]:not([data-zone="paper"]), .axh-labels.zfocus[data-zone="ink"] .axh-l[data-zone]:not([data-zone="ink"]),
